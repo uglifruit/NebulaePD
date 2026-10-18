@@ -483,6 +483,23 @@ def gloop_grid_test(wav=None):
     ])
 
 
+def gloop_pitch_test(wav=None):
+    """Heads 1+2 on a 1 s loop. Head 2 (Source on): Source+Pitch from 0.5 (baseline) to 0.75 = +12 -> 2x.
+    Then an alt-reset jump to 0 (ignored). Then Pitch encoder +12 (0.8) -> ALL heads x2: head 1 0.5 s, head 2 0.25 s."""
+    return dict(wav=wav, steps=[
+        (10, "\\; blend 1"),
+        (1100, "\\; record 1"),
+        (1300, "\\; gl_blip bang"),
+        (2100, "\\; record 0 \\; h2_vol 1"),
+        (3000, "\\; source 1"),
+        (3500, "\\; pitch_alt 0.5"),
+    ] + [(3520 + i * 20, f"\\; pitch_alt {0.5 + 0.025 * (i + 1):g}") for i in range(10)] + [   # turned like an encoder
+        (5000, "\\; pitch_alt 0"),
+        (6000, "\\; pitch 0.8"),
+        (8500, "\\; pd quit"),
+    ])
+
+
 if __name__ == "__main__":
     import gloop
     write("lib/nebulae_controls.pd", controls_canvas(top=True))

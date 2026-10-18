@@ -48,7 +48,8 @@ def controls_ui(Canvas):
     c.connect(d, 0, m, 0)
     c.connect(m, 0, sp, 0)
     # defaults until the knobs report (the module streams real values straight away)
-    dflt = c.msg(600, 55, f"\\; gl_xf {5 * SR // 1000} \\; gl_wet 1 \\; gl_degr 0 \\; gl_wobd 0 \\; gl_grid 0")
+    dflt = c.msg(600, 55, f"\\; gl_xf {5 * SR // 1000} \\; gl_wet 1 \\; gl_degr 0 \\; gl_wobd 0 \\; gl_grid 0 "
+                          f"\\; gl_transp 1")
     c.connect(lb, 0, dflt, 0)
     # head select = 1 + source + 2*freeze, read from the latch states themselves, so the Source and Freeze LEDs
     # always show the selected head (1: both off, 2: Source, 3: Freeze, 4: both) - also after a power cycle.
@@ -131,11 +132,15 @@ def controls_ui(Canvas):
     return c
 
 
-def takeover(c, x, y, knob, param, convert):
+def takeover(c, x, y, knob, param, convert, idle_ms=None, max_jump=None):
     """Per-knob takeover for the selected head: the knob only drives a head after moving 0.02 from where it was
-    when that head was selected. `convert` is a list of object texts applied to the value before sending."""
+    when that head was selected. `convert` is a list of object texts (or a builder) applied before sending.
+    idle_ms: if no message arrived for this long (e.g. alt values, which only stream while Source is held), the next
+             value becomes the new baseline instead of a move.
+    max_jump: a change bigger than this in one message (e.g. an alt-reset click) re-baselines instead of moving."""
     r = c.obj(x, y, f"r {knob}")
-    t = c.obj(x, y + 22, "t f f f")
+    t = c.obj(x, y + 22, "t f f b f" if idle_ms else "t f f f")
+    last_out = 3 if idle_ms else 2
     last = c.obj(x + 120, y + 44, "f")           # last knob value (cold)
     diff = c.obj(x + 60, y + 44, "-")             # v - snapshot
     ab = c.obj(x + 60, y + 66, "abs")
@@ -144,14 +149,37 @@ def takeover(c, x, y, knob, param, convert):
     opn = c.msg(x + 60, y + 132, "1")
     spg = c.obj(x, y + 154, "spigot")
     c.connect(r, 0, t, 0)
-    c.connect(t, 2, last, 1)
+    c.connect(t, last_out, last, 1)
     c.connect(t, 1, diff, 0)
     c.connect(diff, 0, ab, 0)
-    c.connect(ab, 0, gt, 0)
     c.connect(gt, 0, s1, 0)
     c.connect(s1, 0, opn, 0)
     c.connect(opn, 0, spg, 1)
     c.connect(t, 0, spg, 0)
+    # re-baseline: snapshot := current value, close the spigot
+    rb = c.obj(x + 200, y + 66, "t b b")
+    rbz = c.msg(x + 200, y + 88, "0")
+    c.connect(rb, 1, last, 0)
+    c.connect(rb, 0, rbz, 0)
+    c.connect(rbz, 0, spg, 1)
+    if max_jump:
+        mj = c.obj(x + 60, y + 66 + 11, f"moses {max_jump}")
+        c.connect(ab, 0, mj, 0)
+        c.connect(mj, 0, gt, 0)
+        c.connect(mj, 1, rb, 0)
+    else:
+        c.connect(ab, 0, gt, 0)
+    if idle_ms:
+        tb = c.obj(x + 260, y + 22, "t b b")
+        tm = c.obj(x + 260, y + 44, "timer")
+        c.connect(t, 2, tb, 0)
+        c.connect(tb, 1, tm, 1)
+        c.connect(tb, 0, tm, 0)
+        idl = c.obj(x + 260, y + 66, f"> {idle_ms}")
+        si = c.obj(x + 260, y + 88, "sel 1")
+        c.connect(tm, 0, idl, 0)
+        c.connect(idl, 0, si, 0)
+        c.connect(si, 0, rb, 0)
     prev = spg
     yy = y + 176
     if callable(convert):
@@ -186,15 +214,26 @@ def takeover(c, x, y, knob, param, convert):
 def knobs_heads(Canvas):
     """Primary knobs -> parameters of the selected head (with takeover)."""
     c = Canvas("#N canvas 0 50 1400 600 %NAME% 0;")
-    c.text(10, 5, "Selected-head knobs (takeover): start=pos size=size density=jitter overlap=pan speed=rate pitch=semitones")
+    c.text(10, 5, "Selected-head knobs (takeover): start=pos size=size density=jitter overlap=pan speed=rate. "
+                  "pitch_alt=interval. pitch (+1V/oct) = transpose ALL heads")
     takeover(c, 10, 30, "start", "pos", [])
     takeover(c, 240, 30, "size", "size", [])
     takeover(c, 470, 30, "density", "jit", [])
     takeover(c, 700, 30, "overlap", "pan", [])
     # speed: Nebulae curve. 0.5 = stop, 0.625 = x1 fwd, 0.375 = x1 rev, ends = x4.
     takeover(c, 930, 30, "speed", "spd", spd2rate)
-    # pitch: semitones = round(pitch*60) - 36 (0.6 = unison), ratio = 2^(st/12)
-    takeover(c, 1160, 30, "pitch", "pit", ["* 60", "+ 0.5", "int", "- 36", "* 0.057762", "exp"])
+    # Source + Pitch: interval of the selected head, semitones = round(pitch_alt*48) - 24 (0.5 = unison, +-2 oct).
+    # Alt values only stream while Source is held: re-baseline after 150 ms of silence; ignore reset-click jumps.
+    takeover(c, 1160, 30, "pitch_alt", "pit", ["* 48", "+ 0.5", "int", "- 24", "* 0.057762", "exp"],
+             idle_ms=150, max_jump=0.2)
+    # Pitch encoder + 1V/oct: transpose ALL heads, semitones = round(pitch*60) - 36 (click 0.6 = unison)
+    x, y = 1450, 30
+    prev = c.obj(x, y, "r pitch")
+    for txt in ["* 60", "+ 0.5", "int", "- 36", "change", "* 0.057762", "exp", "s gl_transp"]:
+        y += 22
+        o = c.obj(x, y, txt)
+        c.connect(prev, 0, o, 0)
+        prev = o
     return c
 
 
@@ -484,11 +523,18 @@ def head(Canvas, n):
 
     # rate = spd * pit * wobble; phasor freq = rate * SR / size
     rsp = c.obj(750, 30, f"r h{n}_spd")
-    rpi = c.obj(850, 30, f"r h{n}_pit")
+    rpi = c.obj(850, 8, f"r h{n}_pit")         # this head's interval ratio
+    rtr = c.obj(950, 8, "r gl_transp")         # global transpose ratio (pitch encoder + 1V/oct)
+    ptr = c.obj(850, 30, "* 1")
+    ttr = c.obj(950, 30, "t b f")
+    c.connect(rpi, 0, ptr, 0)
+    c.connect(rtr, 0, ttr, 0)
+    c.connect(ttr, 1, ptr, 1)
+    c.connect(ttr, 0, ptr, 0)
     rate = c.obj(750, 74, "*")
     tpi = c.obj(850, 52, "t b f")
     c.connect(rsp, 0, rate, 0)
-    c.connect(rpi, 0, tpi, 0)
+    c.connect(ptr, 0, tpi, 0)
     c.connect(tpi, 1, rate, 1)
     c.connect(tpi, 0, rate, 0)     # bang re-outputs with new pitch
     trate = c.obj(750, 96, "t f f")

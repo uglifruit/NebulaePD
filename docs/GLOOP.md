@@ -15,7 +15,7 @@ those encoders. So the selected head is encoded in the **Source and Freeze latch
 | **density** | jitter of the selected head (how far the sub-loop moves each repeat) | volume, head 3 |
 | **overlap** | pan of the selected head (CCW = L, CW = R) | volume, head 4 |
 | **speed** | rate of the selected head: centre stops, click = 1× fwd, click again = 1× reverse, ends = 4× | — |
-| **pitch** | transpose the selected head in semitones, 1V/oct (click position = unison) | — |
+| **pitch** (+1V/oct) | transpose **all heads** in semitones (click position = unison); heads keep their intervals | **interval of the selected head**, ±2 oct (0.5 = unison) |
 | **window** | crossfade at the sub-loop edges, 5 ms – 1 s (all heads) | tape wobble (all heads) |
 | **blend** | input (dry) ↔ loop mix | loop degrade per pass |
 | **Source** (tap) + **Freeze** | select the head (table below) | — (holding Source is the alt layer) |
@@ -33,6 +33,9 @@ those encoders. So the selected head is encoded in the **Source and Freeze latch
 Tap Source to flip 1↔2 / 3↔4, press Freeze to flip 1↔3 / 2↔4. The Nebulae remembers both states across power
 cycles, so the LEDs and the selected head always agree.
 
+- **Pitch is global** because the encoder and the V/oct jack arrive as one value: per-head V/oct would leave other heads
+  stuck on random notes. Per-head pitch is the alt interval. It uses takeover too, re-baselined on each Source hold, and
+  jumps over 0.2 in one message (the Nebulae's Source+Pitch-click alt reset) are ignored.
 - **Knob takeover:** after you select a head, a knob only affects that head once you turn it, so heads keep their
   settings when you switch. CV into a knob counts as movement, so CV modulates the selected head.
 - At load the head follows the Source/Freeze LEDs. Head 1 starts at full volume; heads 2–4 are muted until you set
@@ -52,7 +55,8 @@ cycles, so the LEDs and the selected head always agree.
 ## Differences from Gloop / not implemented yet
 - Effects pass still to do: delay, reverb, bit crusher, wavefolder, tape saturation/hiss/age, tilt EQ, wet/dry.
   (Degrade and wobble are in.)
-- No assignable CV targets: Nebulae CV inputs are hard-wired to knobs, so CV modulates the selected head's parameter.
+- No assignable CV targets: Nebulae CV inputs are hard-wired to knobs. CV into start/size/density/overlap/speed modulates
+  the selected head; V/oct transposes all heads (like Gloop's `spdA` in semitone mode).
 - No one-shot / jump triggers, no "replace" write mode (overdub only), no fine-sensitivity mode.
 - Crossfade is a fade-out/fade-in at the sub-loop edges (a dip at long settings), not Gloop's overlapping crossfade.
 - Gloop's input is mono; this records stereo.
@@ -60,5 +64,6 @@ cycles, so the LEDs and the selected head always agree.
 ## Testing on a PC
 `python tools/gen.py` builds `sim/test_03_gloop.pd`; `pd -nogui -batch -r 48000 -open sim/test_03_gloop.pd` records a 1 s
 loop from a test blip, switches heads via Source/Freeze, pauses and resumes a head, and restarts all heads. `tools/gen.py` also has `gloop_full_test` (overdub, size, reverse, degrade,
-clear) and `gloop_grid_test` (grid, pan, jitter, wobble). Pass `wav=` to record the output, then inspect it with
-`python tools/wavpeaks.py`. All three scenarios pass in Pd 0.57; not yet run on the module.
+clear), `gloop_grid_test` (grid, pan, jitter, wobble) and `gloop_pitch_test` (per-head interval, ignored alt-reset jump,
+global transpose). Pass `wav=` to record the output, then inspect it with
+`python tools/wavpeaks.py`. All four scenarios pass in Pd 0.57; not yet run on the module.
