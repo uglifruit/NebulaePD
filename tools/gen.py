@@ -500,15 +500,67 @@ def gloop_pitch_test(wav=None):
     ])
 
 
+GT_ALL0 = "\\; blend 1 \\; size 0 \\; density 0 \\; window 0 \\; overlap 0 \\; start 0"
+
+
+def glitch_glitch_test(wav=None):
+    """Clock every 500 ms from 1.2 s (ramps: odd beats 1.0, even 0.5). Passthrough -> Record (force): each beat = the
+    previous one -> /4 -> reverse every slice -> degrade -> no force, prob 0 = passthrough -> Start gate on/off."""
+    return dict(wav=wav, steps=[
+        (10, GT_ALL0),
+        (1200, "\\; gt_tclkon 1"),
+        (3450, "\\; record 1"),
+        (5450, "\\; size 0.7"),
+        (7450, "\\; density 1"),
+        (9450, "\\; window 1 \\; overlap 1"),
+        (11450, "\\; record 0 \\; density 0 \\; window 0 \\; overlap 0 \\; size 0"),
+        (12450, "\\; start 1"),
+        (13450, "\\; start 0"),
+        (14500, "\\; pd quit"),
+    ])
+
+
+def glitch_stutter_test(wav=None):
+    """Stutter: Source on + Record (force), 8 slices -> scrambled eighths. Then repeat 1 (one slice per beat), then
+    drift 1 (slices from earlier beats), then shuffle prob 0 without force = passthrough."""
+    return dict(wav=wav, steps=[
+        (10, GT_ALL0 + " \\; source 1"),
+        (1200, "\\; gt_tclkon 1"),
+        (3450, "\\; record 1 \\; size 1"),
+        (6450, "\\; overlap 1"),
+        (8450, "\\; overlap 0 \\; density 1"),
+        (10450, "\\; record 0 \\; density 0"),
+        (11500, "\\; pd quit"),
+    ])
+
+
+def glitch_freeze_test(wav=None):
+    """Glitch force /1, freeze at 3.45 s then mute the input: the beat before the freeze keeps repeating (one level).
+    Unfreeze + unmute at 6.45 s: live alternating beats return within two beats."""
+    return dict(wav=wav, steps=[
+        (10, GT_ALL0 + " \\; record 1"),
+        (1200, "\\; gt_tclkon 1"),
+        (3450, "\\; freeze 1"),
+        (3550, "\\; gt_tmute 1"),
+        (6450, "\\; freeze 0 \\; gt_tmute 0"),
+        (9000, "\\; pd quit"),
+    ])
+
+
 if __name__ == "__main__":
     import gloop
+    import glitch
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
     write("patches/02_echo.pd", echo_patch())
     write("patches/03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas))
+    write("patches/04_glitch.pd", glitch.glitch_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
     write("sim/test_03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas, level_printer=level_printer,
                                                     test=gloop_basic_test()))
+    for name, scen in [("glitch", glitch_glitch_test), ("stutter", glitch_stutter_test),
+                       ("freeze", glitch_freeze_test)]:
+        write(f"sim/test_04_{name}.pd", glitch.glitch_patch(Canvas, controls_canvas, test=scen()))

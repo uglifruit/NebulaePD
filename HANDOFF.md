@@ -19,6 +19,7 @@ Last updated 2026-10-18. Read this first, then `docs/PROTOCOL.md`, then the doc 
 | Item | State |
 |---|---|
 | `patches/03_gloop.pd` | Gloop-style 4-head looper. **Confirmed working on hardware.** User guide: `patches/03_gloop_README.md`; design: `docs/GLOOP.md` |
+| `patches/04_glitch.pd` | Port of the owner's Workshop Computer #57 Glitch (clock-synced beat-repeater, Glitch + Stutter modes). Offline-tested, **awaiting hardware test**. Guide: `patches/04_glitch_README.md`; design: `docs/GLITCH.md`; builder `tools/glitch.py` |
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
@@ -82,7 +83,9 @@ root, and commit both. `.gitattributes` keeps `.pd/.instr/.csd` LF.
   - no `expr`, and no signal into `lop~`'s cutoff inlet (send floats);
   - `[*~ <arg>]` when the right inlet takes floats (argless `*~` wants a signal);
   - `[table]` rather than `[array define]`;
-  - escape `,` and `;` in comments (`gen.py`'s `text()` does this).
+  - escape `,` and `;` in comments (`gen.py`'s `text()` does this);
+  - write `$1` as `\$1` in generated text (Python `"seed \\$1"`); an unescaped `$1` expands at load time
+    ("argument number out of range").
 
 ## 5. How to test (do this before handing anything over)
 ```bash
@@ -94,6 +97,10 @@ PD="/c/Program Files/Pd/bin/pd.com"                   # Pd 0.57 is installed
 - Test builds swap `adc~` for a blip source and script control messages as `(ms, msg)` steps. See `gloop_*_test()` and
   `echo_patch(test=...)` in `gen.py`.
 - Pass `wav=<absolute Windows path>` to record the output, then run `python tools/wavpeaks.py file.wav`.
+- **`writesf~` drops audio in `-batch` runs.** They finish in well under a second, its disk thread falls behind, and
+  WAVs come out short and time-shifted. 04_glitch tests record with `tabwrite~` into tables and save with
+  `soundfiler write` at quit, which is deterministic. Older gloop and echo WAV results may have been affected.
+- `pd.com -batch` is synchronous: a whole test runs in a fraction of a second.
 - **WAV time 0 = DSP start = real 0.3 s.**
 - Trust WAV peaks, not `env~` prints; `env~` readings misled twice.
 - For gloop debugging, set `gloop.DEBUG_HEAD = n` to print a head's phase and index.

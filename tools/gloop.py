@@ -18,12 +18,12 @@ BUF = 120 * SR + 512  # 2 minutes + guard samples for tabread4~
 DEBUG_HEAD = 0        # tests: set to a head number to print its phase/index
 
 
-def press(c, x, y, name, rising_only=False):
+def press(c, x, y, name, rising_only=False, primed="gl_primed"):
     """[r name] -> [change] -> primed spigot (-> [sel 1]); returns the object whose outlet 0 fires on a press."""
     r = c.obj(x, y, f"r {name}")
     ch = c.obj(x, y + 22, "change")
     sp = c.obj(x, y + 44, "spigot")
-    rp = c.obj(x + 60, y + 22, "r gl_primed")
+    rp = c.obj(x + 60, y + 22, f"r {primed}")
     c.connect(r, 0, ch, 0)
     c.connect(ch, 0, sp, 0)
     c.connect(rp, 0, sp, 1)
