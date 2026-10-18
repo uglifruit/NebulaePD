@@ -428,7 +428,8 @@ def write(path, canvas):
 
 
 def gloop_basic_test(wav=None):
-    """Record a 1 s loop with a blip 0.2 s in; head 1 plays it; then select head 2 (Source tap) at 2x speed."""
+    """1 s loop (blip 0.2 s in) on head 1 -> head 2 (Source on) at 2x -> pause head 2 (File) -> head 4 (Source+Freeze)
+    at 2x -> Reset restarts all heads -> resume head 2 (File, after selecting it again)."""
     return dict(wav=wav, steps=[
         (10, "\\; blend 1"),
         (1100, "\\; record 1"),
@@ -436,7 +437,16 @@ def gloop_basic_test(wav=None):
         (2100, "\\; record 0"),
         (4500, "\\; source 1 \\; h2_vol 1"),
         (4600, "\\; speed 0.8125"),
-        (7000, "\\; pd quit"),
+        (6000, "\\; filestate 1"),
+        (6050, "\\; filestate 0"),
+        (7000, "\\; freeze 1 \\; h4_vol 1"),
+        (7100, "\\; speed 0.85"),
+        (8500, "\\; reset 1"),
+        (8510, "\\; reset 0"),
+        (9500, "\\; freeze 0"),
+        (9600, "\\; filestate 1"),
+        (9650, "\\; filestate 0"),
+        (11000, "\\; pd quit"),
     ])
 
 
