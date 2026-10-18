@@ -1,0 +1,37 @@
+nebconfigbegin
+sr,48000
+ksmps,64
+-B,512
+-b,128
+nebconfigend
+
+; GENDYN (Generation Dynamique Stochastique) - Xenakis dynamic stochastic synthesis via the gendy opcode.
+; Original: Christopher Konopka (Qu-Bit), V1 port by Chris Erin. MIT, from QB_Nebulae_V2/Instruments/GENDYN.
+; Rewritten to avoid every construct that only the original used (it boot-loops on hardware; see docs/INSTR.md):
+;   - ASCII-only, ';' comments only (original: /* */ block with UTF-8 accents)
+;   - no global-space init lines (original: gk*/initcps init in instr 0)
+;   - no '\' line continuation
+;   - locals instead of port writing back into the same global
+;   - stereo outs (original: mono out -> left channel only)
+;   - min/max frequency ordered (original let pitch > speed invert them)
+;
+; Controls: pitch/speed = frequency range, window = distribution (0-5), start = amp dist param,
+;           size = dur dist param, density = amp scale, overlap = dur scale, blend = control points (1-20)
+
+instr 1
+  ksel   portk gkwindow * 5, 0.06
+  kadpar portk 0.001 + gkloopstart * 0.999, 0.06
+  kddpar portk 0.001 + gkloopsize * 0.999, 0.06
+  kf1    portk 13 + gkpitch * 867, 0.06
+  kf2    portk 13 + gkspeed * 867, 0.06
+  kmin   min kf1, kf2
+  kmax   max kf1, kf2
+  kascl  portk 0.01 + gkdensity * 0.99, 0.06
+  kdscl  portk 0.01 + gkoverlap * 0.99, 0.06
+  knum   portk 1 + gkblend * 19, 0.06, 20
+
+  agdx gendy 0.5, ksel, ksel, kadpar, kddpar, kmin, kmax, kascl, kdscl, 20, knum
+  alp  butterlp agdx, 4750
+  aout balance alp, agdx
+  outs aout, aout
+endin

@@ -1,8 +1,9 @@
 # Csound `.instr` development notes
 
 Sources: `reference/Nebulae_Development_Reference.pdf`, upstream `Code/nebulae/conductor.py`, `Code/instr/*`.
-Csound is **not installed** on this PC yet, so `.instr` files here are unverified until tested on hardware or via the
-official Instr Tester (`Instruments/Instr Tester/Neb_Instr_Tester.zip` in the upstream repo).
+Desktop check: `python tools/instr2csd.py file.instr out.csd --set pitch=0.6 ...` builds the same orchestra the module's
+`conductor.py` builds, then `csound -n out.csd` compiles and runs it offline (tested with Csound 6.18.1 portable).
+The module runs an **older** Csound (Arch ARM era, version unconfirmed), so desktop success is necessary, not sufficient.
 
 ## File layout
 ```
@@ -40,6 +41,21 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
   root to recover.
 - Test IO (`e_testio.instr`) is the recommended minimal template.
 
+## How a bad instrument becomes a boot loop (from upstream nebulae.py)
+1. The selected bank/instr is saved to `Code/config/bootinstr.txt` and reloaded on every start.
+2. `start()` calls `compileOrc()` **without checking the result**, then starts the performance thread.
+3. If Csound fails (compile error, crash, perf thread ends), `run()` exits / Python dies, systemd restarts
+   `nebulae.service`, which reloads the same instr -> loop every few seconds (boot LEDs each time).
+4. Recovery: replace the file's contents with a working instrument under the **same name** (owner-verified), or remove
+   it so `nebulae.py` falls back to the factory granular looper. `neb_log.txt` on the USB gets a new block per restart.
+
 ## Known issues
-- **GENDYN (`Instruments/GENDYN/gendyn.instr`) boot-loops (reboots every few seconds) on the owner's unit.**
-  Excluded from this repo and not investigated yet. Do not copy it to the USB drive.
+- **GENDYN (`Instruments/GENDYN/gendyn.instr`) boot-loops on the owner's unit.** Investigation (2026-10-18):
+  - Compiles and runs cleanly for 60 s in desktop Csound 6.18 at default and extreme knob settings - DSP is sound;
+    `gendy` is built into libcsound, so not a missing opcode; its `knum` divide-by-zero guard exists back to 6.07.
+  - So the failure is specific to the module's environment. Constructs used **only** by GENDYN (not by working
+    instruments): `/* */` header with UTF-8 accents (`Generation`), global-space `gk.. init` lines plus a non-global
+    `initcps init 13` in instr 0, a `\` line continuation in the `gendy` call, and `port` writing into its own global.
+  - `instr/demos/gendyn_fixed.instr` removes all of them (plus: stereo `outs`, min/max frequency ordered, nebconfig).
+    **Untested on hardware.** If it works and the cause matters, bisect by re-adding one construct at a time.
+  - Original also: mono `out` (left only), pitch above speed inverts min/max frequency (still stable in 6.18).

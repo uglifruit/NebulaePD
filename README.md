@@ -10,6 +10,7 @@ desktop test harness.
 - `patches/` — `00_template.pd` (start here), `01_drone.pd` (demo using all main controls)
 - `lib/nebulae_controls.pd` — standalone control receiver (embedded as a subpatch in each instrument)
 - `sim/` — `sim_controls.pd` GUI and `send_fudi.py` TCP sender for testing without hardware
+- `tools/instr2csd.py` — wrap a `.instr` into a `.csd` like the module does, for desktop `csound -n` checks
 - `tools/gen.py` — generates the `.pd` files above (`python tools/gen.py`); edit this or edit patches in Pd directly
 - `reference/` — official Nebulae development PDF; `upstream/` — files copied from
   [QB_Nebulae_V2](https://github.com/Qu-Bit-Electronix/QB_Nebulae_V2) (MIT, © 2019 Qu-Bit Electronix; see `upstream/UPSTREAM_LICENSE`)
