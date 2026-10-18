@@ -44,7 +44,7 @@ def main():
                 pk = max(abs(t) for t in x[s:s + seg])
                 if pk > 1e-4:
                     out.append(f"{s / sr:.2f}s:{pk:.3f}")
-            print(f"  ch{c + 1}", " ".join(out[:16]))
+            print(f"  ch{c + 1}", " ".join(out[:200]))
 
 
 if __name__ == "__main__":

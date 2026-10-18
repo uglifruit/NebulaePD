@@ -427,11 +427,61 @@ def write(path, canvas):
     print("wrote", path)
 
 
+def gloop_basic_test(wav=None):
+    """Record a 1 s loop with a blip 0.2 s in; head 1 plays it; then select head 2 (Source tap) at 2x speed."""
+    return dict(wav=wav, steps=[
+        (10, "\\; blend 1"),
+        (1100, "\\; record 1"),
+        (1300, "\\; gl_blip bang"),
+        (2100, "\\; record 0"),
+        (4500, "\\; source 1 \\; h2_vol 1"),
+        (4600, "\\; speed 0.8125"),
+        (7000, "\\; pd quit"),
+    ])
+
+
+def gloop_full_test(wav=None):
+    """1 s loop (blip at 0.2) -> overdub a blip at 0.7 -> head 1 size 0.5 -> reverse -> degrade -> clear."""
+    return dict(wav=wav, steps=[
+        (10, "\\; blend 1"),
+        (1100, "\\; record 1"),
+        (1300, "\\; gl_blip bang"),
+        (2100, "\\; record 0"),
+        (3550, "\\; record 1"),
+        (3800, "\\; gl_blip bang"),
+        (4600, "\\; record 0"),
+        (6000, "\\; size 0.5"),
+        (8000, "\\; speed 0.375"),
+        (9500, "\\; blend_alt 0.6"),
+        (12000, "\\; record_alt 1"),
+        (13000, "\\; pd quit"),
+    ])
+
+
+def gloop_grid_test(wav=None):
+    """1 s loop -> grid 4 + size 0.3 (snaps to 0.25) -> pan hard right -> jitter + wobble."""
+    return dict(wav=wav, steps=[
+        (10, "\\; blend 1"),
+        (1100, "\\; record 1"),
+        (1300, "\\; gl_blip bang"),
+        (2100, "\\; record 0"),
+        (3000, "\\; file_alt 1"),
+        (3100, "\\; size 0.3"),
+        (5000, "\\; overlap 1"),
+        (6500, "\\; density 0.5 \\; window_alt 1"),
+        (9000, "\\; pd quit"),
+    ])
+
+
 if __name__ == "__main__":
+    import gloop
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
     write("patches/02_echo.pd", echo_patch())
+    write("patches/03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas))
+    write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
-    write("sim/sim_controls.pd", sim_patch())
+    write("sim/test_03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas, level_printer=level_printer,
+                                                    test=gloop_basic_test()))
