@@ -1,0 +1,3 @@
+*.instr text eol=lf
+*.pd text eol=lf
+*.csd text eol=lf
