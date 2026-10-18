@@ -35,7 +35,8 @@ cycles, so the LEDs and the selected head always agree.
 
 - **Knob takeover:** after you select a head, a knob only affects that head once you turn it, so heads keep their
   settings when you switch. CV into a knob counts as movement, so CV modulates the selected head.
-- At load, head 1 is selected and at full volume; heads 2–4 are muted until you set their volumes on the alt layer.
+- At load the head follows the Source/Freeze LEDs. Head 1 starts at full volume; heads 2–4 are muted until you set
+  their volumes on the alt layer.
   (The Nebulae only sends alt values while Source is held.)
 - Gates into Source/Freeze also change the head (and knob CV then follows the selection). Reset gate restarts heads.
 - Proper per-head LEDs would need a custom Nebulae firmware that lets Pd send LED states back (not done).
