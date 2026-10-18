@@ -7,7 +7,7 @@ desktop test harness.
 - `docs/PROTOCOL.md` — control messages (TCP 3000 FUDI), ranges, button semantics
 - `docs/DEPLOY.md` — loading patches on the module; testing on a PC
 - `instr/` — Csound instruments (template + demos); notes in `docs/INSTR.md`
-- `patches/` — `00_template.pd` (start here), `01_drone.pd` (demo using all main controls)
+- `patches/` — `00_template.pd` (start here), `01_drone.pd` (demo using all main controls), `02_echo.pd` (stereo tape echo, below)
 - `lib/nebulae_controls.pd` — standalone control receiver (embedded as a subpatch in each instrument)
 - `sim/` — `sim_controls.pd` GUI and `send_fudi.py` TCP sender for testing without hardware
 - `tools/instr2csd.py` — wrap a `.instr` into a `.csd` like the module does, for desktop `csound -n` checks
@@ -18,3 +18,20 @@ desktop test harness.
 Local clones for study (gitignored): `external/QB_Nebulae_V2`, `external/NebulaePatches` (TheTechnobear).
 
 Status: patches load cleanly in Pd 0.5x headless; **not yet tested on hardware.**
+
+## 02_echo — stereo tape echo with freeze
+Live-input effect. Vanilla objects only (`delwrite~`/`vd~`/`lop~`/`hip~`/`clip~`), chosen to work on old Pd versions.
+
+| Control | Function |
+|---|---|
+| start | delay time, 10 ms – 2 s (exponential); changes glide over 250 ms like tape |
+| size | feedback, 0 – 0.98 |
+| density | tone: low-pass in the feedback loop, ~80 Hz – 12 kHz (plus a fixed 40 Hz high-pass) |
+| overlap | wow depth, 0 – 8 ms |
+| window | wow rate, 0.05 – 6 Hz |
+| pitch | stereo spread: right delay = left × (1 + 0.5 × pitch); click position 0.6 gives a 1.3× offset |
+| blend | dry/wet |
+| freeze | holds the loop: input muted, feedback 1, filter bypassed — repeats sustain indefinitely |
+
+Unused: speed, record, file, source, reset, all alt controls.
+Desktop test: `pd -nogui -batch -r 48000 -open sim/test_02_echo.pd` renders a blip through it (prints L/R levels).
