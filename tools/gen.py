@@ -549,7 +549,9 @@ def glitch_freeze_test(wav=None):
 
 def glitch_pitch_test(wav=None):
     """Glitch force /4 (440 Hz input): Pitch +12 -> 880 Hz staccato slices; Speed click (+3/repeat) ->
-    440/523/622/740; Speed -3/repeat -> falling; Pitch -12 -> 220 Hz."""
+    440/523/622/740; Speed -3/repeat -> falling; Pitch -12 -> 220 Hz. Then no force (all pass-through): Pitch -12 ->
+    slice-locked 220 Hz (each slice restarts at the live position); Pitch +12 -> live 440 (untransposed);
+    Pitch -12 + Freeze -> live 440."""
     return dict(wav=wav, steps=[
         (10, GT_ALL0 + " \\; record 1 \\; size 0.7 \\; pitch 0.6 \\; speed 0.5"),
         (1200, "\\; gt_tclkon 1"),
@@ -557,7 +559,10 @@ def glitch_pitch_test(wav=None):
         (5450, "\\; pitch 0.6 \\; speed 0.625"),
         (7450, "\\; speed 0.375"),
         (9450, "\\; speed 0.5 \\; pitch 0.4"),
-        (11000, "\\; pd quit"),
+        (10450, "\\; record 0"),
+        (12450, "\\; pitch 0.8"),
+        (13450, "\\; pitch 0.4 \\; freeze 1"),
+        (14500, "\\; pd quit"),
     ])
 
 

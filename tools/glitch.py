@@ -94,7 +94,7 @@ def ui(Canvas):
     # defaults until the module reports (it streams every value straight away)
     dflt = c.msg(560, 55, "\\; gt_mode 0 \\; gt_force 0 \\; gt_gate 0 \\; gt_freeze 0 \\; gt_zone 0 "
                           "\\; gt_pdens 0 \\; gt_px 0 \\; gt_py 0 \\; gt_x 0 \\; gt_wet 1 \\; gt_T 0 \\; gt_step 0 "
-                          "\\; gt_dmul 0")
+                          "\\; gt_dmul 0 \\; gt_smax 24")
     c.connect(lb, 0, dflt, 0)
     # clock: Reset (button or jack, a ~10 ms trigger), ignored for 1 s after load
     p = press(c, 10, 30, "reset", True, primed="gt_primed")
@@ -307,27 +307,8 @@ def clock(Canvas):
     e = c.obj(x, 620, "t b f")
     ffirst = c.obj(x + 100, 664, "f")
     c.connect(e, 1, ffirst, 1)
-    tb3 = c.obj(x, 642, "t b b b")
+    tb3 = c.obj(x, 642, "t b b")
     c.connect(e, 0, tb3, 0)
-    # ramp: this slice's semitones = k * step;  rate = 2^((T + k*step)/12), T live, clipped to -48..+24
-    fkk = c.obj(x + 200, 664, "f")
-    rkk = c.obj(x + 240, 642, "r gt_k")
-    c.connect(rkk, 0, fkk, 1)
-    c.connect(tb3, 2, fkk, 0)
-    mst = c.obj(x + 200, 686, "* 0")
-    rst = c.obj(x + 260, 664, "r gt_step")
-    c.connect(rst, 0, mst, 1)
-    c.connect(fkk, 0, mst, 0)
-    c.connect(mst, 0, c.obj(x + 200, 708, "s gt_Rs"), 0)
-    rRs = c.obj(x + 100, 760, "r gt_Rs")
-    sumT = c.obj(x + 100, 804, "+ 0")
-    c.connect(rRs, 0, sumT, 0)
-    rT = c.obj(x + 200, 760, "r gt_T")
-    tT = c.obj(x + 200, 782, "t b f")
-    c.connect(rT, 0, tT, 0)
-    c.connect(tT, 1, sumT, 1)
-    c.connect(tT, 0, sumT, 0)
-    chain(c, x + 100, 804, sumT, ["clip -48 24", "* 0.057762", "exp", "s gt_rate"])
     flm = c.obj(x + 50, 664, "f")
     rlm = c.obj(x + 90, 642, "r gt_lmode")
     c.connect(rlm, 0, flm, 1)
@@ -407,7 +388,7 @@ def glitch_mode(Canvas):
     # o3: glitch this slice?
     g = roll(c, 700, 270, tg, 3, 11, "gt_pdens")
     gg = or_force_gate(c, 700, 330, g)
-    c.connect(gg, 0, c.obj(700, 400, "s gt_g"), 0)
+    c.connect(gg, 0, c.obj(700, 400, "s gt_gsel"), 0)
     # o2: reverse?  forward: B = S, D = 1;  reverse: B = S + len - 1, D = -1
     rv2 = roll(c, 300, 160, tg, 2, 12, "gt_pdens")
     sr = c.obj(300, 204, "sel 0 1")
@@ -540,7 +521,7 @@ def stutter_mode(Canvas):
     # shuffle this slice? (window), else live
     sh = roll(c, 250, 580, tq, 1, 24, "gt_px")
     sg = or_force_gate(c, 250, 640, sh)
-    c.connect(sg, 0, c.obj(250, 710, "s gt_g"), 0)
+    c.connect(sg, 0, c.obj(250, 710, "s gt_gsel"), 0)
     # B = S + order[idx] * len
     t5 = c.obj(10, 536, "t b b")
     c.connect(tq, 0, t5, 0)
@@ -553,6 +534,102 @@ def stutter_mode(Canvas):
     c.connect(rsS, 0, ml2 - 1, 1)
     fixed = c.msg(10, 680, f"\\; gt_D 1 \\; gt_dec 1 \\; gt_dmul 0 \\; gt_q {Q0} \\; gt_slice bang")
     c.connect(t5, 0, fixed, 0)
+    return c
+
+
+def pass_rate(Canvas):
+    """After each boundary (gt_slice): glitched slice -> wet, rate = T + k*step (ramp), up to +24.
+    Pass-through slice with Pitch below the click (and not frozen) -> slice-locked pitch-down: read the buffer from
+    the write head at rate 2^(T/12) <= 2^(-1/12) (never overtakes the writer, even with tabread4~'s 2-sample
+    look-ahead; the writer runs first in DSP order), re-synced every slice: zero added latency at each slice start.
+    Otherwise live pass-through."""
+    c = Canvas("#N canvas 0 50 1000 600 %NAME% 0;")
+    c.text(10, 5, "Per slice: glitched -> wet + ramp. Pass-through + pitch down -> slice-locked tape-slow read. "
+                  "Else live. rate = 2^(clip(T + Rs, -48, smax)/12)")
+    rgs = c.obj(10, 30, "r gt_gsel")
+    fg = c.obj(10, 74, "f")
+    c.connect(rgs, 0, fg, 1)
+    rsl = c.obj(10, 52, "r gt_slice")      # sent last by the mode boundary: B/D/... are already out
+    c.connect(rsl, 0, fg, 0)
+    sg = c.obj(10, 96, "sel 1 0")
+    c.connect(fg, 0, sg, 0)
+    ptr = c.obj(400, 300, "f 0")            # 1 while a pass-through slice is a buffer read
+    # glitched: wet, ramp k*step, up to +24
+    t1 = c.obj(10, 140, "t b b b")
+    c.connect(sg, 0, t1, 0)
+    m1 = c.msg(10, 250, "\\; gt_smax 24 \\; gt_g 1")
+    c.connect(t1, 2, m1, 0)
+    fk = c.obj(80, 184, "f")
+    rk = c.obj(120, 162, "r gt_k")
+    c.connect(rk, 0, fk, 1)
+    c.connect(t1, 1, fk, 0)
+    ms = c.obj(80, 206, "* 0")
+    rst = c.obj(140, 184, "r gt_step")
+    c.connect(rst, 0, ms, 1)
+    c.connect(fk, 0, ms, 0)
+    c.connect(ms, 0, c.obj(80, 228, "s gt_Rs"), 0)
+    z1 = c.msg(200, 250, "0")
+    c.connect(t1, 0, z1, 0)
+    c.connect(z1, 0, ptr, 1)
+    # pass-through: pitch down and not frozen?
+    ft = c.obj(300, 140, "f")
+    rt = c.obj(340, 118, "r gt_T")
+    c.connect(rt, 0, ft, 1)
+    c.connect(sg, 1, ft, 0)
+    lt = c.obj(300, 162, "< 0")
+    c.connect(ft, 0, lt, 0)
+    an = c.obj(300, 184, "* 1")
+    c.connect(lt, 0, an, 0)
+    rf = c.obj(380, 140, "r gt_freeze")
+    nf = c.obj(380, 162, "== 0")
+    c.connect(rf, 0, nf, 0)
+    c.connect(nf, 0, an, 1)
+    s2 = c.obj(300, 206, "sel 1 0")
+    c.connect(an, 0, s2, 0)
+    # slice-locked read: B = write position (next index to be written), rate capped at -1 semitone
+    t2 = c.obj(300, 228, "t b b b")
+    c.connect(s2, 0, t2, 0)
+    c.connect(t2, 2, c.obj(500, 250, "s gt_snap"), 0)
+    fc = c.obj(400, 272, "f")
+    rc = c.obj(440, 250, "r gt_c")
+    c.connect(rc, 0, fc, 1)
+    c.connect(t2, 1, fc, 0)
+    chain(c, 400, 272, fc, [f"mod {BUF}", "s gt_B"])
+    m2 = c.msg(300, 380, f"\\; gt_D 1 \\; gt_dec 1 \\; gt_dmul 0 \\; gt_q {Q0} \\; gt_smax -1 \\; gt_Rs 0 \\; gt_g 1")
+    c.connect(t2, 0, m2, 0)
+    o2 = c.msg(250, 250, "1")
+    c.connect(t2, 0, o2, 0)
+    c.connect(o2, 0, ptr, 1)
+    # live
+    tl = c.obj(600, 228, "t b b")
+    c.connect(s2, 1, tl, 0)
+    m3 = c.msg(600, 272, "\\; gt_g 0 \\; gt_smax 24 \\; gt_Rs 0")
+    c.connect(tl, 1, m3, 0)
+    z3 = c.msg(700, 272, "0")
+    c.connect(tl, 0, z3, 0)
+    c.connect(z3, 0, ptr, 1)
+    # freezing during a slice-locked read: back to live (the buffer ahead now holds old audio)
+    rf2 = c.obj(400, 420, "r gt_freeze")
+    sf = c.obj(400, 442, "sel 1")
+    c.connect(rf2, 0, sf, 0)
+    c.connect(sf, 0, ptr, 0)
+    sp = c.obj(400, 464, "sel 1")
+    c.connect(ptr, 0, sp, 0)
+    c.connect(sp, 0, c.msg(400, 486, "\\; gt_g 0"), 0)
+    # rate = 2^(clip(T + Rs, -48, smax)/12): T live, Rs and smax per slice
+    rRs = c.obj(650, 30, "r gt_Rs")
+    sm = c.obj(650, 74, "+ 0")
+    c.connect(rRs, 0, sm, 0)
+    rT = c.obj(750, 30, "r gt_T")
+    tT = c.obj(750, 52, "t b f")
+    c.connect(rT, 0, tT, 0)
+    c.connect(tT, 1, sm, 1)
+    c.connect(tT, 0, sm, 0)
+    cl = c.obj(650, 96, "clip -48 24")
+    c.connect(sm, 0, cl, 0)
+    rmx = c.obj(750, 74, "r gt_smax")
+    c.connect(rmx, 0, cl, 2)
+    chain(c, 650, 96, cl, ["* 0.057762", "exp", "s gt_rate"])
     return c
 
 
@@ -656,6 +733,9 @@ def writer(Canvas):
     c.connect(clr, 0, rp, 0)
     idx = c.obj(150, 146, "-~ 0.5")       # counts 1,2,3..: n - 0.5 reads the sample about to be written
     c.connect(rp, 0, idx, 0)
+    # dummy outlet: the patch connects it to the reader so DSP always runs the writer first (slice-locked reads
+    # start right at the write head and must see this block's samples)
+    c.connect(idx, 0, c.obj(150, 440, "outlet~"), 0)
     rs = c.obj(300, 124, "r gt_snap")
     sn = c.obj(300, 168, "snapshot~")
     c.connect(rp, 0, sn, 0)
@@ -689,6 +769,7 @@ def reader(Canvas):
                   "out = g*fade*crush(buf[idx]) + (1-g)*live")
     il = c.obj(10, 30, "inlet~")
     ir = c.obj(500, 30, "inlet~")
+    c.obj(1050, 30, "inlet~")             # from the writer, unused: only forces writer-before-reader DSP order
     rs = c.obj(150, 30, "r gt_slice")
     clr = c.msg(150, 52, "clear")
     c.connect(rs, 0, clr, 0)
@@ -867,12 +948,14 @@ def glitch_patch(Canvas, controls_canvas, test=None):
     c.sub(200, 90, "glitch", glitch_mode(Canvas))
     c.sub(300, 90, "stutter", stutter_mode(Canvas))
     c.sub(400, 90, "shuffle", shuffle(Canvas))
+    c.sub(500, 90, "pass_rate", pass_rate(Canvas))
     adc = c.sub(10, 140, "testsrc", beat_source(Canvas)) if test else c.obj(10, 140, "adc~ 1 2")
     wr = c.sub(10, 180, "writer", writer(Canvas))
     rd = c.sub(200, 180, "reader", reader(Canvas))
     for ch in (0, 1):
         c.connect(adc, ch, wr, ch)
         c.connect(adc, ch, rd, ch)
+    c.connect(wr, 0, rd, 2)               # DSP order: writer before reader
     # blend: dry*(1-wet) + glitch*wet
     rw = c.obj(400, 140, "r gt_wet")
     wet = chain(c, 400, 140, rw, ["pack f 20", "line~"])

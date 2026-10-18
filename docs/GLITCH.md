@@ -22,7 +22,7 @@ length), the patch uses the Pi's headroom instead of copying the limit.
 | overlap | Y | degrade probability | repeat probability |
 | Freeze latch | CV In 1 | freeze | freeze |
 | blend | (Out 2 = dry) | dry/wet | dry/wet |
-| pitch (+1V/oct) | (new) | transpose slices, `round(pitch·60) − 36` st, live | same |
+| pitch (+1V/oct) | (new) | transpose slices, `round(pitch·60) − 36` st, live. Pass-through: slice-locked pitch-down only | same |
 | speed | (new) | ramp: slice k of the beat += `k·round(24·(speed−0.5))` st, latched per slice | same |
 
 CV In 2 (bipolar mod) needs no mapping: every Nebulae pot already sums its own CV jack.
@@ -66,10 +66,20 @@ flashes on the clock.
   clear). Everything happens in one logical instant, so it all lands in the same DSP block. Slice lengths are whole
   blocks, so the `[delay]` chain stays block-exact. After the div-th slice of a beat the next one waits `GRACE`; if no
   clock comes, slices keep cycling, as on the WC.
-- **Rate** (Pitch/Speed).
-  - The clock subpatch sends `gt_k`: the slice index in the beat, `k mod div`, 0 at a clock.
-  - At each boundary, `E` sends `gt_Rs = k·step`.
-  - Then `gt_rate = 2^(clip(T + Rs, −48, 24)/12)`. T comes from Pitch and is recomputed live; step comes from Speed.
+- **Per-slice routing and rate** (`pass_rate` subpatch).
+  - The mode boundaries send `gt_gsel` (glitch or shuffle this slice?), then `gt_slice` last. On `gt_slice`,
+    `pass_rate` decides:
+    - **glitched:** `g = 1`, `smax = 24`, `Rs = k·step`. The clock sends `gt_k`, the slice index in the beat
+      (`k mod div`, 0 at a clock).
+    - **pass-through, T < 0, not frozen:** a slice-locked read.
+      - `gt_snap` gives `B = c`: the next write index, i.e. the write head itself.
+      - Also sent: `D = 1`, no degrade, `Rs = 0`, `smax = −1`, `g = 1`.
+      - The writer's dummy `outlet~` → the reader's third `inlet~` forces writer-before-reader DSP order. So with
+        rate ≤ 2^(−1/12), even `tabread4~`'s 2-sample look-ahead only touches samples already written.
+      - Zero added latency at each slice start. Freezing mid-slice sends `g = 0`, because the buffer ahead now holds
+        old audio.
+    - **otherwise:** `g = 0` (live).
+  - Rate: `gt_rate = 2^(clip(T + Rs, −48, smax)/12)`. T comes from Pitch and is recomputed live.
 - **Reader.**
   - Index:
     - `p` = time counter (`sig~ 1` into `rpole~`). `pr` = read counter: `rpole~` of the rate signal, minus the
@@ -122,4 +132,6 @@ Pass `wav=` to the scenario. Output is recorded with `tabwrite~` and saved by `s
   - −3 per repeat → 440/370/311/262 Hz;
   - −12 → 220 Hz.
   - A live Pitch change lands mid-beat; a Speed change lands at the next slice.
+  - No force, Pitch −12 → pass-through slices at 220 Hz. Each starts at the live level of its boundary, with no
+    pre-boundary audio. Pitch +12 → live 440 Hz. Pitch −12 + Freeze → live.
 - **Clicks:** no sample jumps > 0.07 (0.035 on the quieter pitch render) except the test input's own ramp resets.

@@ -75,16 +75,23 @@ At each clock pulse the beat is cut into slices, which are reshuffled and played
 
 ## Pitch and Speed (both modes)
 
-Both act only on the glitched / shuffled slices. Live pass-through is never transposed, and the rhythm never changes;
-only the material inside each slice does.
+The rhythm never changes; only the material inside each slice does.
 
 | Control | Does |
 |---|---|
-| **pitch** (encoder + 1V/oct jack) | **Transpose** in semitones. Click = original pitch; the range is −3 to +2 octaves. Live, so a sequencer into the 1V/oct jack plays the repeats as a melody |
+| **pitch** (encoder + 1V/oct jack) | **Transpose** in semitones. Click = original pitch; the range is −3 to +2 octaves. Live, so a sequencer into the 1V/oct jack plays the repeats as a melody. Glitched slices go up or down. **Pass-through goes down only** (see below) |
 | **speed** (encoder + CV) | **Ramp** across the repeats of each beat: every slice after the first steps by N semitones. Right of centre = rising ratchets, left = falling (a tape-slowing feel). Click positions = ±3 semitones per repeat, ends = ±12. **Centre = flat** |
 
 - A pitched-**up** slice plays its own material faster and then goes quiet until the next slice, so it sounds tighter
   and more staccato. A pitched-**down** slice plays only the start of its material, slower.
+- **Pass-through with Pitch below the click** is slice-locked. At every slice boundary it picks up the live input
+  exactly where it is and plays it slower and lower, until the next boundary snaps it back. A hit on the beat grid
+  comes out **in time, with no added latency**: drums stay locked to the clock, each hit sounds like tape slowing
+  under it, and only hits between boundaries drift later. Use ÷4 or ÷8 for tighter re-syncs.
+  - **Pitch above the click:** pass-through stays untransposed. Live audio can't be played faster than it arrives
+    without adding delay.
+  - **While frozen:** pass-through is plain live audio.
+  - Speed's ramp applies to glitched slices only.
 - The total shift is limited to −48…+24 semitones, so steep ramps on ÷6 stop climbing at +2 octaves.
 - **Speed remembers its last position.** If it sits on a click when you load the patch, the ratchets will step by ±3.
   Turn Speed to the **centre** for plain repeats.
