@@ -3,3 +3,4 @@ __pycache__/
 *.pd~
 .claude/
 external/
+tools/csound609/

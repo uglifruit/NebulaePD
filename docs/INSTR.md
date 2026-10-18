@@ -3,7 +3,17 @@
 Sources: `reference/Nebulae_Development_Reference.pdf`, upstream `Code/nebulae/conductor.py`, `Code/instr/*`.
 Desktop check: `python tools/instr2csd.py file.instr out.csd --set pitch=0.6 ...` builds the same orchestra the module's
 `conductor.py` builds, then `csound -n out.csd` compiles and runs it offline (tested with Csound 6.18.1 portable).
-The module runs an **older** Csound (Arch ARM era, version unconfirmed), so desktop success is necessary, not sufficient.
+## Csound version on the module: 6.09.1
+- Firmware updates (`neb_update.zip`, really a tar.gz) only replace `Code/` (Python, instr, scripts). Csound comes
+  from the factory OS image and is never updated by firmware.
+- `Code/nebulae/ctcsound.py` (the Python binding, which must match libcsound's API) is **byte-identical to the one
+  released with Csound 6.09.1** (July 2017); 6.09.0 differs by 16 lines, 6.10+ by 100+. The instr tester's
+  `ctcsound_linux.py` matches 6.09.0. So: v2.1.2 modules run Csound 6.09.x. Pi 4 (USB-C) units ship a newer OS
+  image; their version is unconfirmed.
+- Avoid opcodes/syntax added after 6.09 (check the "New in version" note in the Csound manual).
+- `node tools/run_csound609.js out.csd 10` runs a CSD in Csound 6.09.1 (Emscripten build, float samples) the way the
+  module does and reports `compileOrc` result, peak and NaN count. Setup: unzip `csound-emscripten-6.09.1.zip` from the
+  Csound 6.09.1 GitHub release into `tools/csound609/`. Not the real ARM/ALSA runtime, but the same parser and opcodes.
 
 ## File layout
 ```
@@ -51,11 +61,17 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
 
 ## Known issues
 - **GENDYN (`Instruments/GENDYN/gendyn.instr`) boot-loops on the owner's unit.** Investigation (2026-10-18):
-  - Compiles and runs cleanly for 60 s in desktop Csound 6.18 at default and extreme knob settings - DSP is sound;
+  - Compiles (`compileOrc` = 0) and runs 30 s cleanly in **Csound 6.09.1** (the module's version) at default and
+    extreme knob settings: peak ~0.5, no NaN. Same in 6.18 for 60 s. So it is **not** a parse error or a DSP blow-up
+    in Csound itself, and the "old parser" theory below is now unlikely.
+  - DSP is sound;
     `gendy` is built into libcsound, so not a missing opcode; its `knum` divide-by-zero guard exists back to 6.07.
   - So the failure is specific to the module's environment. Constructs used **only** by GENDYN (not by working
     instruments): `/* */` header with UTF-8 accents (`Generation`), global-space `gk.. init` lines plus a non-global
     `initcps init 13` in instr 0, a `\` line continuation in the `gendy` call, and `port` writing into its own global.
   - `instr/demos/gendyn_fixed.instr` removes all of them (plus: stereo `outs`, min/max frequency ordered, nebconfig).
     **Untested on hardware.** If it works and the cause matters, bisect by re-adding one construct at a time.
+  - Remaining suspects are the real-time side: ALSA/realtime on ARM (double-precision build), CPU/underruns, or
+    something in the Python app. Definitive answer needs the module's log: SSH in and run
+    `journalctl -u nebulae -b` (or `-b -1` after a restart), or check `Code/log/formattedcsd.txt` and `neb_log.txt`.
   - Original also: mono `out` (left only), pitch above speed inverts min/max frequency (still stable in 6.18).
