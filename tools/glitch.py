@@ -41,10 +41,10 @@ def chain(c, x, y, src, texts, dy=22, outlet=0):
     return prev
 
 
-def rnd(c, x, y, k, rng=4096):
-    """[random rng], seeded from gt_seed (+k so every instance differs)."""
+def rnd(c, x, y, k, rng=4096, seed="gt_seed"):
+    """[random rng], seeded from [r seed] (+k so every instance differs)."""
     r = c.obj(x, y, f"random {rng}")
-    rs = c.obj(x + 90, y - 66, "r gt_seed")
+    rs = c.obj(x + 90, y - 66, f"r {seed}")
     a = c.obj(x + 90, y - 44, f"+ {k}")
     m = c.msg(x + 90, y - 22, "seed \\$1")     # .pd files escape $ as \$
     c.connect(rs, 0, a, 0)

@@ -566,15 +566,129 @@ def glitch_pitch_test(wav=None):
     ])
 
 
+SP0 = ("\\; blend 1 \\; density 1 \\; size 1 \\; window 0 \\; overlap 0 \\; start 0 \\; speed 0.5 \\; pitch 0.6 "
+       "\\; sp_flat 1")
+
+
+def spectral_calib_test(wav=None):
+    """Flat gains (sp_flat): 440 Hz sine from 0.5 s = passthrough at unity (latency from the onset). Blend 0.5 at
+    2 s must not comb (dry is latency-aligned), blend 0 at 2.5 s = dry."""
+    return dict(wav=wav, steps=[
+        (10, SP0),
+        (500, "\\; sp_tsin 0.5"),
+        (2000, "\\; blend 0.5"),
+        (2500, "\\; blend 0"),
+        (3500, "\\; pd quit"),
+    ])
+
+
+def spectral_bands_test(wav=None):
+    """Chord + noise, ~11 bands, probability 0.5, snap smoothing. Clock re-rolls every 500 ms from 1 s; random
+    re-rolls every frame at 4 s; sparse + slow smoothing at 6 s; dense at 8 s."""
+    return dict(wav=wav, steps=[
+        (10, SP0 + " \\; sp_flat 0 \\; density 0.5 \\; size 0.3 \\; sp_tchd 0.5 \\; sp_tnse 0.1"),
+        (1000, "\\; sp_tclk 1"),
+        (4000, "\\; start 1 \\; sp_tclk 0"),
+        (6000, "\\; start 0 \\; window 0.8 \\; density 0.2 \\; sp_tclk 1"),
+        (8000, "\\; density 0.9"),
+        (10000, "\\; pd quit"),
+    ])
+
+
+def spectral_freeze_test(wav=None):
+    """Flat gains, chord. Normal freeze at 1.5 s, input muted at 2 s (level drops: live phase of nothing).
+    Unfreeze + chord at 3.5 s. Sealed (Source) at 4 s, freeze at 4.5 s, mute at 5 s (level holds)."""
+    return dict(wav=wav, steps=[
+        (10, SP0 + " \\; sp_tchd 0.5"),
+        (1500, "\\; freeze 1"),
+        (2000, "\\; sp_tchd 0"),
+        (3500, "\\; freeze 0 \\; sp_tchd 0.5"),
+        (4000, "\\; source 1"),
+        (4500, "\\; freeze 1"),
+        (5000, "\\; sp_tchd 0"),
+        (7000, "\\; pd quit"),
+    ])
+
+
+def spectral_pitch_test(wav=None):
+    """Flat gains, 440 Hz sine, sealed. Freeze at 1.5 s, mute at 1.8 s. Pitch +12 at 2.5 s (880), -12 at 4 s (220).
+    Unfreeze, unseal, sine back and Pitch +7 at 5.5 s: live 659 Hz."""
+    return dict(wav=wav, steps=[
+        (10, SP0 + " \\; sp_tsin 0.5 \\; source 1"),
+        (1500, "\\; freeze 1"),
+        (1800, "\\; sp_tsin 0"),
+        (2500, "\\; pitch 0.8"),
+        (4000, "\\; pitch 0.4"),
+        (5500, "\\; freeze 0 \\; source 0 \\; sp_tsin 0.5 \\; pitch 0.716667"),
+        (7500, "\\; pd quit"),
+    ])
+
+
+def spectral_gather_test(wav=None):
+    """Flat gains, sealed, sine 440 Hz. Gather (Record) at 1 s, switch the input to 660 Hz at 2 s: both sound.
+    Mute at 3 s: the gathered pair decays (-60 dB in ~7.7 s). Freeze at 4 s: it holds."""
+    return dict(wav=wav, steps=[
+        (10, SP0 + " \\; sp_tsin 0.4 \\; source 1"),
+        (1000, "\\; record 1"),
+        (2000, "\\; sp_tfreq 660"),
+        (3000, "\\; sp_tsin 0"),
+        (4000, "\\; freeze 1"),
+        (6000, "\\; pd quit"),
+    ])
+
+
+def spectral_tape_test(wav=None):
+    """Flat gains. Tape mix (alt blend) turned up from 0 to 1 like a pot (pickup), then a 30 ms blip at 1 s: echoes
+    every ~224 ms (default time), decaying by ~0.43 (default feedback) and darkening."""
+    return dict(wav=wav, steps=[
+        (10, SP0),
+        (500, "\\; blend_alt 0"),
+    ] + [(520 + i * 10, f"\\; blend_alt {0.1 * (i + 1):g}") for i in range(10)] + [
+        (1000, "\\; sp_tblip bang"),
+        (3000, "\\; pd quit"),
+    ])
+
+
+def spectral_drift_test(wav=None):
+    """Noise, 8 bands, probability 0.4, snap. Speed click (+0.25 cycles/s) from 1 s: the open bands rise through the
+    spectrum. Speed 0.5 at 5 s: they stop."""
+    return dict(wav=wav, steps=[
+        (10, SP0 + " \\; sp_flat 0 \\; density 0.4 \\; size 0.2 \\; sp_tnse 0.3"),
+        (1000, "\\; speed 0.625"),
+        (5000, "\\; speed 0.5"),
+        (7000, "\\; pd quit"),
+    ])
+
+
+def spectral_recapture_test(wav=None):
+    """Flat gains, 440 Hz sine, freeze at 1 s. Input to 660 Hz at 1.5 s (still 440: frozen). File pressed at 2.5 s:
+    the freeze re-captures 660 Hz without unfreezing."""
+    return dict(wav=wav, steps=[
+        (10, SP0 + " \\; sp_tsin 0.5"),
+        (1000, "\\; freeze 1"),
+        (1500, "\\; sp_tfreq 660"),
+        (2500, "\\; filestate 1"),
+        (2550, "\\; filestate 0"),
+        (3500, "\\; pd quit"),
+    ])
+
+
+SPECTRAL_TESTS = [("calib", spectral_calib_test), ("bands", spectral_bands_test), ("freeze", spectral_freeze_test),
+                  ("pitch", spectral_pitch_test), ("gather", spectral_gather_test), ("tape", spectral_tape_test),
+                  ("drift", spectral_drift_test), ("recapture", spectral_recapture_test)]
+
+
 if __name__ == "__main__":
     import gloop
     import glitch
+    import spectral
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
     write("patches/02_echo.pd", echo_patch())
     write("patches/03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas))
     write("patches/04_glitch.pd", glitch.glitch_patch(Canvas, controls_canvas))
+    write("patches/05_spectral.pd", spectral.spectral_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
@@ -589,3 +703,8 @@ if __name__ == "__main__":
         if wavdir:
             write(f"{wavdir}/t_{name}.pd",
                   glitch.glitch_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/t_{name}.wav")))
+    for name, scen in SPECTRAL_TESTS:
+        write(f"sim/test_05_{name}.pd", spectral.spectral_patch(Canvas, controls_canvas, test=scen()))
+        if wavdir:
+            write(f"{wavdir}/s_{name}.pd",
+                  spectral.spectral_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/s_{name}.wav")))

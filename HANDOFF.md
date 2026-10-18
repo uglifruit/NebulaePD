@@ -13,7 +13,7 @@ For a **new instrument**, see §8.
   04_glitch ports. They:
   - test every patch on real hardware;
   - name files on the USB root with numeric prefixes (`01_…`), because the instrument selector is alphabetical
-    across 5 buttons. **The next instrument is `05_…`**;
+    across 5 buttons. **The next instrument is `06_…`**;
   - want design choices offered as options with a recommendation (AskUserQuestion works well), and often answer with
     a variant of their own;
   - like ports to be "operationally and philosophically" faithful, but **don't copy the original's hardware limits**
@@ -25,13 +25,14 @@ For a **new instrument**, see §8.
 |---|---|
 | `patches/03_gloop.pd` | Gloop-style 4-head looper. **Confirmed working on hardware.** Guide `patches/03_gloop_README.md`; design `docs/GLOOP.md`; builder `tools/gloop.py` |
 | `patches/04_glitch.pd` | Port of WC #57 Glitch: clock-synced beat-repeater, Glitch + Stutter modes. **Core confirmed working on hardware.** Pitch (transpose glitches, V/oct), Speed (pitch ramp across repeats) and slice-locked pitch-down on pass-through were added afterwards: offline-tested, **awaiting hardware**. Guide `patches/04_glitch_README.md`; design `docs/GLITCH.md`; builder `tools/glitch.py` |
+| `patches/05_spectral.pd` | "Spectral Clouds+" after the owner's WorkshopSpectral (WC port of Kammerl's Spectral Clouds): random log-band gates, probability, smoothing, texture, normal/sealed freeze, plus true stereo + spread, spectral pitch (V/oct, peak-locked), band drift, gather, re-capture, tape on the alt layer. Offline-tested, **awaiting hardware** (main risk: CPU burst per hop, see `docs/SPECTRAL.md`). Guide `patches/05_spectral_README.md`; design `docs/SPECTRAL.md`; builder `tools/spectral.py` |
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. **Parked by the user.** Both pass in Csound 6.09.1 and 6.18 on the desktop; suspect is `gendy` on the module's build. The next step would be SSH plus `journalctl -u nebulae` |
 
 **Roadmap** (not started):
-- The owner is starting a **new instrument** next (unspecified).
+- 05_spectral: hardware feedback. If it crackles, rebuild with `N = 1024` in `tools/spectral.py` (verified offline).
 - 04_glitch: hardware feedback on Pitch/Speed/pass-through pitch-down.
 - Gloop effects pass: delay, reverb, bit crush, wavefold, tape saturation/hiss/age, tilt EQ. The user picked "core first".
 - Optional soft limiter on the gloop output.
@@ -46,10 +47,11 @@ sim/            sim_controls.pd (GUI sliders), send_fudi.py (TCP sender), test_*
 tools/gen.py    GENERATES every .pd (Canvas builder, echo/drone/template, test scenarios)  <- source of truth
 tools/gloop.py  03_gloop builder (heads, writer, recorder, takeover, ui; press() helper)
 tools/glitch.py 04_glitch builder (ui, clock, glitch, stutter, shuffle, pass_rate, writer, reader, beat_source)
+tools/spectral.py 05_spectral builder (ui, tables, bands, stft: ana/pool/syn per side, tape, test_source; pickup())
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
-tools/wavcheck.py    beats / clicks / freq / holds: sample-level checks of test renders (see its docstring)
+tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1
-docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, GLOOP, GLITCH
+docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, GLOOP, GLITCH, SPECTRAL
 reference/      Qu-Bit dev reference PDF;  upstream/  a few MIT files copied from Qu-Bit's repo
 external/       (gitignored) clones of Qu-Bit-Electronix/QB_Nebulae_V2 and TheTechnobear/NebulaePatches - re-clone if missing
 tools/csound609/ (gitignored) unzipped csound-emscripten-6.09.1 from the Csound 6.09.1 GitHub release
@@ -122,6 +124,8 @@ PD="/c/Program Files/Pd/bin/pd.com"                   # Pd 0.57 is installed
 python tools/gen.py --wav C:/path/to/scratch     # writes scratch/t_{glitch,stutter,freeze,pitch}.pd -> .wav
 "$PD" -nogui -batch -r 48000 -stderr -open C:/path/to/scratch/t_glitch.pd
 python tools/wavcheck.py beats C:/path/to/scratch/t_glitch.wav
+# 05_spectral: the same --wav run also writes scratch/s_{calib,bands,freeze,pitch,gather,tape,drift,recapture}.pd
+python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rms, peaks, octave bands (numpy)
 ```
 - Test builds swap `adc~` for a scripted source and send control messages as `(ms, msg)` steps. See `gloop_*_test()`,
   `glitch_*_test()` and `echo_patch(test=...)` in `gen.py`. 04_glitch's `beat_source` sends Reset pulses every 500 ms
@@ -202,24 +206,45 @@ python tools/wavcheck.py beats C:/path/to/scratch/t_glitch.wav
   - Reader: time counter + integrated rate counter → decimate → wrapped index → `tabread4~` → bitcrush → fades →
     wet gate.
 
+### 05_spectral (full detail: `docs/SPECTRAL.md`)
+- **Knobs:** density = probability; size = bands 4..128; window = smoothing; overlap = texture; start = re-roll rate
+  (CCW = Reset only); speed = drift (barber pole, 0.5 = still); pitch = spectral pitch V/oct; blend = dry/wet.
+- **Buttons:** Reset = re-roll; Freeze = freeze; Source = sealed; Record = gather; File = re-capture.
+- **Alt layer:** start = spread; size = gather decay; window/overlap/density/blend = tape time/feedback/wow/mix.
+  Alt values apply only after the knob moves (`pickup()`).
+- **Engine:**
+  - `block~ 2048 4` (latency N − 64 samples, measured; the dry is delayed to match).
+  - ana: `rfft~`, magnitude, phase via an atan cubic with `clip~` steps (no `atan2~`/`>~`), true frequency, then the
+    write-back store M/F/P. P is stored frame-centred (−k/2).
+  - pool1..4: max-pooled argmax copies, `switch~`ed on only when pitched.
+  - syn: unpitched = the store. Pitched = peak-locked: loudest bin near k/r, window-kernel magnitude, shared centred
+    phase, accumulator at r·F, reseeded 40 ms after Pitch settles.
+  - Band gains: control-rate `[pd bands]`, one 128-band `until` pass per hop, threshold one tick late.
+    Mask = `sp_eff[n·wrap(sp_L + drift)]`.
+- **New Pd lessons:**
+  - a reblocked subpatch's latency is N − 64;
+  - argless `switch~` inside a reblocked subpatch inherits its block (period 1), so it can turn parts off cheaply;
+  - `tabread~` accepts `set <table>` to switch tables at run time.
+
 ## 8. Starting a new instrument (checklist)
-1. **Name:** `patches/05_<name>.pd`, with the numeric prefix for the selector.
-2. **Builder:** a new `tools/<name>.py` with `<name>_patch(Canvas, controls_canvas, test=None)`.
+1. **Name:** `patches/06_<name>.pd`, with the numeric prefix for the selector.
+2. **Builder:** a new `tools/<name>.py` with `<name>_patch(Canvas, controls_canvas, test=None)`. `tools/spectral.py` is
+   the most recent example (`op()`/`fl()`/`lerp()`/`step()` signal helpers, `pickup()` for alt knobs).
    - Embed `controls_canvas()` as `[pd nebulae_controls]` (it also turns DSP on).
    - Use a unique send prefix per instrument (gloop `gl_`, glitch `gt_`).
    - Reuse `gloop.press()` for primed button edges, and the `chain()`/`rnd()` helpers in `glitch.py`.
 3. **Register in `tools/gen.py`'s `__main__`:**
-   - write `patches/05_<name>.pd`;
-   - write `sim/test_05_*.pd` from `<name>_*_test()` scenario functions (`(ms, msg)` steps);
+   - write `patches/06_<name>.pd`;
+   - write `sim/test_06_*.pd` from `<name>_*_test()` scenario functions (`(ms, msg)` steps);
    - extend `--wav`.
 4. **Test harness:** copy `glitch.glitch_patch`'s `if test:` block (tabwrite~ + soundfiler recording) and a scripted
    source like `beat_source`.
 5. **Verify:**
    - Load check (no output).
    - Batch runs + `tools/wavcheck.py`.
-   - Make sure `03_gloop.pd`/`04_glitch.pd` are unchanged by builder edits (`git status`).
+   - Make sure the other patches are unchanged by builder edits (`git status`).
 6. **Docs:**
-   - `patches/05_<name>_README.md` (user guide: panel map, knobs, buttons, quick start, differences);
+   - `patches/06_<name>_README.md` (user guide: panel map, knobs, buttons, quick start, differences);
    - `docs/<NAME>.md` (design);
    - this file's §2 status row, §3 layout and §7 summary;
    - update `CLAUDE.md` if the builder list changes.

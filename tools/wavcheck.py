@@ -5,6 +5,7 @@
   python tools/wavcheck.py clicks f.wav [t0] [t1] [thr=0.07]       sample-to-sample jumps above thr
   python tools/wavcheck.py freq   f.wav t0 t1 [win=0.04]          zero-crossing frequency + peak per window
   python tools/wavcheck.py holds  f.wav t0 t1 [step=256]           hold-run lengths (decimation) + grid check (bitcrush)
+  python tools/wavcheck.py spec   f.wav t0 t1 [win=0.25]          rms, top 3 spectral peaks, octave-band dB (numpy)
 
 Notes: a full-scale 440 Hz sine moves at most ~0.058/sample, so 'clicks' at 0.07 only flags real discontinuities
 (lower thr for quieter or higher signals). WAV time 0 = DSP start (= logical 0.3 s in the test scripts).
@@ -69,7 +70,27 @@ def holds(path, t0, t1, step=256):
     print(f"samples {len(x)}, off the 1/{step} grid: {off} of {len(vals)}")
 
 
+def spec(path, t0, t1, win=0.25):
+    import numpy as np
+    sr, x = ch1(path)
+    x = np.asarray(x, dtype=float)
+    edges = [62.5 * 2 ** k for k in range(9)]          # octave bands 62.5 Hz .. 16 kHz
+    print("  time    rms   peaks (Hz)            octave bands dB from " + " ".join(f"{e:g}" for e in edges[:-1]))
+    t = t0
+    while t + win <= t1 + 1e-9:
+        seg = x[int(t * sr):int((t + win) * sr)]
+        mag = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+        fr = np.fft.rfftfreq(len(seg), 1 / sr)
+        pk = [i for i in range(1, len(mag) - 1) if mag[i] >= mag[i - 1] and mag[i] > mag[i + 1]]
+        top = sorted(pk, key=lambda i: -mag[i])[:3]
+        db = [10 * np.log10(np.sum(mag[(fr >= a) & (fr < b)] ** 2) + 1e-12) for a, b in zip(edges, edges[1:])]
+        rms = float(np.sqrt(np.mean(seg ** 2)))
+        print(f"  {t:5.2f}s {rms:.3f}  " + " ".join(f"{fr[i]:6.0f}" for i in sorted(top)).ljust(22)
+              + " ".join(f"{d:5.0f}" for d in db))
+        t += win
+
+
 if __name__ == "__main__":
     cmd, path, *rest = sys.argv[1:]
     args = [float(a) for a in rest]
-    {"beats": beats, "clicks": clicks, "freq": freq, "holds": holds}[cmd](path, *args)
+    {"beats": beats, "clicks": clicks, "freq": freq, "holds": holds, "spec": spec}[cmd](path, *args)
