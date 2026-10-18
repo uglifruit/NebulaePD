@@ -22,6 +22,8 @@ length), the patch uses the Pi's headroom instead of copying the limit.
 | overlap | Y | degrade probability | repeat probability |
 | Freeze latch | CV In 1 | freeze | freeze |
 | blend | (Out 2 = dry) | dry/wet | dry/wet |
+| pitch (+1V/oct) | (new) | transpose slices, `round(pitch·60) − 36` st, live | same |
+| speed | (new) | ramp: slice k of the beat += `k·round(24·(speed−0.5))` st, latched per slice | same |
 
 CV In 2 (bipolar mod) needs no mapping: every Nebulae pot already sums its own CV jack.
 
@@ -64,11 +66,21 @@ flashes on the clock.
   clear). Everything happens in one logical instant, so it all lands in the same DSP block. Slice lengths are whole
   blocks, so the `[delay]` chain stays block-exact. After the div-th slice of a beat the next one waits `GRACE`; if no
   clock comes, slices keep cycling, as on the WC.
+- **Rate** (Pitch/Speed).
+  - The clock subpatch sends `gt_k`: the slice index in the beat, `k mod div`, 0 at a clock.
+  - At each boundary, `E` sends `gt_Rs = k·step`.
+  - Then `gt_rate = 2^(clip(T + Rs, −48, 24)/12)`. T comes from Pitch and is recomputed live; step comes from Speed.
 - **Reader.**
-  - Index: `p` = slice counter; `eff = floor(p/dec)·dec`, with floor done as `z − wrap~ z` on positive values only;
-    `idx = wrap((B + BUF + D·eff)/BUF)·BUF + 0.5`; then `tabread~`.
+  - Index:
+    - `p` = time counter (`sig~ 1` into `rpole~`). `pr` = read counter: `rpole~` of the rate signal, minus the
+      current rate, so it starts at 0 and stays phase-continuous when the rate changes.
+    - Decimation: `eff = pr − wrap~(pr/dec)·dmul`, where `dmul = dec` while degrading and 0 otherwise. That gives
+      `floor(pr/dec)·dec` or plain `pr`, so interpolation survives when not decimating.
+    - `idx = wrap((B + BUF + D·eff)/BUF)·BUF`, then `tabread4~` (an integer index returns that exact sample).
   - Bitcrush: `floor(x/q + 65536) − 65536`, times q, with `q = 2^bits/32768`.
-  - Fade: 64-sample edge fade, `clip(p/64)·clip((len−1−p)/64)`.
+  - Fade: 64-sample edge fade, `clip(p/64)·clip((len−1−max(p, pr))/64)`. A sped-up slice ends when its own region
+    `[B, B+len)` is used up. It never reads beyond that region, so it never reads ahead of the writer, which leaves a
+    staccato gap.
   - Wet gate g, with a 1.5 ms `line~`: `out = g·fade·crushed + (1−g)·live`.
   - The main patch then mixes it with dry by blend.
 - **Randomness.** `[random 4096] < threshold`, with thresholds 0..4095 as on the WC. Every `[random]` is seeded from
@@ -104,4 +116,10 @@ Pass `wav=` to the scenario. Output is recorded with `tabwrite~` and saved by `s
 - **stutter:** Force + 8 slices → scrambled; repeat 1 → one flat slice per beat; drift 1 → full-level material where
   the previous beat was half; probability 0 → passthrough.
 - **freeze:** the pre-freeze beat loops with the input muted; live audio returns at the 2nd clock after unfreeze.
-- **Clicks:** no sample jumps > 0.07 except the test input's own ramp resets.
+- **pitch** (÷4, Force), measured by zero crossings per slice:
+  - +12 → 880 Hz with the slice's second half silent;
+  - Speed +3 per repeat → 440/523/622/740 Hz;
+  - −3 per repeat → 440/370/311/262 Hz;
+  - −12 → 220 Hz.
+  - A live Pitch change lands mid-beat; a Speed change lands at the next slice.
+- **Clicks:** no sample jumps > 0.07 (0.035 on the quieter pitch render) except the test input's own ramp resets.

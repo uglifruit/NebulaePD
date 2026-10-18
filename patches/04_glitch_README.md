@@ -24,7 +24,8 @@ Install: copy `04_glitch.pd` to the **root** of the Nebulae USB drive, then load
    density       [ pitch ]        overlap        window  = X  Glitch: degrade amount / Stutter: shuffle probability
                                                  overlap = Y  Glitch: degrade probability / Stutter: repeat probability
           blend          window                  blend   = dry <-> glitched
-                                                 pitch, speed: not used
+                                                 pitch   = TRANSPOSE the glitches, 1V/oct (click = original)
+                                                 speed   = RAMP: each repeat steps up (right) / down (left), centre = flat
 
   [record]  [file]  [source]  [reset]  [freeze]
    FORCE      -      MODE      CLOCK    FREEZE
@@ -72,6 +73,22 @@ At each clock pulse the beat is cut into slices, which are reshuffled and played
 | **window** | shuffle probability per slice (else live pass-through) |
 | **overlap** | repeat probability: how often a slice plays again before moving on. CW = one slice stutters for the whole beat |
 
+## Pitch and Speed (both modes)
+
+Both act only on the glitched / shuffled slices. Live pass-through is never transposed, and the rhythm never changes;
+only the material inside each slice does.
+
+| Control | Does |
+|---|---|
+| **pitch** (encoder + 1V/oct jack) | **Transpose** in semitones. Click = original pitch; the range is −3 to +2 octaves. Live, so a sequencer into the 1V/oct jack plays the repeats as a melody |
+| **speed** (encoder + CV) | **Ramp** across the repeats of each beat: every slice after the first steps by N semitones. Right of centre = rising ratchets, left = falling (a tape-slowing feel). Click positions = ±3 semitones per repeat, ends = ±12. **Centre = flat** |
+
+- A pitched-**up** slice plays its own material faster and then goes quiet until the next slice, so it sounds tighter
+  and more staccato. A pitched-**down** slice plays only the start of its material, slower.
+- The total shift is limited to −48…+24 semitones, so steep ramps on ÷6 stop climbing at +2 octaves.
+- **Speed remembers its last position.** If it sits on a click when you load the patch, the ratchets will step by ±3.
+  Turn Speed to the **centre** for plain repeats.
+
 ## Freeze
 
 Press Freeze, or send a gate to its jack. The buffer stops recording and the clock keeps running, so you can keep
@@ -88,6 +105,8 @@ beat until one full beat of new audio has been recorded, so there's no stale aud
 5. Bring up **window** and **overlap** for lo-fi degradation.
 6. Tap **Source** for Stutter mode: size fully CW (8 slices), Record on, and the beat is scrambled.
 7. Press **Freeze** to hold a moment and keep chopping it.
+8. Back in Glitch mode at ÷4, turn **speed** right of centre for rising ratchets, and patch a sequencer into the
+   **pitch** 1V/oct jack to play the repeats as a melody.
 
 ## Differences from the Workshop Computer version
 

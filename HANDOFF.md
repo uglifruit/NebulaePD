@@ -19,7 +19,7 @@ Last updated 2026-10-18. Read this first, then `docs/PROTOCOL.md`, then the doc 
 | Item | State |
 |---|---|
 | `patches/03_gloop.pd` | Gloop-style 4-head looper. **Confirmed working on hardware.** User guide: `patches/03_gloop_README.md`; design: `docs/GLOOP.md` |
-| `patches/04_glitch.pd` | Port of the owner's Workshop Computer #57 Glitch (clock-synced beat-repeater, Glitch + Stutter modes). Offline-tested, **awaiting hardware test**. Guide: `patches/04_glitch_README.md`; design: `docs/GLITCH.md`; builder `tools/glitch.py` |
+| `patches/04_glitch.pd` | Port of the owner's Workshop Computer #57 Glitch (clock-synced beat-repeater, Glitch + Stutter modes). Core **confirmed working on hardware**. Pitch = transpose the glitches (V/oct) and Speed = ramp across repeats were added afterwards: offline-tested, awaiting hardware. Guide: `patches/04_glitch_README.md`; design: `docs/GLITCH.md`; builder `tools/glitch.py` |
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |

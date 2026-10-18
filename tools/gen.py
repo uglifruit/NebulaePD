@@ -547,6 +547,20 @@ def glitch_freeze_test(wav=None):
     ])
 
 
+def glitch_pitch_test(wav=None):
+    """Glitch force /4 (440 Hz input): Pitch +12 -> 880 Hz staccato slices; Speed click (+3/repeat) ->
+    440/523/622/740; Speed -3/repeat -> falling; Pitch -12 -> 220 Hz."""
+    return dict(wav=wav, steps=[
+        (10, GT_ALL0 + " \\; record 1 \\; size 0.7 \\; pitch 0.6 \\; speed 0.5"),
+        (1200, "\\; gt_tclkon 1"),
+        (3450, "\\; pitch 0.8"),
+        (5450, "\\; pitch 0.6 \\; speed 0.625"),
+        (7450, "\\; speed 0.375"),
+        (9450, "\\; speed 0.5 \\; pitch 0.4"),
+        (11000, "\\; pd quit"),
+    ])
+
+
 if __name__ == "__main__":
     import gloop
     import glitch
@@ -562,5 +576,5 @@ if __name__ == "__main__":
     write("sim/test_03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas, level_printer=level_printer,
                                                     test=gloop_basic_test()))
     for name, scen in [("glitch", glitch_glitch_test), ("stutter", glitch_stutter_test),
-                       ("freeze", glitch_freeze_test)]:
+                       ("freeze", glitch_freeze_test), ("pitch", glitch_pitch_test)]:
         write(f"sim/test_04_{name}.pd", glitch.glitch_patch(Canvas, controls_canvas, test=scen()))
