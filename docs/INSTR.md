@@ -83,7 +83,9 @@ VERSION block without the mandatory/reversion lines.
     instruments): `/* */` header with UTF-8 accents (`Generation`), global-space `gk.. init` lines plus a non-global
     `initcps init 13` in instr 0, a `\` line continuation in the `gendy` call, and `port` writing into its own global.
   - `instr/demos/gendyn_fixed.instr` removes all of them (plus: stereo `outs`, min/max frequency ordered, nebconfig).
-    **Untested on hardware.** If it works and the cause matters, bisect by re-adding one construct at a time.
+    **Tested on hardware 2026-10-18: also boot-loops.** So the syntax quirks are ruled out; what both files share is
+    the `gendy` opcode itself (plus butterlp/balance). Next suspect: `gendy` on the module's Csound build/ARM.
+    Parked. (Original note: if it works and the cause matters, bisect by re-adding one construct at a time.
   - Owner's neb_log (2026-10-18) shows the loop: restarts every ~15 s with buff/cache ~183-188 MiB, so the Pi stays up
     and the Nebulae service restarts. That fits a crash or exit of the Python/Csound process during instrument start.
   - Remaining suspects are the real-time side: ALSA/realtime on ARM (double-precision build), CPU/underruns, or

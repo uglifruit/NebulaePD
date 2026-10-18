@@ -13,6 +13,6 @@
 | bowed_drone | bowed string / physical model drone | 45 |
 | fm_grit | extreme-ratio FM + reverb | 60 |
 
-`gendyn_fixed.instr` - rewrite of GENDYN (original boot-loops; see `docs/INSTR.md`). Untested on hardware.
+`gendyn_fixed.instr` - rewrite of GENDYN (original boot-loops; see `docs/INSTR.md`). **Also boot-loops on hardware - do not use.**
 Not copied: original GENDYN. Larger upstream instruments (Granular Looper ~1000 lines,
 Realms, Mars Affects, Avalon, One Shot) are in `external/QB_Nebulae_V2/Instruments/` for reading.
