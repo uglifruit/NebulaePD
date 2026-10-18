@@ -39,7 +39,7 @@ Install: copy `05_spectral.pd` to the **root** of the Nebulae USB drive, then lo
 |---|---|---|
 | **Reset** (jack or button) | **Re-roll** every band gain now. Clock it for rhythmic spectral patterns (start fully CCW so re-rolls only come from the clock) | flashes |
 | **Freeze** | **Freeze** the spectrum: hold the magnitudes (see below). A gate into the Freeze jack toggles it | on = frozen |
-| **Source** | **Sealed**: frozen or gathered sound keeps its own phases, so nothing of the live input gets through. Hold Source for the alt layer | on = sealed |
+| **Source** | **Sealed**: a frozen sound keeps its own phases, so nothing of the live input gets through. (Gathered sound always does this.) Hold Source for the alt layer | on = sealed |
 | **Record** | **Gather**: the spectrum keeps the loudest of what it holds and what comes in, decaying slowly. A gate into the Record jack toggles it | on = gathering |
 | **File** (button) | **Re-capture**: take the current input as the new held spectrum, without unfreezing | — |
 
@@ -101,7 +101,9 @@ its own as a chord. Pull the input and it carries on (measured: level holds). Th
   and blur into each other, like a spectral sustain.
 - Frozen, the decay stops: whatever you play **adds** to the hold wherever it's louder. Freeze a chord, turn Gather
   on, and play another chord into it.
-- With Sealed on, gathered partials ring at their own frequencies even after the input stops.
+- Gathered partials always ring on at their own frequencies, whatever Source is set to, so they sustain cleanly
+  after the input moves on or stops. Sharp changes in the input (a chord change) are gathered too, and fade like
+  everything else.
 
 **Re-capture (File)** replaces the hold with the current input in one frame: a quick "refreeze" without the gap of
 unfreezing.

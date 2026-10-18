@@ -62,8 +62,13 @@ previous frame, which is how the write-back stores and accumulators work.
   - d = `sp_deff` = max(decay, freeze): no decay while frozen.
 - **Source phase P:**
   - live = g ? sel : nfz;
-  - P = p + (1 − live)·seal·(P + F/4 − p). Bins that took the live frame use the live phase. Held bins use the live
-    phase (normal freeze) or advance at their stored F (sealed).
+  - P = p + (1 − live)·hold·(P + F/4 − p), with hold = max(seal, gather) (`sp_hold`). Bins that took the live
+    frame use the live phase. Held bins advance at their stored F when sealed **or gathering**, and use the live
+    phase only in a plain normal freeze.
+  - The first hardware test caught a bug here: hold was seal only. Gather with Source off then gave held partials
+    the phase of whatever unrelated live bin lay under them, so the gathered spectrum collapsed into a noise sweep
+    as soon as the input changed (440 → 660 test: the held 440 fell 15 dB in 0.5 s and broadband energy rose
+    50 dB). It now fades at the gather rate.
   - At r = 1 this is exactly the original's sealed freeze.
 - **Centred storage:** P is stored as P − k/2 (`sp_hk` = frac(k/2)). A centred windowed partial's bins alternate in
   sign, so a phase moved to another bin must carry that (−1)^Δk. Without it, +12 st collapsed to −23 dB.

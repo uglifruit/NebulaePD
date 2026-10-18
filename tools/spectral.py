@@ -230,6 +230,17 @@ def ui(Canvas):
         c.connect(t, 0, cd, 0)
     mxd = op(c, x3, y0 + 110, "max", op(c, x3, y0 + 88, "v sp_wd", (cd, 0)), op(c, x3 + 90, y0 + 88, "v sp_wfrz", (cd, 1)))
     c.connect(mxd, 0, c.obj(x3, y0 + 132, "s sp_deff"), 0)
+    # held bins keep their own frequency when sealed OR gathering: a gathered partial given the phase of whatever
+    # unrelated live bin is under it turns into a noise sweep. Source (sealed) only matters for a plain freeze.
+    x4 = x0 + 700
+    ch_ = c.obj(x4, y0 + 66, "t b b")
+    for i, n in enumerate(["seal", "g"]):
+        r = c.obj(x4 + i * 90, y0, f"r sp_{n}")
+        t = op(c, x4 + i * 90, y0 + 22, "t b f", r)
+        c.connect(t, 1, c.obj(x4 + i * 90 + 40, y0 + 44, f"v sp_h{n}"), 0)
+        c.connect(t, 0, ch_, 0)
+    mxh = op(c, x4, y0 + 110, "max", op(c, x4, y0 + 88, "v sp_hseal", (ch_, 0)), op(c, x4 + 90, y0 + 88, "v sp_hg", (ch_, 1)))
+    c.connect(mxh, 0, c.obj(x4, y0 + 132, "s sp_hold"), 0)
 
     # --- knobs ---
     x, y = 10, 400
@@ -646,14 +657,14 @@ def ana(Canvas, ch):
     newF = lerp(c, 200, 760, NF, GF, "sp_g")
     op(c, 10, 730, f"tabsend~ sp_M0{ch}", newM)
     op(c, 200, 840, f"tabsend~ sp_F0{ch}", newF)
-    # source phase: live where the store took the live frame, else (sealed) advanced by the stored frequency.
-    # live = g ? sel : nfz  ->  newP = p + (1 - live) * seal * (P + F/4 - p)
+    # source phase: live where the store took the live frame, else (sealed or gathering) advanced by the stored
+    # frequency. live = g ? sel : nfz  ->  newP = p + (1 - live) * hold * (P + F/4 - p), hold = max(seal, g)
     # P is stored frame-centred (minus k/2 turns: a windowed partial's bins alternate in sign), so a phase moved to
     # another bin by the pitch remap keeps its bins coherent; syn adds k/2 back for the bin it lands in.
     hk = c.obj(760, 620, "tabreceive~ sp_hk")
     P = op(c, 600, 662, "+~", c.obj(600, 640, f"tabreceive~ sp_P0{ch}"), hk)
     lv = fl(c, 500, 680, "+~ 1", fl(c, 500, 658, "*~ 0", sel, "sp_g"), "sp_nfzg")
-    cs = fl(c, 500, 746, "*~ 0", chain(c, 500, 680, lv, ["*~ -1", "+~ 1"]), "sp_seal")
+    cs = fl(c, 500, 746, "*~ 0", chain(c, 500, 680, lv, ["*~ -1", "+~ 1"]), "sp_hold")
     adv = chain(c, 600, 690, op(c, 600, 690, "+~", P, op(c, 680, 668, "*~ 0.25", newF)), ["+~ 64", "wrap~"])
     newP = op(c, 500, 830, "+~", p, op(c, 500, 808, "*~", op(c, 500, 786, "-~", adv, p), cs))
     pc = chain(c, 500, 860, op(c, 500, 860, "-~", newP, hk), ["+~ 64", "wrap~"])

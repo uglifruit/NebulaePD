@@ -626,10 +626,11 @@ def spectral_pitch_test(wav=None):
 
 
 def spectral_gather_test(wav=None):
-    """Flat gains, sealed, sine 440 Hz. Gather (Record) at 1 s, switch the input to 660 Hz at 2 s: both sound.
+    """Flat gains, Source OFF (gathered bins keep their own frequency anyway), sine 440 Hz. Gather (Record) at 1 s,
+    switch the input to 660 Hz at 2 s: both sound, and the held 440 fades smoothly (it used to collapse into noise).
     Mute at 3 s: the gathered pair decays (-60 dB in ~7.7 s). Freeze at 4 s: it holds."""
     return dict(wav=wav, steps=[
-        (10, SP0 + " \\; sp_tsin 0.4 \\; source 1"),
+        (10, SP0 + " \\; sp_tsin 0.4"),
         (1000, "\\; record 1"),
         (2000, "\\; sp_tfreq 660"),
         (3000, "\\; sp_tsin 0"),
