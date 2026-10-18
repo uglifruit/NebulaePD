@@ -9,7 +9,9 @@ Desktop check: `python tools/instr2csd.py file.instr out.csd --set pitch=0.6 ...
 - `Code/nebulae/ctcsound.py` (the Python binding, which must match libcsound's API) is **byte-identical to the one
   released with Csound 6.09.1** (July 2017); 6.09.0 differs by 16 lines, 6.10+ by 100+. The instr tester's
   `ctcsound_linux.py` matches 6.09.0. So: v2.1.2 modules run Csound 6.09.x. Pi 4 (USB-C) units ship a newer OS
-  image; their version is unconfirmed.
+  image; their version is unconfirmed. **The owner's unit is a Pi 4** (neb_log shows 3.8 GiB RAM), so for this unit
+  6.09.1 is a lower bound / best guess, not a fact. Firmware updates would still install the 6.09.1 `ctcsound.py`
+  (it is a ctypes binding and works across 6.x), so the file on the module does not prove the library version.
 - Avoid opcodes/syntax added after 6.09 (check the "New in version" note in the Csound manual).
 - `node tools/run_csound609.js out.csd 10` runs a CSD in Csound 6.09.1 (Emscripten build, float samples) the way the
   module does and reports `compileOrc` result, peak and NaN count. Setup: unzip `csound-emscripten-6.09.1.zip` from the
@@ -59,6 +61,17 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
 4. Recovery: replace the file's contents with a working instrument under the **same name** (owner-verified), or remove
    it so `nebulae.py` falls back to the factory granular looper. `neb_log.txt` on the USB gets a new block per restart.
 
+## Reading neb_log.txt
+Each start of the Nebulae app (`nebulae.py` -> `logger.spill_basic_info`) appends a block: VERSION, VERSION_DATE, CPU/GPU
+temp, `free -h`. The boot script (`checkfirmware.sh`, on the OS image, not in the repo) adds the
+"mandatory_files ... reversion request" lines once per service start. Instrument changes from the selector add a
+VERSION block without the mandatory/reversion lines.
+- No RTC: the clock restarts from a saved time at each cold power-on, so timestamps jump **backwards** at power cycles.
+- `buff/cache` ~88-90 MiB means a fresh kernel (cold boot). ~180+ MiB means the same kernel kept running.
+- A boot loop shows as blocks every ~10-15 s, each with mandatory/reversion lines, and buff/cache staying ~185 MiB:
+  that is the **service** restarting (app crash -> systemd restart), not the Pi rebooting.
+- Csound's own error messages are **not** written here; they go to the systemd journal (`journalctl -u nebulae`).
+
 ## Known issues
 - **GENDYN (`Instruments/GENDYN/gendyn.instr`) boot-loops on the owner's unit.** Investigation (2026-10-18):
   - Compiles (`compileOrc` = 0) and runs 30 s cleanly in **Csound 6.09.1** (the module's version) at default and
@@ -71,6 +84,8 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
     `initcps init 13` in instr 0, a `\` line continuation in the `gendy` call, and `port` writing into its own global.
   - `instr/demos/gendyn_fixed.instr` removes all of them (plus: stereo `outs`, min/max frequency ordered, nebconfig).
     **Untested on hardware.** If it works and the cause matters, bisect by re-adding one construct at a time.
+  - Owner's neb_log (2026-10-18) shows the loop: restarts every ~15 s with buff/cache ~183-188 MiB, so the Pi stays up
+    and the Nebulae service restarts. That fits a crash or exit of the Python/Csound process during instrument start.
   - Remaining suspects are the real-time side: ALSA/realtime on ARM (double-precision build), CPU/underruns, or
     something in the Python app. Definitive answer needs the module's log: SSH in and run
     `journalctl -u nebulae -b` (or `-b -1` after a restart), or check `Code/log/formattedcsd.txt` and `neb_log.txt`.
