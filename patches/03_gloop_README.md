@@ -112,6 +112,6 @@ Heads 2–4 start **muted**. Hold Source and turn up size, density or overlap to
 - Not yet included: delay, reverb, bit crusher, wavefolder, tape saturation/hiss/dropouts, tilt EQ.
 - CV goes to fixed knobs (no assignable CV targets). No one-shot or jump triggers, overdub only (no replace mode).
 - Long crossfades dip in volume at the loop point rather than overlapping.
-- Not yet tested on hardware: built and tested offline in Pd. Please report how it feels.
+- Tested offline in Pd and confirmed working on a Pi 4 Nebulae (firmware v2.1.2).
 
 More technical detail: [`docs/GLOOP.md`](../docs/GLOOP.md).

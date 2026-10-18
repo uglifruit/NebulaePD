@@ -17,7 +17,8 @@ desktop test harness.
 
 Local clones for study (gitignored): `external/QB_Nebulae_V2`, `external/NebulaePatches` (TheTechnobear).
 
-Status: patches load cleanly in Pd 0.5x headless; **not yet tested on hardware.**
+Status: all patches load cleanly in Pd 0.57 headless. **03_gloop is confirmed working on a Pi 4 Nebulae (fw v2.1.2).**
+00/01/02 have not been reported on hardware yet. New sessions: start with [`HANDOFF.md`](HANDOFF.md).
 
 ## 02_echo — stereo tape echo with freeze
 Live-input effect. Vanilla objects only (`delwrite~`/`vd~`/`lop~`/`hip~`/`clip~`), chosen to work on old Pd versions.

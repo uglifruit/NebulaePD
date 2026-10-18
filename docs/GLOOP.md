@@ -66,4 +66,4 @@ cycles, so the LEDs and the selected head always agree.
 loop from a test blip, switches heads via Source/Freeze, pauses and resumes a head, and restarts all heads. `tools/gen.py` also has `gloop_full_test` (overdub, size, reverse, degrade,
 clear), `gloop_grid_test` (grid, pan, jitter, wobble) and `gloop_pitch_test` (per-head interval, ignored alt-reset jump,
 global transpose). Pass `wav=` to record the output, then inspect it with
-`python tools/wavpeaks.py`. All four scenarios pass in Pd 0.57; not yet run on the module.
+`python tools/wavpeaks.py`. All four scenarios pass in Pd 0.57. **Confirmed working on the owner's Pi 4 Nebulae (2026-10-18).**
