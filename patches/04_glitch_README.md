@@ -80,7 +80,7 @@ The rhythm never changes; only the material inside each slice does.
 | Control | Does |
 |---|---|
 | **pitch** (encoder + 1V/oct jack) | **Transpose** in semitones. Click = original pitch; the range is −3 to +2 octaves. Live, so a sequencer into the 1V/oct jack plays the repeats as a melody. Glitched slices go up or down. **Pass-through goes down only** (see below) |
-| **speed** (encoder + CV) | **Ramp** across the repeats of each beat: every slice after the first steps by N semitones. Right of centre = rising ratchets, left = falling (a tape-slowing feel). Click positions = ±3 semitones per repeat, ends = ±12. **Centre = flat** |
+| **speed** (encoder + CV) | **Ramp** across the repeats of each beat: every slice after the first steps by N semitones. Left of centre = falling (a tape-slowing feel): left click = −3 semitones per repeat, left end = −12. **Centre to the right click = flat.** Past the right click = rising, up to +12 at the right end |
 
 - A pitched-**up** slice plays its own material faster and then goes quiet until the next slice, so it sounds tighter
   and more staccato. A pitched-**down** slice plays only the start of its material, slower.
@@ -93,8 +93,8 @@ The rhythm never changes; only the material inside each slice does.
   - **While frozen:** pass-through is plain live audio.
   - Speed's ramp applies to glitched slices only.
 - The total shift is limited to −48…+24 semitones, so steep ramps on ÷6 stop climbing at +2 octaves.
-- **Speed remembers its last position.** If it sits on a click when you load the patch, the ratchets will step by ±3.
-  Turn Speed to the **centre** for plain repeats.
+- **Speed remembers its last position.** On the right click the repeats are plain. On the left click they fall by 3
+  semitones per repeat, so click it over for plain repeats.
 
 ## Freeze
 

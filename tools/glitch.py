@@ -135,9 +135,22 @@ def ui(Canvas):
     # Pitch (+1V/oct): transpose the glitches, semitones = round(pitch*60) - 36 (click 0.6 = 0), live
     r = c.obj(530, 260, "r pitch")
     chain(c, 530, 260, r, ["* 60", "+ 0.5", "int", "- 36", "change", "s gt_T"])
-    # Speed: semitones per repeat = round(24*(speed - 0.5)): centre 0, click +-3, ends +-12 (latched per slice)
+    # Speed: semitones per repeat (latched per slice). Left of centre round(24*(speed - 0.5)): left click -3, end -12.
+    # Centre to the right click (0.625) = 0, so loading on either click is flat or falling. Then round(32*(speed -
+    # 0.625)) up to +12 at the right end.
     r = c.obj(680, 260, "r speed")
-    chain(c, 680, 260, r, ["- 0.5", "* 24", "+ 12.5", "int", "- 12", "change", "s gt_step"])
+    ms = c.obj(680, 282, "moses 0.5")
+    c.connect(r, 0, ms, 0)
+    lo = chain(c, 680, 282, ms, ["- 0.5", "* 24", "+ 12.5", "int", "- 12"])
+    mc = c.obj(800, 304, "moses 0.625")
+    c.connect(ms, 1, mc, 0)
+    z = c.msg(800, 326, "0")
+    c.connect(mc, 0, z, 0)
+    hi = chain(c, 880, 304, mc, ["- 0.625", "* 32", "+ 0.5", "int"], outlet=1)
+    cg = c.obj(680, 420, "change")
+    for s_ in (lo, z, hi):
+        c.connect(s_, 0, cg, 0)
+    c.connect(cg, 0, c.obj(680, 442, "s gt_step"), 0)
     r = c.obj(400, 330, "r blend")
     chain(c, 400, 330, r, ["s gt_wet"])
     return c

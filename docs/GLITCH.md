@@ -23,7 +23,7 @@ length), the patch uses the Pi's headroom instead of copying the limit.
 | Freeze latch | CV In 1 | freeze | freeze |
 | blend | (Out 2 = dry) | dry/wet | dry/wet |
 | pitch (+1V/oct) | (new) | transpose slices, `round(pitch·60) − 36` st, live. Pass-through: slice-locked pitch-down only | same |
-| speed | (new) | ramp: slice k of the beat += `k·round(24·(speed−0.5))` st, latched per slice | same |
+| speed | (new) | ramp: slice k of the beat += k·step st, latched per slice. step = `round(24·(speed−0.5))` left of centre (left click −3, end −12), 0 from centre to the right click (0.625), then `round(32·(speed−0.625))` (end +12) | same |
 
 CV In 2 (bipolar mod) needs no mapping: every Nebulae pot already sums its own CV jack.
 
@@ -126,10 +126,10 @@ Pass `wav=` to the scenario. Output is recorded with `tabwrite~` and saved by `s
 - **stutter:** Force + 8 slices → scrambled; repeat 1 → one flat slice per beat; drift 1 → full-level material where
   the previous beat was half; probability 0 → passthrough.
 - **freeze:** the pre-freeze beat loops with the input muted; live audio returns at the 2nd clock after unfreeze.
-- **pitch** (÷4, Force), measured by zero crossings per slice:
+- **pitch** (÷4, Force), measured by the spectral peak per slice (`wavcheck.py spec ... 0.125`; zero crossings misread the faded slices):
   - +12 → 880 Hz with the slice's second half silent;
-  - Speed +3 per repeat → 440/523/622/740 Hz;
-  - −3 per repeat → 440/370/311/262 Hz;
+  - Speed right click → flat 440 Hz; Speed 0.71875 (+3 per repeat) → 440/523/622/740 Hz;
+  - left click (−3 per repeat) → 440/370/311/262 Hz;
   - −12 → 220 Hz.
   - A live Pitch change lands mid-beat; a Speed change lands at the next slice.
   - No force, Pitch −12 → pass-through slices at 220 Hz. Each starts at the live level of its boundary, with no

@@ -194,7 +194,8 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
   prob); overlap = Y (degrade prob / repeat prob); blend = dry/wet.
 - **Pitch/Speed:**
   - Pitch = transpose the glitched slices, live (V/oct).
-  - Speed = per-repeat ramp, `k·round(24·(speed−0.5))` semitones.
+  - Speed = per-repeat ramp of k·step semitones. step: left click −3 (end −12); centre to the right click 0; past it,
+    up to +12.
   - Pass-through with Pitch < 0 is slice-locked pitch-down (reads from the write head, zero latency at each slice
     start). Pass-through with Pitch > 0 stays live.
 - **Engine:**
