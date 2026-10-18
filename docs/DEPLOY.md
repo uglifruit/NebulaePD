@@ -1,13 +1,14 @@
 # Getting a patch onto the Nebulae
 
 Per the official reference (page 5):
-1. Put your `.pd` file where the Nebulae looks for Pd patches. **The exact USB folder is not documented in the PDF or
-   README — check the user manual / Qu-Bit support, or inspect a stock USB drive.** (`handleuserfiles.sh` in the
-   upstream `Code/scripts/` copies user content at boot; read it to confirm.)
-2. Load any factory `.instr` other than the default.
-3. Hold the **Speed** encoder, turn right until only the positive speed LED is green.
-4. Your Pd patches appear alphabetically on the button LEDs — hence the `00_`, `01_` prefixes. Press a button, then
-   press the Speed encoder to load. Press the Pitch encoder to cancel.
+1. Copy the `.pd` file to the **root of the FAT32 USB drive** (not in a folder). At boot, `*.pd` is copied to
+   `/home/alarm/pd` (`handleuserfiles.sh`). To load while powered: hold **File** and press **Source**.
+2. Hold the **Speed** encoder ~2-3 s to open the instrument selector (firmware v2.1.2 manual, p.24). Turn Speed to pick
+   the bank: negative LED = `.instr`, both = Factory, **positive LED = Pure Data bank**. (v2.1.2: PD files can be
+   loaded directly from the main granular instrument — no need to load another .instr first.)
+3. Patches appear alphabetically across the 5 button LEDs (hence `00_`, `01_` prefixes). Press a button, then click
+   Speed to load. Click Pitch to cancel. Pitch encoder scrolls when there are more than 5 files.
+4. Nebulae boots into the last-used instrument (v2.1.2).
 
 Patches must contain `[netreceive 3000]` (embedded in every patch here). Patches here are single self-contained files.
 Audio files from USB are in `/home/alarm/audio`.

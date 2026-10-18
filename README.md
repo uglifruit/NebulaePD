@@ -13,4 +13,6 @@ desktop test harness.
 - `reference/` — official Nebulae development PDF; `upstream/` — files copied from
   [QB_Nebulae_V2](https://github.com/Qu-Bit-Electronix/QB_Nebulae_V2) (MIT, © 2019 Qu-Bit Electronix; see `upstream/UPSTREAM_LICENSE`)
 
+Local clones for study (gitignored): `external/QB_Nebulae_V2`, `external/NebulaePatches` (TheTechnobear).
+
 Status: patches load cleanly in Pd 0.5x headless; **not yet tested on hardware.**

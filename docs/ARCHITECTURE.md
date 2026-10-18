@@ -13,6 +13,18 @@ inferred or not stated by Qu-Bit; confirm on hardware.
 - **No CV outputs.** One gate/EOL pulse output (GPIO 16) — not controllable from Pd yet.
 - OS: Arch Linux ARM; user `alarm`. Pd Vanilla installed. Pd version **(unverified)**.
 
+## Facts from the v2.1.2 user manual (`reference/Nebulae_v2.1.2.pdf` if copied)
+- 20HP, 48 kHz / 24-bit, true stereo I/O, **10 Vpp** in (AC-coupled) and out. Knobs/CV: **12-bit**. CV range -5..+5 V.
+- Gate thresholds 0.4 V. **Pulse out = 5 V gate** (default instrument: fires on loop reset).
+- Latest hardware revision is a **Pi 4** (USB-C port); older units are earlier Pis -> budget CPU for the slowest.
+- **75 MB** of audio loaded total from USB (files beyond that are skipped); wav/flac/aif, any rate (resampled to 48k).
+- USB must be FAT32; files must be in the **root** of the drive. `neb_log.txt` is written to the drive at boot.
+- Filesystem is read-only most of the time (confirmed by manual) -> do not rely on writing files from Pd.
+- Pi 4 variant: manual says no firmware update needed.
+- Source+Speed = hardware input level (so `speed_alt` is not yours). Source+Pitch click = restore all secondaries.
+- Technobear's patches (`external/NebulaePatches`) show a working PD pattern: `netreceive 3000`, `loadbang -> ; pd dsp 1`,
+  and a custom ARM external (`clds~.pd_linux`) shipped alongside the .pd. SuperCollider needs his custom firmware.
+
 ## Software stack
 ```
  hardware (ADC/GPIO/encoders) ──► Python control app (Code/nebulae/*.py, Python 2-era)
@@ -28,7 +40,7 @@ inferred or not stated by Qu-Bit; confirm on hardware.
   selector while a non-default `.instr` is loaded (see `docs/DEPLOY.md`).
 - When in Pd mode, Csound is muted and the Python app streams every primary control as a text message.
 - Pd runs with `-rt` (realtime priority) at 48 kHz, no GUI. Block size / audio buffer / latency **(unverified)**.
-- DSP: with `-nogui` something must turn DSP on. The official template does not (its file has no loadbang/dsp
+- DSP: with `-nogui` something must turn DSP on. Technobear's clds.pd uses loadbang -> `; pd dsp 1`; the official template does not (its file has no loadbang/dsp
   message); the launcher may. This repo's `nebulae_controls` sends `; pd dsp 1` after 300 ms to be safe.
 
 ## Control protocol (summary — details in `PROTOCOL.md`)
