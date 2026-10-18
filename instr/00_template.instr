@@ -1,0 +1,20 @@
+; 00_template.instr - starting point for a Nebulae Csound instrument.
+; Derived from Qu-Bit's Test IO / template (MIT). See docs/INSTR.md.
+nebconfigbegin
+sr,48000
+ksmps,64
+-B,512
+-b,128
+nebconfigend
+
+; Controls arrive as globals: gkpitch gkspeed gkloopstart gkloopsize gkdensity gkoverlap gkblend gkwindow (0-1),
+; buttons gkfreeze gkrecord gkfilestate gksource gkreset; alt layer = *_alt. Full list: docs/INSTR.md
+
+instr 1
+ainl, ainr inch 1, 2
+if gksource == 1 then   ; source button used as a latching mute in Test IO
+    ainl = 0
+    ainr = 0
+endif
+outs ainl, ainr
+endin

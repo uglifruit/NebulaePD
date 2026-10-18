@@ -6,6 +6,7 @@ desktop test harness.
 - `docs/ARCHITECTURE.md` — hardware/software architecture, constraints, open questions
 - `docs/PROTOCOL.md` — control messages (TCP 3000 FUDI), ranges, button semantics
 - `docs/DEPLOY.md` — loading patches on the module; testing on a PC
+- `instr/` — Csound instruments (template + demos); notes in `docs/INSTR.md`
 - `patches/` — `00_template.pd` (start here), `01_drone.pd` (demo using all main controls)
 - `lib/nebulae_controls.pd` — standalone control receiver (embedded as a subpatch in each instrument)
 - `sim/` — `sim_controls.pd` GUI and `send_fudi.py` TCP sender for testing without hardware
