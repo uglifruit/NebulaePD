@@ -61,11 +61,87 @@ It carves holes in a spectrum, so it needs a **sustained, harmonically rich spec
 - **Poor:** drums and sparse plucks (41 ms of latency and a 2048-point window smear transients into a wash), single
   sine waves (one band does all the work), and anything quiet (the effect scales with the input).
 
-**Quick start:**
-1. Patch noise or a held chord in.
-2. Set size about 2 o'clock, window slow (about 2 o'clock), density at noon, blend fully CW.
-3. Sweep density and listen to the holes open and close.
-4. Turn Speed to its click for a slow rising drift, or patch a clock into Reset.
+## First steps
+
+A guided tour, about ten minutes. Each step builds on the one before.
+
+**0. Clean slate.** The Nebulae carries button states and Speed over from the last instrument, so check first:
+- **Record**, **Freeze** and **Source** LEDs off. Press any that are lit. (Tap Source; don't hold it.)
+- **Speed** turned to the centre: it snaps there, and the band pattern stands still.
+- **Pitch** on its click (no shift).
+
+**1. Set up.**
+1. Patch a sustained sound into the inputs: a pad, a drone, a held chord, or noise.
+2. Set the knobs:
+   - **blend** fully CW (wet only);
+   - **density** at noon;
+   - **size** about 2 o'clock;
+   - **window** about 2 o'clock;
+   - **overlap** and **start** fully CCW.
+
+You should hear your sound with slowly shifting holes in it.
+
+**2. Density.**
+1. Sweep **density** from CCW to CW: sparse ringing bands → your sound with holes → nearly the full sound.
+2. Leave it at noon.
+
+**3. Size.**
+1. Turn **size** down to about 9 o'clock: a few broad bands, like a random multiband gate.
+2. Turn it up to full: fine, comb-like shimmer.
+3. Leave it around 1 o'clock.
+
+**4. Re-roll and smoothing.**
+1. Press **Reset**: every band gets a new random gain, and the bands morph to it.
+2. Turn **window** fully CCW and press Reset again: now the bands snap.
+3. Turn **start** up a little: re-rolls now happen on their own, slow at first and faster as you turn.
+4. Try **window** CCW with **start** high for a stuttering spectral gate.
+5. Then set start back to CCW and window to about 2 o'clock.
+6. Optional: patch a clock into the **Reset** jack, with start CCW, for re-rolls in time.
+
+**5. Texture.** Turn up **overlap**: transients smear into a wash and the stereo image widens. Then back to CCW.
+
+**6. Drift.**
+1. Turn **Speed** right of centre: the hole pattern climbs up through the spectrum and wraps round, like a barber
+   pole.
+2. Turn it left of centre and it falls.
+3. Further from the centre is faster.
+4. Back to the centre to stop.
+
+**7. Freeze.**
+1. Press **Freeze** while the sound is playing: the spectrum holds, and the bands keep moving over it.
+2. Play something different into it: the held sound changes colour, because normal freeze takes its phase from the
+   live input.
+3. Pull the input: the level drops.
+4. Now tap **Source** (LED on = Sealed) and re-patch the input: the held sound rings on by itself.
+5. Press **File** to re-capture whatever is playing now, without unfreezing.
+
+**8. Play the freeze.**
+1. Keep Freeze and Sealed on and turn **Pitch**: the held spectrum transposes, from 3 octaves down to 2 up.
+2. Patch a sequencer into the **1V/oct** jack and the frozen sound becomes a playable chord.
+3. Click Pitch to return to the original.
+
+**9. Gather.**
+1. Turn Freeze off and press **Record**.
+2. Change chords or notes slowly: each new sound hangs on and blurs into the next, fading over several seconds.
+3. Press **Freeze** too: the fading stops, and anything louder you play now **adds** to the hold. Build up a cloud
+   chord by chord.
+4. **Hold Source** and turn **size** to set how long gathered sound takes to fade.
+5. Press Record and Freeze again to return to live.
+
+**10. Alt layer.** Hold **Source** and move a knob:
+- **blend:** tape mix (fully CCW is off);
+- **window:** tape time;
+- **overlap:** tape feedback;
+- **density:** tape wow;
+- **start:** stereo spread (the left and right band patterns drift apart).
+
+Each alt knob takes over once you move it.
+
+**Back to plain:**
+- Record, Freeze and Source off;
+- Pitch on its click;
+- Speed at the centre;
+- tape mix (alt blend) fully CCW.
 
 ## The band filter
 
