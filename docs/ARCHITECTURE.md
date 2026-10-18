@@ -36,8 +36,8 @@ inferred or not stated by Qu-Bit; confirm on hardware.
                                         ▼
                                   codec audio I/O  (adc~ / dac~)
 ```
-- Instruments are either Csound `.instr` files or Pd patches. Pd patches can only be loaded from the instrument
-  selector while a non-default `.instr` is loaded (see `docs/DEPLOY.md`).
+- Instruments are either Csound `.instr` files or Pd patches, chosen from the instrument selector's Pd bank
+  (see `docs/DEPLOY.md`). The older dev PDF said PD needed a non-default .instr loaded first; v2.1.2 removed that.
 - When in Pd mode, Csound is muted and the Python app streams every primary control as a text message.
 - Pd runs with `-rt` (realtime priority) at 48 kHz, no GUI. Block size / audio buffer / latency **(unverified)**.
 - DSP: with `-nogui` something must turn DSP on. Technobear's clds.pd uses loadbang -> `; pd dsp 1`; the official template does not (its file has no loadbang/dsp
