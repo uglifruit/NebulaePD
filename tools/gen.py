@@ -580,6 +580,12 @@ if __name__ == "__main__":
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
     write("sim/test_03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas, level_printer=level_printer,
                                                     test=gloop_basic_test()))
+    # --wav DIR: also write WAV-recording variants DIR/t_<name>.pd -> DIR/t_<name>.wav (not committed; use a scratch dir)
+    import sys
+    wavdir = sys.argv[sys.argv.index("--wav") + 1].replace("\\", "/") if "--wav" in sys.argv else None
     for name, scen in [("glitch", glitch_glitch_test), ("stutter", glitch_stutter_test),
                        ("freeze", glitch_freeze_test), ("pitch", glitch_pitch_test)]:
         write(f"sim/test_04_{name}.pd", glitch.glitch_patch(Canvas, controls_canvas, test=scen()))
+        if wavdir:
+            write(f"{wavdir}/t_{name}.pd",
+                  glitch.glitch_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/t_{name}.wav")))
