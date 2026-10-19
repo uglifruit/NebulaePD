@@ -162,6 +162,8 @@ Things to know:
 - **Density and smoothing:** the threshold follows how spread out the gains currently are, so density opens about the
   same number of bands whatever smoothing is set to.
 - **Low end:** everything below about 190 Hz moves as one band, so bass doesn't chatter at high band counts.
+- **No clicks:** bands fade open and shut over about 50 ms rather than switching instantly, so drift and re-rolls
+  don't tick on held notes. Snap smoothing (window CCW) is therefore a fast flicker rather than a hard chop.
 
 ## Freeze, Sealed, Gather, Re-capture
 

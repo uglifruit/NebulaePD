@@ -82,7 +82,8 @@ previous frame, which is how the write-back stores and accumulators work.
 ### syn (per side)
 - **Unpitched:** magnitude `sp_M0`, phase `sp_P0` + k/2, i.e. the store as is. Calibration (`sp_flat 1`) is an exact
   passthrough: 0.500 in → 0.500 out, no clicks.
-- **Pitched — peak-locked resynthesis:**
+- **Pitched — peak-locked resynthesis** (`[pd pitched_L/R]`, `switch~`ed off while unpitched; syn blends its
+  outlets by `sp_pitched`, so stale outlets don't matter):
   - Bin k reads the level-ℓ pool at k/r − off, with ℓ = clip(⌈1 − semis/12⌉, 1, 4) and off = 2^(ℓ−1) − 0.5. The
     2^ℓ ≥ 2/r window is centred on k/r, so no partial is missed down to −36 st.
   - That gives the loudest nearby bin J with M, F and P.
@@ -94,6 +95,10 @@ previous frame, which is how the write-back stores and accumulators work.
   - The reseed fires 40 ms after the last Pitch change (`sp_cpz` = pitched·(1 − rs)).
 - **Band mask:** `sp_eff[n·wrap(sp_L + u)]`. `sp_L` = log(k/8)/log(128) (0 below bin 9), so continuous band counts
   and drift come free, with no per-count layout rebuild.
+- **De-click:** each bin's gate eases toward its new value, mask += 0.35·(target − mask) per frame (`sp_mkL/R`,
+  `DECLICK`): about 95% in 7 frames (75 ms). A gate otherwise switches within one hop, and on sustained tones
+  drift, re-rolls and threshold wobble then tick. On a sine with drift, 5 ms envelope steps over 10% of peak fell
+  from 66 to 12 in 8.5 s; with typical settings, from 8 to 0.
 - **Texture:** `cos~` → `rifft~` → window → 1/(2N).
 
 ### bands (control rate)
@@ -128,11 +133,12 @@ previous frame, which is how the write-back stores and accumulators work.
 | drift (Speed click) | the band pattern cycles back to its start after 4 s; Speed 0.5 = static |
 | spread (alt start 0 → 1) | L/R correlation 1.000 → 0.36–0.62 |
 | tape | echoes every 224 ms (default), 0.50 / 0.20 / 0.09 / 0.04 |
-| CPU (desktop, 60 s stereo) | unpitched 2.7 s, pitched up 3.4 s, −36 st 4.6 s (4.6–7.7% of a core) |
+| CPU (desktop, 60 s stereo) | unpitched 2.3 s (was 2.7 s before the pitched path got its `switch~`), pitched up 3.0–3.4 s, −36 st 4.3–4.5 s |
 
 **Hardware risk:** the whole STFT runs in one of every 8 DSP ticks. Scaling the desktop figures by an estimated 4× for
-the Pi 4 gives a burst of about 2 ms per hop unpitched and about 3.3 ms at −36, against the module's
-`-audiobuf 5`. If it crackles on hardware, set `N = 1024` in `tools/spectral.py`: everything else derives from N,
+the Pi 4 gives a burst of about 1.7 ms per hop unpitched and about 3.3 ms at −36, against the module's
+`-audiobuf 5`. Clicks on hardware that stay with a static spectrum (density fully CW, start CCW, Speed centre,
+Pitch on its click) point to this. If it crackles on hardware, set `N = 1024` in `tools/spectral.py`: everything else derives from N,
 and it halves the burst.
 
 ## Tests

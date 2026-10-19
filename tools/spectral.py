@@ -14,9 +14,10 @@ Engine
     max-holds it with a decay, and P (frame-centred phase) is live, or advanced at the stored frequency (sealed).
   - pool1..4: max-pooled copies of the store over 2, 4, 8, 16 bins (argmax M, F, P, bin J), switch~ed off unless
     pitched at that search level.
-  - syn: unpitched = the store as is. Pitched = peak-locked: bin k takes the loudest bin J near k/r and renders it
-    at r*F with the window kernel W(k - r*F)/W(J - F) and J's centred phase (reseeded 40 ms after Pitch settles, then
-    accumulated). Then the band mask, texture, and cos~ + rifft~.
+  - syn: unpitched = the store as is. Pitched ([pd pitched], switch~ed off while unpitched) = peak-locked: bin k
+    takes the loudest bin J near k/r and renders it at r*F with the window kernel W(k - r*F)/W(J - F) and J's
+    centred phase (reseeded 40 ms after Pitch settles, then accumulated). Then the band mask (each bin's gate eased
+    over a few frames: de-click), texture, and cos~ + rifft~.
 - [pd bands] runs at control rate, one tick per hop: re-roll band targets, smooth the band gains, threshold them by
   mean + (0.5 - probability) * spread, and write the per-band gains (sp_effL/R) that syn reads per bin through
   sp_L, the log band coordinate (+ the drift offset).
@@ -38,6 +39,7 @@ LOWMERGE = int(190 * N / SR)   # bins <= this (~190 Hz) share band 0 (8 at N = 2
 LAT_MS = (N - 64) * 1000 / SR  # STFT latency (reblocking: N minus the parent block), measured offline
 BIG = "1e+30"                  # step(x) = clip~(x * BIG, 0, 1)
 LEVELS = 5                     # store + max-pooled levels of 2, 4, 8, 16 bins (pitch peak search, to -36 st)
+DECLICK = 0.35                 # per-frame easing of each bin's band gate (0.35: ~95% in 7 frames = 75 ms)
 WN = 513                       # sp_W: sine-window kernel |W(d)|, d = (i - 256)/64 (+1/128), main lobe only
 
 # alt-layer defaults (the module only sends alt values while Source is held)
@@ -697,14 +699,12 @@ def pool(Canvas, ch, lv):
     return c
 
 
-def syn(Canvas, ch):
-    """Unpitched: the store as is. Pitched (peak-locked): bin k finds the loudest bin J near k/r (pool level
-    sp_lvl), takes its amplitude shaped by the window kernel at the new position, W(k - r*F)/W(J - F), and its
-    centred phase (reseed) or its accumulator advanced at r*F. Then band mask, texture, rifft~."""
-    c = Canvas("#N canvas 0 50 1100 800 %NAME% 0;")
-    c.text(10, 5, "unpitched = store (M0/P0) - pitched = peak near k/r: M*W(k-rF)/W(J-F) - phase P (reseed) or "
-                  "accumulator + r*F/4 - mask eff[n*wrap(L+u)] - texture - cos~ - rifft~")
-    c.obj(10, 30, "inlet~")                            # order only: after ana and the pools
+def pitched(Canvas, ch):
+    """Pitched path (peak-locked): bin k finds the loudest bin J near k/r (pool level sp_lvl), takes its amplitude
+    shaped by the window kernel at the new position, W(k - r*F)/W(J - F), and its centred phase (reseed) or its
+    accumulator advanced at r*F. switch~ed off while unpitched (syn then ignores its outlets)."""
+    c = Canvas("#N canvas 0 50 1100 500 %NAME% 0;")
+    op(c, 1000, 30, "switch~", c.obj(1000, 8, "r sp_pitched"))
     k = c.obj(200, 30, "tabreceive~ sp_k")
     hk = c.obj(300, 30, "tabreceive~ sp_hk")
     j = fl(c, 200, 80, "-~ 0", fl(c, 200, 55, "*~ 1", k, "sp_ir"), "sp_off")
@@ -722,20 +722,36 @@ def syn(Canvas, ch):
     ws = op(c, 420, 230, "tabread~ sp_W", chain(c, 420, 140, op(c, 420, 162, "-~", rds["J"], rds["F"]),
                                                  ["*~ 64", "+~ 256"]))
     magp = op(c, 200, 280, "/~", op(c, 200, 255, "*~", rds["M"], wo), op(c, 420, 255, "max~ 0.5", ws))
-    magu = c.obj(100, 255, f"tabreceive~ sp_M0{ch}")
-    mag = lerp(c, 100, 280, magu, magp, "sp_pitched")
-    # phase
     acc = c.obj(560, 140, f"tabreceive~ sp_A{ch}")
     A = chain(c, 560, 165, op(c, 560, 165, "+~", acc, inc), ["+~ 64", "wrap~"])
     pp = op(c, 650, 230, "+~", rds["P"], hk)                         # centred -> this bin
     phip = lerp(c, 650, 260, pp, A, "sp_cpz")
+    op(c, 10, 330, "outlet~", magp)
+    op(c, 650, 330, "outlet~", phip)
+    return c
+
+
+def syn(Canvas, ch):
+    """Unpitched: the store as is (M0, P0). Pitched: [pd pitched]. Then band mask (de-clicked), texture, rifft~."""
+    c = Canvas("#N canvas 0 50 1100 800 %NAME% 0;")
+    c.text(10, 5, "unpitched = store (M0/P0) - pitched = [pd pitched] - mask eff[n*wrap(L+u)] eased per bin - "
+                  "texture - cos~ - rifft~")
+    c.obj(10, 30, "inlet~")                            # order only: after ana and the pools
+    hk = c.obj(300, 30, "tabreceive~ sp_hk")
+    pt_ = c.sub(200, 200, f"pitched_{ch}", pitched(Canvas, ch))
+    magu = c.obj(100, 255, f"tabreceive~ sp_M0{ch}")
+    mag = lerp(c, 100, 280, magu, (pt_, 0), "sp_pitched")
     pu = op(c, 750, 230, "+~", c.obj(750, 200, f"tabreceive~ sp_P0{ch}"), hk)
-    phi = lerp(c, 750, 330, pu, phip, "sp_pitched")
+    phi = lerp(c, 750, 330, pu, (pt_, 1), "sp_pitched")
     op(c, 750, 400, f"tabsend~ sp_A{ch}", phi)
     # band mask
     L = c.obj(900, 200, "tabreceive~ sp_L")
     bi = fl(c, 900, 275, "*~ 16", op(c, 900, 250, "wrap~", fl(c, 900, 225, "+~ 0", L, "sp_u")), "sp_n")
-    mk = op(c, 900, 300, f"tabread~ sp_eff{ch}", bi)
+    mk0 = op(c, 900, 300, f"tabread~ sp_eff{ch}", bi)
+    # de-click: each bin's gate eases toward its new value over a few frames (a hard 0/1 switch per hop ticks)
+    mprev = c.obj(1000, 300, f"tabreceive~ sp_mk{ch}")
+    mk = op(c, 900, 350, "+~", mprev, op(c, 900, 325, f"*~ {DECLICK:g}", op(c, 900, 325 - 1, "-~", mk0, mprev)))
+    op(c, 1000, 375, f"tabsend~ sp_mk{ch}", mk)
     g = op(c, 100, 420, "*~", mag, mk)
     tx = fl(c, 300, 420, "*~ 0", c.obj(300, 395, "noise~"), "sp_tex")
     pt = op(c, 10, 450, "+~", phi, tx)
@@ -830,7 +846,7 @@ def spectral_patch(Canvas, controls_canvas, test=None):
                    "size=gather decay window/overlap/density/blend=tape time/feedback/wow/mix")
     c.sub(10, 60, "nebulae_controls", controls_canvas())
     for i, nm in enumerate(["sp_win", "sp_k", "sp_exp", "sp_hk", "sp_nz", "sp_L"] +
-                           [f"sp_{t}{ch}" for t in ("php", "A") for ch in "LR"] +
+                           [f"sp_{t}{ch}" for t in ("php", "A", "mk") for ch in "LR"] +
                            [f"sp_{t}{lv}{ch}" for t in "MFPJ" for lv in range(LEVELS) for ch in "LR"
                             if not (t == "J" and lv == 0)]):
         c.obj(10 + (i % 7) * 130, 400 + (i // 7) * 22, f"table {nm} {N}")
