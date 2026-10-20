@@ -79,7 +79,8 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
     safe either way.)
   - `reset` is a pulse. `freeze`/`record` latch on the rising edge. `source` latches on the falling edge, and a long hold
     enters the alt layer without toggling.
-  - `speed_alt` (input gain) and `reset_alt` belong to the Nebulae itself.
+  - `speed_alt` (input gain) and `reset_alt` belong to the Nebulae itself. `speed_alt` does reach Pd (0..32, 1 per
+    detent, click = 23 = 0 dB); 06_topo uses it for swing (no audio input there), but the gain carries over.
   - Clicking Pitch while holding Source resets **all** alt values to defaults (`pitch_alt` default is 0).
 - **Gate inputs (from `controlhandler.py`/`digitaldata.py`): no gate input stays high while a gate is held.**
   - `reset` and `sourcegate` are **triggers**: a short pulse per rising edge. **Reset is the clock input**
@@ -236,7 +237,8 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
   Record (any latch change) = mutate burst; File short = recall home, held 1 s = store home.
 - **Knobs:** start/size = map X/Y; density = fill; overlap = chaos; window = auto-mutate; blend = Sound (kit morph);
   speed = drift (still between the clicks); pitch = tune. Alt: fill offsets K/S/H/P, window = length, blend = decay;
-  pitch_alt = swing (direct, so alt reset clears it).
+  alt Speed (`speed_alt`) = swing, 23 = straight, ±8 = 12/8 (only after it moves). pitch_alt is unused. Sound past
+  noon also fades in a crunch bus (drive/clip, bit-crush, sample-rate reduction).
 - **Engine:**
   - The map is `tp_map` (25 nodes × 4 lanes × 32). `[pd mapq]` is a synchronous bilinear query (`s tp_q` → `v tp_qr`).
   - Mutations live in `tp_off`; a move that wouldn't be heard becomes a flip.

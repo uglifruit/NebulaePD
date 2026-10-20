@@ -17,13 +17,14 @@ builder is `tools/topo.py`; the user guide is `patches/06_topo_README.md`. Send 
 | density | fill `clip((density − 0.04)/0.92)`: the bottom 4% is silent (a pot fully CCW reads ~0.01–0.03, and 9s play from fill 0.012) | `tp_fill` |
 | overlap | chaos: level += (random 511 − 255)·overlap·0.5 per step | `tp_chaos` |
 | window | auto-mutations per cycle `round(12·w²)`; 0 below 0.05 | `tp_namt` |
-| blend | Sound: position `2·blend` → kit `a = clip(int, 0, 1)` and fraction (808 → 909 → crunch) | `[v tp_sa]`, `tp_sfr` |
+| blend | Sound: position `2·blend` → kit `a = clip(int, 0, 1)` and fraction (808 → 909 → crunch). Past noon also the crunch bus, `c = clip(2·blend − 1)`: mix `clip(4c)`, drive `1 + 5c` into `clip~ ±1`, bit-crush `qi = 2^(15 − 10c)` (16 → 6 bits), `samphold~` at `24000 − 18000c` Hz | `[v tp_sa]`, `tp_sfr`, `tp_cr*` |
 | speed | drift rate `3e-5·r²` per step, `r = clip((abs(speed − 0.5) − 0.13)/0.37)`: zero between the clicks | `tp_drate` |
 | pitch | tune ratio `2^((pitch·60 − 36)/12)`, latched per hit | `tp_tune` |
 | start/size/density/overlap_alt | lane fill offsets `v − 0.5` (K, S, H, P) | `tp_fo0..3` |
 | window_alt | length `1 + round(31·v)` | `tp_len` |
 | blend_alt | decay ×`exp((v − 0.5)·2·ln 4)` (0.25..4) | `tp_decay` |
-| pitch_alt | swing `clip(10·pitch_alt)`; applied directly (no pickup), so the alt-reset click (→ 0) clears it | `tp_swing` |
+| speed_alt (routed only in 06: `controls_canvas(extra_alt=["speed_alt"])`) | swing `clip(abs(v − 23)/8)`: the click (23 = 0 dB) = straight, ±8 detents = 12/8. `pickup(move=0.5, jump=1000)`: only after it changes. It is also the module's input gain (`amixer Capture`), which carries over to other instruments | `tp_swing` |
+| pitch_alt | unused. It used to be swing, but its stored value (from other instruments) started a swing as soon as Source was held | — |
 
 The alt knobs use `spectral.pickup()`. Note that its jump guard compares against the stream-start baseline, so after
 0.2 of travel it re-baselines and needs another 0.02 to reopen. Real knobs stream ~0.001 steps, so the effect is
@@ -59,7 +60,7 @@ polyrhythmic column).
 - **`[pd thr]`:** `thr_L = 255.001 − 255·clip(fill + fo_L)` → `[v tp_thrL]` and `tp_thrt`. At fill 0 nothing can
   reach it (levels are clipped to 255), so Fill 0 = silence even with chaos.
 - **`[pd steps]`:** the clock trigger fires right to left:
-  1. the period (`timer`, gaps > 2 s ignored) → `tp_swd = 0.4·swing·period`;
+  1. the period (`timer`, gaps > 2 s ignored) → `tp_swd = swing·period/3` (1 = 12/8);
   2. advance: step = 0 if `tp_rflag` (reset or load), else `(step + 1) mod len`. Step 0 → `tp_cycle` (auto-mutate);
      then `tp_drift`;
   3. schedule: `[delay (step mod 2)·tp_swd]` → `tp_pst` → per lane:
@@ -99,7 +100,7 @@ hardware they sounded like bleeps (see below).
   - **CH/OH:** the 808 metal: six square `phasor~`s at 205.3, 304.4, 369.6, 522.7, 540 and 800 Hz × metal, ÷6.
     Mixed with noise by `noise`, then `bp~ cut 1` → `hip~ 0.6·cut` ×2 × env. A CH hit chokes both OH halves.
   - **P:** `osc~` with a 40 ms sweep, × amp env, + a 6 ms `bp~ 3000` noise click.
-- **Post:** equal-power pans, then `*~ 0.8` → `spectral.softclip`. The `LEVEL`s set the single-hit peaks to about
+- **Post:** equal-power pans, then `crunch()`, `*~ 0.8` and `spectral.softclip`. The `LEVEL`s set the single-hit peaks to about
   K 0.64, S 0.67, C 0.52, CH 0.34, OH 0.35, P 0.46.
 
 ### First hardware report (2026-10-20) and fixes
@@ -129,6 +130,6 @@ Group the prints into cycles to compare patterns. Checked offline:
 | sound | the same blend gives identical kick spectra; blend 1 (crunch) → K 62 Hz with drive harmonics, a brighter S; blend 0.5 → the 909 hats |
 | pattern | locked, chaos 0: cycles 1–3 identical (29 hits, house node); density 0.03 (dead zone) → 0 hits; fill 1 → 56 hits |
 | mutate | Record → the next cycle differs; File short → the plain map; File held 1.3 s stores; Record → differs; File short → the stored pattern; Window 1 → a new pattern each cycle; Freeze → repeats |
-| groove | swing 1 → odd steps exactly 50 ms late at 125 ms; length 12 → 12-step cycles; Source gate → the next step is 0; Speed 1 → the pattern drifts; fill 0.15 + hats offset −0.18 → kick/snare only |
+| groove | alt Speed 23 → 31 → odd steps 41.67 ms late at 125 ms (12/8); holding Source with a stored 27 or 26 → no swing; length 12 → 12-step cycles; Source gate → the next step is 0; Speed 1 → the pattern drifts; fill 0.15 + hats offset −0.18 → kick/snare only |
 
 A 61 s render takes ~1.5 s on the desktop, about 3× lighter per second than 05_spectral.

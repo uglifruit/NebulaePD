@@ -25,7 +25,8 @@ are **not** sent otherwise. Consequences:
 
 ## Alt controls (hold the **source** button; pots/encoders only — no CV)
 `start_alt size_alt density_alt overlap_alt blend_alt window_alt pitch_alt record_alt file_alt source_alt freeze_alt`
-(0–1, or 0/1 for buttons). `reset_alt` (resets all alts to defaults) and `speed_alt` (hardware input gain) are
+(0–1, or 0/1 for buttons). `reset_alt` (resets all alts to defaults) and `speed_alt` (hardware input gain: 0..32, 1 per detent, click = 23 = 0 dB;
+it *is* sent to Pd, see 06_topo) are
 handled by the Nebulae itself and not meant for your patch. The reference PDF lists a few alt-edge-sensitivity
 details inconsistently (e.g. `record_alt`); treat button semantics as unverified.
 

@@ -181,19 +181,20 @@ def map_values():
 # --- the kit -------------------------------------------------------------------------------------------------------
 # Analog-model voices after the TR-808/909 recipes. Every parameter has three kit values (808-ish, 909-ish, crunch);
 # the Sound knob (blend) morphs 0 -> 808, 0.5 -> 909, 1 -> crunch, and the sounds only change when it moves.
+# Past noon it also fades in the crunch bus (crunch()): drive into a hard clip, bit-crush, sample-rate reduction.
 # Kinds: hz = Hz (stored log2, x Tune), log = stored log2, oct = octaves (-> 2^v - 1), dec = ms (x Decay), lin.
 KITS = {
-    "K":  [("f", "hz", (48, 55, 62)), ("sweep", "oct", (1.6, 2.3, 3.0)), ("ptime", "lin", (60, 35, 18)),
-           ("decay", "dec", (650, 380, 220)), ("click", "lin", (0.15, 0.45, 0.7)), ("drive", "lin", (1.2, 2.2, 4.0))],
-    "S":  [("f1", "hz", (175, 185, 220)), ("f2", "hz", (260, 330, 410)), ("tdec", "dec", (160, 130, 90)),
-           ("ndec", "dec", (260, 320, 380)), ("snappy", "lin", (0.5, 0.7, 0.9)), ("ncut", "log", (1200, 1800, 2600))],
-    "C":  [("fc", "log", (1000, 1250, 1600)), ("tail", "dec", (180, 250, 380))],
-    "CH": [("metal", "hz", (1.0, 1.12, 1.35)), ("cut", "log", (7000, 8000, 9500)), ("decay", "dec", (45, 60, 35)),
-           ("noise", "lin", (0.15, 0.35, 0.6))],
-    "OH": [("metal", "hz", (1.0, 1.12, 1.35)), ("cut", "log", (6500, 7500, 9000)), ("decay", "dec", (380, 480, 300)),
-           ("noise", "lin", (0.15, 0.35, 0.6))],
-    "P":  [("f", "hz", (160, 200, 330)), ("sweep", "oct", (0.5, 0.8, 1.2)), ("decay", "dec", (260, 200, 120)),
-           ("noise", "lin", (0.05, 0.1, 0.25))],
+    "K":  [("f", "hz", (48, 55, 66)), ("sweep", "oct", (1.6, 2.3, 3.6)), ("ptime", "lin", (60, 35, 12)),
+           ("decay", "dec", (650, 380, 200)), ("click", "lin", (0.15, 0.45, 0.9)), ("drive", "lin", (1.2, 2.2, 9.0))],
+    "S":  [("f1", "hz", (175, 185, 240)), ("f2", "hz", (260, 330, 470)), ("tdec", "dec", (160, 130, 70)),
+           ("ndec", "dec", (260, 320, 300)), ("snappy", "lin", (0.5, 0.7, 1.0)), ("ncut", "log", (1200, 1800, 3200))],
+    "C":  [("fc", "log", (1000, 1250, 1900)), ("tail", "dec", (180, 250, 320))],
+    "CH": [("metal", "hz", (1.0, 1.12, 1.6)), ("cut", "log", (7000, 8000, 10500)), ("decay", "dec", (45, 60, 30)),
+           ("noise", "lin", (0.15, 0.35, 0.75))],
+    "OH": [("metal", "hz", (1.0, 1.12, 1.6)), ("cut", "log", (6500, 7500, 10000)), ("decay", "dec", (380, 480, 260)),
+           ("noise", "lin", (0.15, 0.35, 0.75))],
+    "P":  [("f", "hz", (160, 200, 420)), ("sweep", "oct", (0.5, 0.8, 1.6)), ("decay", "dec", (260, 200, 70)),
+           ("noise", "lin", (0.05, 0.1, 0.45))],
 }
 ANCHORS = 3
 METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)    # TR-808 hat oscillators (Hz)
@@ -397,9 +398,20 @@ def ui(Canvas):
         pickup(c, x + i * 300, y, knob, f"tp_fo{i}", ["- 0.5"])
     pickup(c, x, y + 260, "window_alt", "tp_len", ["* 31", "+ 1.5", "int"])
     pickup(c, x + 300, y + 260, "blend_alt", "tp_decay", ["- 0.5", f"* {2 * math.log(4):.6f}", "exp"])
-    # pitch_alt (an absolute accumulator, default 0): swing, applied directly so the alt-reset click clears it
-    r = c.obj(x + 600, y + 260, "r pitch_alt")
-    chain(c, x + 600, y + 260, r, ["* 10", "clip 0 1", "change", "s tp_swing"])
+    # Speed encoder on the alt layer (speed_alt 0..32, 1 per detent, click = 23 = 0 dB input gain): swing.
+    # Click = straight, 8 detents either way = 12/8. It only follows once moved or clicked, so a gain another
+    # instrument left behind doesn't start a swing.
+    pickup(c, x + 600, y + 260, "speed_alt", "tp_swing", ["- 23", "abs", "/ 8", "clip 0 1"], move=0.5, jump=1000)
+
+    # Sound past noon fades in the crunch bus: c = clip(2*blend - 1). Mix clip(4c), drive 1 + 5c (into a hard clip),
+    # bits 16 -> 6 (qi = 2^(15 - 10c)), sample rate 24 k -> 6 k
+    r = c.obj(x + 900, y + 260, "r blend")
+    tc = op(c, x + 900, y + 304, "t f f f f f", chain(c, x + 900, y + 260, r, ["* 2", "- 1", "clip 0 1", "change"]))
+    chain(c, x + 900, y + 326, tc, ["* 4", "clip 0 1", "s tp_crm"], outlet=0)
+    chain(c, x + 990, y + 326, tc, ["* 5", "+ 1", "s tp_crg"], outlet=1)
+    chain(c, x + 1080, y + 326, tc, ["* -10", "+ 15", f"* {LN2:.6f}", "exp", "s tp_crqi"], outlet=2)
+    chain(c, x + 1170, y + 326, tc, ["* 10", "- 15", f"* {LN2:.6f}", "exp", "s tp_crq"], outlet=3)
+    chain(c, x + 1260, y + 326, tc, ["* -18000", "+ 24000", "s tp_crr"], outlet=4)
     return c
 
 
@@ -524,13 +536,13 @@ def steps(Canvas):
     c.connect(c.obj(1200, 30, "r tp_len"), 0, c.obj(1200, 52, "v tp_vlen"), 0)
 
     te = op(c, 10, 52, "t b b b", c.obj(10, 30, "r tp_clock"))
-    # o2: step period -> swing delay = swing * 0.4 * period (a gap over 2 s keeps the last one)
+    # o2: step period -> swing delay = swing * period / 3 (1 = 12/8); a gap over 2 s keeps the last one
     tt = op(c, 400, 80, "t b b", (te, 2))
     tm = c.obj(400, 102, "timer")
     c.connect(tt, 1, tm, 1)
     c.connect(tt, 0, tm, 0)
     mo = op(c, 400, 124, "moses 2000", tm)
-    sw = fl(c, 400, 168, "* 0", op(c, 400, 146, "* 0.4", (mo, 0)), "tp_swing")
+    sw = fl(c, 400, 168, "* 0", op(c, 400, 146, f"* {1 / 3:.6f}", (mo, 0)), "tp_swing")   # 1 = 12/8 (triplet)
     setv(c, 400, 190, "tp_swd", sw)
     # o1: advance (or 0 after a reset / at load)
     sr = op(c, 10, 112, "sel 0", op(c, 10, 90, "v tp_rflag", (te, 1)))
@@ -1036,14 +1048,32 @@ def test_clock(Canvas):
     return c
 
 
+def crunch(c, x, y, src):
+    """Crunch bus: dry*(1 - m) + m*decimate(crush(clip(g*dry))). Bit-crush floor(z) = z - wrap~(z) on z >= 0 (old
+    Pd's wrap~ is wrong for negatives), with z = x*qi + 65536; the hard clip keeps |x*qi| <= 2^15."""
+    s, o = src
+    m = chain(c, x + 150, y, c.obj(x + 150, y, "r tp_crm"), ["pack f 20", "line~"])
+    dry = op(c, x, y + 88, "*~", src, chain(c, x + 220, y + 22, m, ["*~ -1", "+~ 1"]))
+    g = chain(c, x + 300, y, c.obj(x + 300, y, "r tp_crg"), ["pack f 20", "line~"])
+    cl = op(c, x + 300, y + 88, "clip~ -1 1", op(c, x + 300, y + 66, "*~", src, g))
+    z = op(c, x + 300, y + 132, "+~ 65536", fl(c, x + 300, y + 110, "*~ 1", cl, "tp_crqi"))
+    fz = op(c, x + 300, y + 176, "-~", z, op(c, x + 380, y + 154, "wrap~", z))
+    cr = fl(c, x + 300, y + 220, "*~ 1", op(c, x + 300, y + 198, "-~ 65536", fz), "tp_crq")
+    rr = c.obj(x + 450, y + 176, "r tp_crr")
+    ph = c.obj(x + 450, y + 198, "phasor~ 24000")
+    c.connect(rr, 0, ph, 0)
+    dec = op(c, x + 300, y + 242, "samphold~", cr, ph)
+    return op(c, x, y + 286, "+~", dry, op(c, x + 300, y + 264, "*~", dec, m))
+
+
 def topo_patch(Canvas, controls_canvas, test=None):
     c = Canvas("#N canvas 0 50 1000 600 10;")
-    c.text(10, 5, "06_topo: clocked drum-pattern generator (Grids-style map) + FM drum synth. See docs/TOPO.md.")
+    c.text(10, 5, "06_topo: clocked drum-pattern generator (Grids-style map) + analog-model drum synth. See docs/TOPO.md.")
     c.text(10, 20, "Clock (16ths) into Reset. Source gate = back to step 1. Freeze = lock. Record = mutate. "
                    "File: short = recall home / long = store home.")
     c.text(10, 35, "start/size = map X/Y. density = fill. overlap = chaos. window = auto-mutate. blend = sound. "
-                   "speed = drift. pitch = tune. Alt: fills K/S/H/P + length + decay + swing (pitch_alt).")
-    c.sub(10, 60, "nebulae_controls", controls_canvas())
+                   "speed = drift. pitch = tune. Alt: fills K/S/H/P + length + decay. Alt Speed = swing.")
+    c.sub(10, 60, "nebulae_controls", controls_canvas(extra_alt=["speed_alt"]))
     c.obj(200, 60, f"table tp_map {25 * NODE}")
     c.obj(350, 60, f"table tp_off {NODE}")
     c.obj(500, 60, f"table tp_home {NODE}")
@@ -1060,7 +1090,7 @@ def topo_patch(Canvas, controls_canvas, test=None):
     vo = c.sub(10, 140, "voices", voices(Canvas))
     outs = []
     for ch, x in [(0, 10), (1, 220)]:
-        outs.append(softclip(c, x, 200, op(c, x, 170, "*~ 0.8", (vo, ch))))
+        outs.append(softclip(c, x, 300, op(c, x, 270, "*~ 0.8", crunch(c, x, 170, (vo, ch)))))
     dac = c.obj(10, 340, "dac~ 1 2")
     c.connect(outs[0], 0, dac, 0)
     c.connect(outs[1], 0, dac, 1)

@@ -50,19 +50,21 @@ class Canvas:
         return "\n".join([self.header.replace("%NAME%", "")] + self.lines) + "\n"
 
 
-def controls_canvas(top=False):
-    """netreceive 3000 -> route -> [s name]; plus DSP-on at load."""
+def controls_canvas(top=False, extra_alt=()):
+    """netreceive 3000 -> route -> [s name]; plus DSP-on at load. extra_alt: more alt names to route (06_topo routes
+    speed_alt, the Nebulae's input gain, for swing because it has no audio input)."""
+    alt = ALT + list(extra_alt)
     c = Canvas("#N canvas 0 50 900 520 10;" if top else "#N canvas 0 50 900 520 %NAME% 0;")
     c.text(10, 5, "Nebulae control receiver (FUDI over TCP 3000). Use [r name] elsewhere.")
     nr = c.obj(10, 30, "netreceive 3000")
     r1 = c.obj(10, 80, "route " + " ".join(PRIMARY))
-    r2 = c.obj(10, 230, "route " + " ".join(ALT))
+    r2 = c.obj(10, 230, "route " + " ".join(alt))
     c.connect(nr, 0, r1, 0)
     for i, name in enumerate(PRIMARY):
         s = c.obj(10 + (i % 8) * 105, 130 + (i // 8) * 30, f"s {name}")
         c.connect(r1, i, s, 0)
     c.connect(r1, len(PRIMARY), r2, 0)
-    for i, name in enumerate(ALT):
+    for i, name in enumerate(alt):
         s = c.obj(10 + (i % 6) * 140, 290 + (i // 6) * 30, f"s {name}")
         c.connect(r2, i, s, 0)
     # DSP on shortly after load (unverified whether the Nebulae launcher already does this).
@@ -720,11 +722,11 @@ def topo_mutate_test(wav=None):
 
 
 def topo_groove_test(wav=None):
-    """Swing 1 (pitch_alt 0.1 at 1.3 s: odd steps 50 ms late); length 12 (window_alt 0.5 -> 0.35 at 5.3 s); Source
+    """Swing 12/8 (alt Speed 23 -> 31 at 1.3 s: odd steps 125/3 = 41.7 ms late); length 12 (window_alt 0.5 -> 0.35 at 5.3 s); Source
     gate reset at 8 s (next step 0); drift at full speed from 10 s. At 14 s fill 0.15 and the hats fill offset
     -0.18 (density_alt swept 0.5 -> 0.32 like a knob): kick and snare stay, no hats."""
     return dict(wav=wav, steps=[
-        (10, TP0), (1200, "\\; tp_tclk 1"), (1300, "\\; pitch_alt 0.1"),
+        (10, TP0), (1200, "\\; tp_tclk 1"), (1300, "\\; speed_alt 23"), (1310, "\\; speed_alt 31"),
         (5300, "\\; window_alt 0.5"), (5320, "\\; window_alt 0.35"),
         (8000, "\\; sourcegate 1"), (8005, "\\; sourcegate 0"),
         (10000, "\\; speed 1"), (14000, "\\; density 0.15")] + [

@@ -81,17 +81,17 @@ def lerp(c, x, y, a, b, rname):
     return op(c, x, y + 44, "+~", a, m)
 
 
-def pickup(c, x, y, knob, dst, convert):
-    """Alt knob -> [s dst] only after it moves 0.02 from where it was when its stream (re)started (alt values only
-    stream while Source is held, and the first ones are the stored values). A jump > 0.2 (alt reset) re-baselines.
+def pickup(c, x, y, knob, dst, convert, move=0.02, jump=0.2):
+    """Alt knob -> [s dst] only after it moves `move` from where it was when its stream (re)started (alt values only
+    stream while Source is held, and the first ones are the stored values). A jump > `jump` (alt reset) re-baselines.
     Same logic as gloop.takeover, for one destination."""
     r = c.obj(x, y, f"r {knob}")
     t = c.obj(x, y + 22, "t f f b f")
     last = c.obj(x + 120, y + 44, "f")
     diff = c.obj(x + 60, y + 44, "-")
     ab = c.obj(x + 60, y + 66, "abs")
-    mj = c.obj(x + 60, y + 88, "moses 0.2")
-    gt = c.obj(x + 60, y + 110, "> 0.02")
+    mj = c.obj(x + 60, y + 88, f"moses {jump:g}")
+    gt = c.obj(x + 60, y + 110, f"> {move:g}")
     s1 = c.obj(x + 60, y + 132, "sel 1")
     opn = c.msg(x + 60, y + 154, "1")
     spg = c.obj(x, y + 176, "spigot")

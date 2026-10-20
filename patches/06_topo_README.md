@@ -57,10 +57,14 @@ sequencer. **Fill** CV makes builds and breakdowns. **Pitch** tracks 1V/oct for 
 | overlap | **Perc fill** offset | centre |
 | window | **Length** 1 – 32 steps | 32 (fully CW) |
 | blend | **Decay**: the whole kit ×0.25 (tight) – ×4 (boomy) | ×1 at centre |
-| pitch encoder | **Swing**: odd 16ths late, turning CW adds swing. Source + Pitch click (alt reset) = straight | straight |
+| speed encoder | **Swing**: click = straight; 8 detents either way = full **12/8** (triplet); in between = in between | straight |
 
-Alt knobs only act once you **move** them, so holding Source doesn't make anything jump to where another instrument
-left the knob.
+Alt knobs (and alt Speed) only act once you **move** them, so holding Source doesn't make anything jump to where
+another instrument left them.
+
+**Swing and input gain:** alt Speed is also the Nebulae's **input gain**. 06 has no audio input, so that doesn't
+matter here, but the gain carries over to the next instrument. **Click alt Speed (straight = 0 dB) before switching
+instruments**, or swing CCW: that only ever lowers the input gain, while CW raises it.
 
 ## First steps
 
@@ -107,7 +111,9 @@ between styles. The further from centre, the faster. Freeze stops it.
 **9. Sound.** Turn **blend**:
 - **CCW, 808-ish:** a long boomy kick, a tonal snare, and the 808's six-oscillator metal hats.
 - **Noon, 909-ish:** a punchier, slightly driven kick, a snappier snare, brighter hats.
-- **CW, crunch:** a short, hard-driven kick, a noisy snare, high hats, a rim-like perc.
+- **CW, crunch:** a short, hard-driven kick, a noisy snare, high hats, a rim-like perc. Past noon a **crunch
+  bus** fades in on the whole kit: drive into a hard clip, a bit-crush down to 6 bits, and sample-rate reduction
+  down to 6 kHz, all getting stronger towards CW.
 
 Positions in between blend the two neighbouring kits, and any position is repeatable. The sounds don't change unless
 the knob (or its CV) moves. Pitch tunes the whole kit, and alt **blend** sets the decay.
