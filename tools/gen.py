@@ -769,11 +769,86 @@ SPECTRAL_TESTS = [("calib", spectral_calib_test), ("bands", spectral_bands_test)
                   ("drift", spectral_drift_test), ("recapture", spectral_recapture_test)]
 
 
+SH0 = ("\\; start 0 \\; size 0.5 \\; density 0 \\; overlap 0 \\; window 0.5 \\; blend 1 \\; speed 0.5 \\; pitch 0.6 "
+       "\\; freeze 0 \\; record 0 \\; source 0 \\; filestate 0")
+
+
+def shimmer_decay_test(wav=None):
+    """Plain reverb (density 0, wet only): noise burst at 0.5 s with Size 0.25 (RT60 1.4 s), then at 6.5 s with
+    Size 0.5 (RT60 4.9 s)."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; size 0.25"), (500, "\\; sh_tnoise bang"), (6000, "\\; size 0.5"),
+                                (6500, "\\; sh_tnoise bang"), (16000, "\\; pd quit")])
+
+
+def shimmer_loop_test(wav=None):
+    """Loop shimmer +12 (density 0.5, Size 0.6): a 440 Hz burst at 0.5 s; 880, 1760, 3520 Hz grow in over time."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; density 0.5 \\; size 0.6"), (500, "\\; sh_tburst bang"),
+                                (10000, "\\; pd quit")])
+
+
+def shimmer_pre_test(wav=None):
+    """Pre shimmer (Source on), otherwise as loop: 880 Hz appears, no cascade to 1760."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; density 0.5 \\; size 0.6 \\; source 1"), (500, "\\; sh_tburst bang"),
+                                (10000, "\\; pd quit")])
+
+
+def shimmer_voiceb_test(wav=None):
+    """Voice A +12 and Voice B -12 (Speed 0.2), equal levels: 220 Hz and 880 Hz both appear."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; density 0.5 \\; size 0.6 \\; speed 0.2"),
+                                (500, "\\; sh_tburst bang"), (8000, "\\; pd quit")])
+
+
+def shimmer_freeze_test(wav=None):
+    """Burst at 0.5 s, Freeze at 1 s (density 0): the level holds to 21 s. A burst at 5 s must not get in."""
+    return dict(wav=wav, steps=[(10, SH0), (500, "\\; sh_tburst bang"), (1000, "\\; freeze 1"),
+                                (5000, "\\; sh_tburst bang"), (21000, "\\; pd quit")])
+
+
+def shimmer_freezesh_test(wav=None):
+    """As freeze, with loop shimmer at density 0.5: the halo climbs but the level must not grow."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; density 0.5"), (500, "\\; sh_tburst bang"), (1000, "\\; freeze 1"),
+                                (21000, "\\; pd quit")])
+
+
+def shimmer_runaway_test(wav=None):
+    """Worst case: density, size, window, overlap at 1, shimmer tone fully open (density_alt moved to 1), sustained
+    sine 0.5, Freeze from 3 s to 40 s, input on throughout. No NaN, bounded."""
+    sweep = [(20 + 5 * i, f"\\; density_alt {0.65 + 0.035 * i:g}") for i in range(11)]
+    return dict(wav=wav, steps=[(10, SH0 + " \\; density 1 \\; size 1 \\; window 1 \\; overlap 1 \\; sh_tsin 0.5")]
+                + sweep + [(3000, "\\; freeze 1"), (40000, "\\; freeze 0"), (60000, "\\; pd quit")])
+
+
+def shimmer_clear_test(wav=None):
+    """Long tail (Size 0.8), Reset at 2 s: silent within ~0.4 s, then the reverb works again (burst at 3 s)."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; size 0.8"), (500, "\\; sh_tburst bang"), (2000, "\\; reset 1"),
+                                (2005, "\\; reset 0"), (3000, "\\; sh_tburst bang"), (5000, "\\; pd quit")])
+
+
+def shimmer_duck_test(wav=None):
+    """Ducking full (blend_alt moved to 1): sustained sine 1-3 s ducks the wet; the tail rises after it stops."""
+    sweep = [(20 + 5 * i, f"\\; blend_alt {0.1 * i:g}") for i in range(11)]
+    return dict(wav=wav, steps=[(10, SH0 + " \\; size 0.6")] + sweep +
+                [(1000, "\\; sh_tsin 0.5"), (3000, "\\; sh_tsin 0"), (6000, "\\; pd quit")])
+
+
+def shimmer_swell_test(wav=None):
+    """Swell (Record on): sine 2-4 s; the wet rises over ~1 s instead of at once."""
+    return dict(wav=wav, steps=[(10, SH0 + " \\; record 1 \\; blend 0.999"), (2000, "\\; sh_tsin 0.5"),
+                                (4000, "\\; sh_tsin 0"), (6000, "\\; pd quit")])
+
+
+SHIMMER_TESTS = [("decay", shimmer_decay_test), ("loop", shimmer_loop_test), ("pre", shimmer_pre_test),
+                 ("voiceb", shimmer_voiceb_test), ("freeze", shimmer_freeze_test),
+                 ("freezesh", shimmer_freezesh_test), ("runaway", shimmer_runaway_test),
+                 ("clear", shimmer_clear_test), ("duck", shimmer_duck_test), ("swell", shimmer_swell_test)]
+
+
 if __name__ == "__main__":
     import gloop
     import glitch
     import spectral
     import topo
+    import shimmer
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
@@ -782,6 +857,7 @@ if __name__ == "__main__":
     write("patches/04_glitch.pd", glitch.glitch_patch(Canvas, controls_canvas))
     write("patches/05_spectral.pd", spectral.spectral_patch(Canvas, controls_canvas))
     write("patches/06_topo.pd", topo.topo_patch(Canvas, controls_canvas))
+    write("patches/07_shimmer.pd", shimmer.shimmer_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
@@ -805,3 +881,8 @@ if __name__ == "__main__":
         write(f"sim/test_06_{name}.pd", topo.topo_patch(Canvas, controls_canvas, test=scen()))
         if wavdir:
             write(f"{wavdir}/d_{name}.pd", topo.topo_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/d_{name}.wav")))
+    for name, scen in SHIMMER_TESTS:
+        write(f"sim/test_07_{name}.pd", shimmer.shimmer_patch(Canvas, controls_canvas, test=scen()))
+        if wavdir:
+            write(f"{wavdir}/h_{name}.pd",
+                  shimmer.shimmer_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/h_{name}.wav")))

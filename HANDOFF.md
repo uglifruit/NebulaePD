@@ -13,7 +13,7 @@ For a **new instrument**, see §8.
   04_glitch ports. They:
   - test every patch on real hardware;
   - name files on the USB root with numeric prefixes (`01_…`), because the instrument selector is alphabetical
-    across 5 buttons. **The next instrument is `07_…`**;
+    across 5 buttons. **The next instrument is `08_…`**;
   - want design choices offered as options with a recommendation (AskUserQuestion works well), and often answer with
     a variant of their own;
   - like ports to be "operationally and philosophically" faithful, but **don't copy the original's hardware limits**
@@ -27,6 +27,7 @@ For a **new instrument**, see §8.
 | `patches/04_glitch.pd` | Port of WC #57 Glitch: clock-synced beat-repeater, Glitch + Stutter modes. **Core confirmed working on hardware.** Pitch (transpose glitches, V/oct), Speed (pitch ramp across repeats) and slice-locked pitch-down on pass-through were added afterwards: offline-tested, **awaiting hardware**. Guide `patches/04_glitch_README.md`; design `docs/GLITCH.md`; builder `tools/glitch.py` |
 | `patches/05_spectral.pd` | "Spectral Clouds+" after the owner's WorkshopSpectral (WC port of Kammerl's Spectral Clouds): random log-band gates, probability, smoothing, texture, normal/sealed freeze, plus true stereo + spread, spectral pitch (V/oct, peak-locked), band drift, gather, re-capture, tape on the alt layer. Offline-tested, **awaiting hardware** (main risk: CPU burst per hop, see `docs/SPECTRAL.md`). Guide `patches/05_spectral_README.md`; design `docs/SPECTRAL.md`; builder `tools/spectral.py` |
 | `patches/06_topo.pd` | Clocked drum-pattern generator (Grids-style map, our own data) + 6-voice analog-model (808/909) drum synth; mutation (Record burst, Window auto, Speed drift), Freeze = lock, File = home. First hardware try (2026-10-20): the FM kit sounded like bleeps and Fill CCW kept playing → rebuilt (analog models, 3 kits, Fill dead zone). **Re-test 2026-10-20: much better, patterns behave as expected on hardware.** Not yet reported: per-kit sound detail, mutation/home/drift in depth. Guide `patches/06_topo_README.md`; design `docs/TOPO.md`; builder `tools/topo.py` |
+| `patches/07_shimmer.pd` | Strymon-style shimmer reverb (owner's reference: BigSky/blueSky): 8-line FDN + 2-voice pitch shifter in the loop (or before it: Source = Pre), tank mod → ensemble chorus, freeze, swell, duck, clear. Offline-tested (RT60, cascade, freeze hold, 60 s runaway, clicks), **awaiting hardware**. Guide `patches/07_shimmer_README.md`; design `docs/SHIMMER.md`; builder `tools/shimmer.py` |
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
@@ -35,6 +36,7 @@ For a **new instrument**, see §8.
 **Roadmap** (not started):
 - 05_spectral: hardware feedback. If it crackles, rebuild with `N = 1024` in `tools/spectral.py` (verified offline).
 - 04_glitch: hardware feedback on Pitch/Speed/pass-through pitch-down.
+- 07_shimmer: hardware feedback (CPU on the Pi, shimmer smoothness, swell threshold vs. Eurorack levels).
 - 06_topo: hardware feedback (sound balance, clock feel). Later idea from the owner: Source cycles through named sample
   kits. But the Source latch also toggles on the Source gate jack (06's step-1 reset), so reset would have to move.
 - Gloop effects pass: delay, reverb, bit crush, wavefold, tape saturation/hiss/age, tilt EQ. The user picked "core first".
@@ -52,10 +54,11 @@ tools/gloop.py  03_gloop builder (heads, writer, recorder, takeover, ui; press()
 tools/glitch.py 04_glitch builder (ui, clock, glitch, stutter, shuffle, pass_rate, writer, reader, beat_source)
 tools/spectral.py 05_spectral builder (ui, tables, bands, stft: ana/pool/syn per side, tape, test_source; pickup())
 tools/topo.py   06_topo builder (NODES map, KITS (3 kits); ui, pos, mapq, thr, steps, mutate, voices, test_clock)
+tools/shimmer.py 07_shimmer builder (ui, reverb (FDN + shifter taps + diffuser), chorus, duck, swell, test_source)
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
 tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1
-docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, GLOOP, GLITCH, SPECTRAL, TOPO
+docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, GLOOP, GLITCH, SPECTRAL, TOPO, SHIMMER
 reference/      Qu-Bit dev reference PDF;  upstream/  a few MIT files copied from Qu-Bit's repo
 external/       (gitignored) clones of Qu-Bit-Electronix/QB_Nebulae_V2 and TheTechnobear/NebulaePatches - re-clone if missing
 tools/csound609/ (gitignored) unzipped csound-emscripten-6.09.1 from the Csound 6.09.1 GitHub release
@@ -249,8 +252,21 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
     each (click-free phase reset). Params come from `tp_snd`, interpolated between 3 kits at each hit.
 - **Test lesson:** an action in pattern cycle k is only fully visible in cycle k+1; space test actions two cycles apart.
 
+### 07_shimmer (full detail: `docs/SHIMMER.md`)
+- **Knobs:** blend = mix (equal-power); size = decay 0.4–60 s; window = damping; start = pre-delay; density = shimmer amount;
+  overlap = mod (tank mod, then ensemble chorus past noon); pitch = Voice A interval (click = +12, V/oct);
+  speed = Voice B interval (off between the clicks; stepped −5/−12/−24 left, +5/+7/+12/+19/+24 right).
+- **Buttons:** Freeze = hold (loop shimmer paused); File held = momentary freeze; Source = Pre/Loop shimmer;
+  Record = swell; Reset = clear (360 ms flush).
+- **Alt:** start = low cut; size = room 0.5–2×; density = shimmer tone LP; overlap = mod rate; window = A/B balance;
+  blend = duck; pitch_alt = detune ±25 cents. Pickup, as 05.
+- **Engine:** tank + shifter in one canvas (a subpatch is sorted as a unit). Lines 0/1 crossfade cos θ/sin θ into the
+  shifter, whose output re-enters through the diffuser (energy-balanced). Shifter has **no makeup gain**: with
+  1/√0.75, steady tones on the 2000/W Hz comb gain 1.33 per pass and cascades grow.
+- **New Pd lessons:** no `!-`/`!/` in vanilla; a frozen loop shimmer drains through its own LP (so Freeze pauses it).
+
 ## 8. Starting a new instrument (checklist)
-1. **Name:** `patches/07_<name>.pd`, with the numeric prefix for the selector.
+1. **Name:** `patches/08_<name>.pd`, with the numeric prefix for the selector.
 2. **Builder:** a new `tools/<name>.py` with `<name>_patch(Canvas, controls_canvas, test=None)`. `tools/topo.py` is
    the most recent example (`trig()` action lists, `setv()`/`vadd()`/`vmul()` for `[v]` arithmetic); `tools/spectral.py` has
    the `op()`/`fl()`/`lerp()`/`step()` signal helpers and `pickup()` for alt knobs.
@@ -258,8 +274,8 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
    - Use a unique send prefix per instrument (gloop `gl_`, glitch `gt_`).
    - Reuse `gloop.press()` for primed button edges, and the `chain()`/`rnd()` helpers in `glitch.py`.
 3. **Register in `tools/gen.py`'s `__main__`:**
-   - write `patches/07_<name>.pd`;
-   - write `sim/test_07_*.pd` from `<name>_*_test()` scenario functions (`(ms, msg)` steps);
+   - write `patches/08_<name>.pd`;
+   - write `sim/test_08_*.pd` from `<name>_*_test()` scenario functions (`(ms, msg)` steps);
    - extend `--wav`.
 4. **Test harness:** copy `glitch.glitch_patch`'s `if test:` block (tabwrite~ + soundfiler recording) and a scripted
    source like `beat_source`.
@@ -268,7 +284,7 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
    - Batch runs + `tools/wavcheck.py`.
    - Make sure the other patches are unchanged by builder edits (`git status`).
 6. **Docs:**
-   - `patches/07_<name>_README.md` (user guide: panel map, knobs, buttons, quick start, differences);
+   - `patches/08_<name>_README.md` (user guide: panel map, knobs, buttons, quick start, differences);
    - `docs/<NAME>.md` (design);
    - this file's §2 status row, §3 layout and §7 summary;
    - update `CLAUDE.md` if the builder list changes.
