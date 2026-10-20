@@ -34,6 +34,7 @@ CHO_MS = [8.0, 12.0, 17.0]                                 # ensemble voices
 CHOK = [0.9, 1.23, 0.71]
 GIN = 0.3                                                  # input -> tank
 OUTG = 0.5                                                 # tank out = OUTG * (sum of 4 lines per side)
+ER = 0.5                                                   # + ER * diffused input (fills the gap before line 0)
 MAKEUP = 1.0                   # not 1/sqrt(0.75): steady tones at multiples of 2000/W Hz add coherently (gain 1.33)
 FLUSH = 360                                                # ms of zero feedback on Clear (> longest line + shifter)
 SPEED_L = [-5, -12, -24]                                   # Voice B, left of the left click (inner -> outer)
@@ -341,13 +342,15 @@ def reverb(Canvas):
         xi = 10 + i * 180
         w = op(c, xi, 1600, "+~", v[i], u[i % 2])
         c.connect(softclip(c, xi, 1630, w), 0, c.obj(xi, 1760, f"delwrite~ sh_t{i} 250"), 0)
-    # out: OUTG * (sum of the 4 reads per side)
+    # out: OUTG * (sum of the 4 reads per side) + ER * diffused input (the reads start only after the shortest
+    # line, ~41 ms: without the direct term the wet sounds pre-delayed with Start at 0)
     for s in (0, 1):
         x0 = 10 + s * 700
         a = op(c, x0, 1800, "+~", rd[s], rd[s + 2])
         b = op(c, x0 + 80, 1800, "+~", rd[s + 4], rd[s + 6])
-        o = op(c, x0, 1844, f"*~ {OUTG}", op(c, x0, 1822, "+~", a, b))
-        c.connect(o, 0, c.obj(x0, 1866, "outlet~"), 0)
+        o = op(c, x0, 1866, "+~", op(c, x0, 1844, f"*~ {OUTG}", op(c, x0, 1822, "+~", a, b)),
+               op(c, x0 + 160, 1844, f"*~ {ER}", u[s]))
+        c.connect(o, 0, c.obj(x0, 1888, "outlet~"), 0)
     return c
 
 

@@ -22,7 +22,9 @@ adc~ -> [duck] (envelope of the dry input -> wet gain signal)
   - Damping: `fc = 7640 (0.2 + 0.8 √window)`. At 7640 Hz Pd's one-pole coefficient reaches 1, so Window CW and
     Freeze (`1e5`) are exactly undamped.
 - **Diffuser:** 4 Schroeder allpasses per side (4.77/3.6/12.7/9.3 ms; g 0.75/0.75/0.625/0.625; R ×1.07). The
-  diffused L feeds lines 0, 2, 4, 6 and R feeds 1, 3, 5, 7. The output is `OUTG × (sum of the 4 reads per side)`.
+  diffused L feeds lines 0, 2, 4, 6 and R feeds 1, 3, 5, 7. The output is `OUTG × (sum of the 4 reads per side)`
+  plus `ER × the diffused input`, a direct term. Without it the wet starts only after the shortest line (about 35–40
+  ms), which sounds like pre-delay at Start 0 (hardware report, 2026-10-21). With it the onset is 2 ms.
 - **Loop shimmer (Source off):** lines 0/1 keep `cos θ` of their feedback. The shifter takes the line's damped read
   `z`. The shifted signal `T` (A·gA + B·gB → `lop~ sh_stone` → `hip~ sh_lc`) is added to the diffuser input at
   `√2 · sin θ · g_s`, which reaches 4 lines at 0.5 each. The energy taken out equals at most the energy put back, so
