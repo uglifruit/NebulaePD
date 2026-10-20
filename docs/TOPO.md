@@ -12,11 +12,11 @@ builder is `tools/topo.py`; the user guide is `patches/06_topo_README.md`. Send 
 | Source latch | ignored: the Source gate jack also toggles it | — |
 | Freeze latch | lock: no auto-mutation, no drift | `tp_lock` |
 | Record latch, any change after priming | mutate burst: `4 + round(12·window)` mutations | `tp_mutnow` |
-| `filestate` | press < 1 s = recall home; held 1 s = store home (fires at 1 s) | `tp_recall` / `tp_store` |
+| `filestate` | press < 1 s = recall home; held 1 s = store home (fires at 1 s); two presses < 400 ms apart = vanilla (offsets 0, drift 0, home kept; the 2nd press closes the recall gate) | `tp_recall` / `tp_store` / `tp_vanilla` |
 | start / size | map X / Y (+ drift, folded into 0..1) | `[pd pos]` |
 | density | fill `clip((density − 0.04)/0.92)`: the bottom 4% is silent (a pot fully CCW reads ~0.01–0.03, and 9s play from fill 0.012) | `tp_fill` |
 | overlap | chaos: level += (random 511 − 255)·overlap·0.5 per step | `tp_chaos` |
-| window | auto-mutations per cycle `round(12·w²)`; 0 below 0.05 | `tp_namt` |
+| window | auto-mutations **per beat** (every 4 steps) `8·w³`: the integer part, plus one more with probability equal to the fraction; 0 below 0.05 | `tp_namt` |
 | blend | Sound: position `2·blend` → kit `a = clip(int, 0, 1)` and fraction (808 → 909 → crunch). Past noon also the crunch bus, `c = clip(2·blend − 1)`: mix `clip(4c)`, drive `1 + 5c` into `clip~ ±1`, bit-crush `qi = 2^(15 − 10c)` (16 → 6 bits), `samphold~` at `24000 − 18000c` Hz | `[v tp_sa]`, `tp_sfr`, `tp_cr*` |
 | speed | drift rate `3e-5·r²` per step, `r = clip((abs(speed − 0.5) − 0.13)/0.37)`: zero between the clicks | `tp_drate` |
 | pitch | tune ratio `2^((pitch·60 − 36)/12)`, latched per hit | `tp_tune` |
@@ -61,7 +61,7 @@ polyrhythmic column).
   reach it (levels are clipped to 255), so Fill 0 = silence even with chaos.
 - **`[pd steps]`:** the clock trigger fires right to left:
   1. the period (`timer`, gaps > 2 s ignored) → `tp_swd = swing·period/3` (1 = 12/8);
-  2. advance: step = 0 if `tp_rflag` (reset or load), else `(step + 1) mod len`. Step 0 → `tp_cycle` (auto-mutate);
+  2. advance: step = 0 if `tp_rflag` (reset or load), else `(step + 1) mod len`. Step mod 4 = 0 → `tp_beat` (auto-mutate); step 0 → `tp_cycle` (tests print it);
      then `tp_drift`;
   3. schedule: `[delay (step mod 2)·tp_swd]` → `tp_pst` → per lane:
      `lvl = clip(clip(qr + off) + chaos·(rnd − 255), 0, 255)`; hit if `lvl ≥ thr`; velocity `0.35 + 0.65·lvl/255`.
@@ -70,12 +70,14 @@ polyrhythmic column).
   - **0–4, move:** neighbour `n = (ms + d) mod len`, `d ∈ {−2, −1, 1, 2}`. If exactly one of the two steps plays
     (`level ≥ thr`), swap their levels by writing both offsets; otherwise **flip** step 1 (so moves are never
     silent no-ops).
-  - **5–7, flip:** silent → `thr + u·(255 − thr)`; playing → `0.9·u·thr`.
+  - **5–7, flip:** playing → `0.9·u·thr`; silent → `thr + u·(255 − thr)` only with probability `0.7·fill` (else
+    unchanged). Without that, heavy mutation drifted towards half the grid playing (29 → 69 hits); with it the
+    playing share settles near `0.7f/(1 + 0.7f)`.
   - **8–9, heal:** offset 0.
   - Before the flip/move fix, a 4-mutation burst was often inaudible (moves between two silent steps); see the
     test notes.
 - **Drift:** per step, unless locked: `dx += (rnd(2001) − 1000)·tp_drate`, clipped ±0.5 (also dy).
-- **Home:** `[until]` copies `tp_off ↔ tp_home` + the drift position.
+- **Home:** `[until]` copies `tp_off ↔ tp_home` + the drift position. **Vanilla:** zero `tp_off`, dx = dy = 0.
 - **Randomness:** `glitch.rnd()` instances seeded from the time to the first clock.
 
 ### Voices (`[pd voices]`)
@@ -131,6 +133,7 @@ Group the prints into cycles to compare patterns. Checked offline:
 | pattern | locked, chaos 0: cycles 1–3 identical (29 hits, house node); density 0.03 (dead zone) → 0 hits; fill 1 → 56 hits |
 | mutate | Record → the next cycle differs; File short → the plain map; File held 1.3 s stores; Record → differs; File short → the stored pattern; Window 1 → a new pattern each cycle; Freeze → repeats |
 | meter | Length 32 and a Source-gate pulse every 12 steps → 12-step loops; the pulses stop → back to 32 |
+| vanilla | Record → B; stored as home; Record → C; File double-tap → the plain map (A); File short → B (home kept). Window 1 → about 70% of hits change per cycle, density ~40 hits (map 29) |
 | groove | alt Speed 23 → 31 → odd steps 41.67 ms late at 125 ms (12/8); holding Source with a stored 27 or 26 → no swing; window_alt 0.35 → 8-step cycles; Source gate → the next step is 0; Speed 1 → the pattern drifts; fill 0.15 + hats offset −0.18 → kick/snare only |
 
 A 61 s render takes ~1.5 s on the desktop, about 3× lighter per second than 05_spectral.

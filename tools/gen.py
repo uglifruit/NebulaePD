@@ -746,8 +746,22 @@ def topo_meter_test(wav=None):
     return dict(wav=wav, steps=[(10, TP0), (1200, "\\; tp_tclk 1")] + pulses + [(18000, "\\; pd quit")])
 
 
+def topo_vanilla_test(wav=None):
+    """Cycles of 4 s from 1.2 s (cycle k starts at 1.2 + 4(k-1) s); an action in cycle k shows in all of k+1.
+    Record (6 s) -> cycle 3 = B; File held (10 s) stores B; Record (14 s) -> cycle 5 = C; File double-tap (22 s) ->
+    cycle 7 = A (vanilla); File short (30 s) -> cycle 9 = B (home kept). Window 1 (38 s) -> cycles 11, 12 churn hard
+    (8 re-draws per beat) at about the map's density."""
+    return dict(wav=wav, steps=[
+        (10, TP0), (1200, "\\; tp_tclk 1"), (6000, "\\; record 1"),
+        (10000, "\\; filestate 1"), (11300, "\\; filestate 0"), (14000, "\\; record 0"),
+        (22000, "\\; filestate 1"), (22050, "\\; filestate 0"), (22200, "\\; filestate 1"), (22250, "\\; filestate 0"),
+        (30000, "\\; filestate 1"), (30100, "\\; filestate 0"), (38000, "\\; window 1"), (49150, "\\; pd quit"),
+    ])
+
+
 TOPO_TESTS = [("voices", topo_voices_test), ("sound", topo_sound_test), ("pattern", topo_pattern_test),
-              ("mutate", topo_mutate_test), ("groove", topo_groove_test), ("meter", topo_meter_test)]
+              ("mutate", topo_mutate_test), ("groove", topo_groove_test), ("meter", topo_meter_test),
+              ("vanilla", topo_vanilla_test)]
 
 
 SPECTRAL_TESTS = [("calib", spectral_calib_test), ("bands", spectral_bands_test), ("freeze", spectral_freeze_test),

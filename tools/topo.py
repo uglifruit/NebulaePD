@@ -8,15 +8,16 @@ Fill sets the level a step needs to play, Chaos jitters the levels on every pass
 snare and hat steps (level > ACCENT).
 
 Mutation lives in a per-step offset table (tp_off) added to the map: Record re-draws a burst of steps, Window re-draws
-some every cycle, Speed lets X/Y drift, Freeze locks both. File: short press = recall home, long press = store home.
+some every beat, Speed lets X/Y drift, Freeze locks both. File: short press = recall home, long press = store home, double-tap = vanilla.
 
 Engine
 - Control rate: each clock pulse (Reset) advances one 16th step. [pd steps] queries [pd mapq] (bilinear read of
   tp_map, synchronous through tp_q -> [v tp_qr]) per lane, adds the offset and chaos, thresholds, and sends
   tp_trig_<voice> <velocity>. Odd steps are delayed by the swing.
-- Signal: every voice is a 2-op phase-modulation voice + band-passed noise, two round-robin subvoices each (the idle
-  one is silent, so its phases can be reset click-free). The 10 voice parameters are read at each hit from tp_snd,
-  interpolated between 8 kit anchors by the Sound knob (blend), so sounds only change when the knob does.
+- Signal: analog-model voices (808/909 recipes) with exponential envelopes (tp_exp), two round-robin halves each
+  (the idle one is silent, so its phases can be reset click-free). Each voice's parameters are read at each hit from
+  tp_snd, interpolated between 3 kits by the Sound knob (blend), so sounds only change when the knob does. Past noon
+  the Sound knob also fades in the crunch bus.
 """
 
 import math
@@ -333,15 +334,26 @@ def ui(Canvas):
     # Record: any latch change (button press or gate edge) = mutate once
     p = press(c, 350, 30, "record", primed="tp_primed")
     chain(c, 350, 74, p, ["t b", "s tp_mutnow"])
-    # File: short press = recall home, held 1 s = store home
+    # File: short press = recall home, held 1 s = store home, double-tap (presses < 400 ms apart) = vanilla
     p = press(c, 470, 30, "filestate", primed="tp_primed")
     sel = op(c, 470, 96, "sel 1 0", p)
-    tpr = op(c, 470, 120, "t b b", (sel, 0))
+    tpr = op(c, 470, 120, "t b b b", (sel, 0))
     one = c.msg(530, 145, "1")
-    c.connect(tpr, 1, one, 0)
+    c.connect(tpr, 2, one, 0)
     gate = c.obj(600, 230, "spigot 1")
     c.connect(one, 0, gate, 1)
-    dl = op(c, 470, 145, "delay 1000", (tpr, 0))
+    dl = op(c, 470, 145, "delay 1000", (tpr, 1))
+    # double-tap: time since the previous press (measure, then restart); < 400 ms -> vanilla, and this press's
+    # release must not recall home
+    tdb = op(c, 700, 120, "t b b", (tpr, 0))
+    tmd = c.obj(700, 145, "timer")
+    c.connect(tdb, 1, tmd, 1)
+    c.connect(tdb, 0, tmd, 0)
+    tvn = op(c, 700, 189, "t b b", (op(c, 700, 167, "moses 400", tmd), 0))
+    zv = c.msg(760, 211, "0")
+    c.connect(tvn, 1, zv, 0)
+    c.connect(zv, 0, gate, 1)
+    c.connect(tvn, 0, c.obj(700, 233, "s tp_vanilla"), 0)
     tst = op(c, 470, 170, "t b b", dl)
     z = c.msg(530, 195, "0")
     c.connect(tst, 1, z, 0)
@@ -360,7 +372,8 @@ def ui(Canvas):
     chain(c, x, y, r, ["change", "- 0.04", "/ 0.92", "clip 0 1", "s tp_fill"])     # bottom 4% = silent
     r = c.obj(x + 110, y, "r overlap")
     chain(c, x + 110, y, r, ["change", "* 0.5", "s tp_chaos"])
-    # window: auto re-draws per cycle round(12*w^2), off below 0.05; Record burst 4 + round(12*w)
+    # window: auto re-draws per beat (4 steps) 8*w^3 (fractions = a chance), off below 0.05; Record burst
+    # 4 + round(12*w)
     r = c.obj(x + 220, y, "r window")
     t = op(c, x + 220, y + 22, "t f f", chain(c, x + 220, y, r, ["change"]))
     chain(c, x + 300, y + 22, t, ["* 12", "+ 4.5", "int", "change", "s tp_nburst"], outlet=1)
@@ -369,7 +382,10 @@ def ui(Canvas):
     c.connect(mo, 0, z, 0)
     tq = op(c, x + 260, y + 66, "t f f", (mo, 1))
     sq = op(c, x + 260, y + 88, "*", (tq, 0), (tq, 1))
-    nm = chain(c, x + 260, y + 88, sq, ["* 12", "+ 0.5", "int"])
+    cu = c.obj(x + 260, y + 110, "*")
+    c.connect(tq, 1, cu, 1)
+    c.connect(sq, 0, cu, 0)
+    nm = chain(c, x + 260, y + 110, cu, ["* 8"])
     cg = c.obj(x + 220, y + 200, "change")
     c.connect(z, 0, cg, 0)
     c.connect(nm, 0, cg, 0)
@@ -557,8 +573,9 @@ def steps(Canvas):
     st = c.obj(10, 210, "t b f")
     c.connect(md, 0, st, 0)
     c.connect(z0, 0, st, 0)
-    ts2 = op(c, 60, 232, "t f f", (st, 1))
-    setv(c, 120, 254, "tp_step", (ts2, 1))
+    ts2 = op(c, 60, 232, "t f f f", (st, 1))
+    setv(c, 180, 254, "tp_step", (ts2, 2))
+    c.connect(chain(c, 120, 232, ts2, ["mod 4", "sel 0"], outlet=1), 0, c.obj(120, 300, "s tp_beat"), 0)  # auto-mutate
     c.connect(op(c, 60, 254, "sel 0", (ts2, 0)), 0, c.obj(60, 276, "s tp_cycle"), 0)
     c.connect(st, 0, c.obj(10, 300, "s tp_drift"), 0)
     # o0: schedule the play: odd steps wait tp_swd ms
@@ -611,7 +628,7 @@ def write_off(c, x, y, src, iname, a, b):
 
 
 def copy(c, x, y, src, frm, to):
-    """bang -> tabwrite to[i] = tabread frm[i] for i < 128."""
+    """bang -> tabwrite to[i] = tabread frm[i] (or 0 if frm is None) for i < 128."""
     t = op(c, x, y, "t b b", src)
     cnt = c.obj(x, y + 66, "f")
     z = c.msg(x + 60, y + 22, "0")
@@ -624,21 +641,41 @@ def copy(c, x, y, src, frm, to):
     tt = op(c, x, y + 88, "t f f", cnt)
     tw = c.obj(x, y + 132, f"tabwrite {to}")
     c.connect(tt, 1, tw, 1)
-    c.connect(op(c, x, y + 110, f"tabread {frm}", (tt, 0)), 0, tw, 0)
+    if frm is None:
+        z = c.msg(x, y + 110, "0")
+        c.connect(tt, 0, z, 0)
+        c.connect(z, 0, tw, 0)
+    else:
+        c.connect(op(c, x, y + 110, f"tabread {frm}", (tt, 0)), 0, tw, 0)
 
 
 def mutate(Canvas):
-    """Re-draws (auto per cycle, Record burst), X/Y drift, home store/recall."""
+    """Re-draws (auto per beat, Record burst), X/Y drift, home store/recall, vanilla."""
     c = Canvas("#N canvas 0 50 1300 900 %NAME% 0;")
-    c.text(10, 5, "One mutation: random lane + step < length. 50% swap with a neighbour (a hit moves), 30% new level, "
-                  "20% heal (offset 0). Lock stops auto re-draws and drift (Record still mutates).")
+    c.text(10, 5, "One mutation: random lane + step < length. 50% move (swap with a neighbour; a flip if that wouldn't "
+                  "be heard), 30% flip, 20% heal (offset 0). Lock stops auto re-draws and drift (Record still mutates).")
     lock = c.obj(10, 30, "r tp_lock")
     nl = op(c, 10, 52, "== 0", lock)
     auto = c.obj(100, 96, "spigot 1")
-    c.connect(c.obj(100, 30, "r tp_cycle"), 0, auto, 0)
+    c.connect(c.obj(100, 30, "r tp_beat"), 0, auto, 0)
     c.connect(nl, 0, auto, 1)
-    un = c.obj(100, 160, "until")
-    c.connect(fl(c, 100, 118, "f 0", auto, "tp_namt"), 0, un, 0)
+    un = c.obj(100, 330, "until")
+    # per beat: int(amt) mutations, plus one more with probability frac(amt)
+    ta = op(c, 100, 140, "t f f", fl(c, 100, 118, "f 0", auto, "tp_namt"))
+    tb = op(c, 160, 184, "t f f", op(c, 160, 162, "int", (ta, 1)))
+    fr = c.obj(100, 206, "-")
+    add = c.obj(100, 306, "+")
+    c.connect(tb, 1, fr, 1)
+    c.connect(tb, 0, add, 1)
+    c.connect(ta, 0, fr, 0)
+    tf = op(c, 100, 250, "t b f", op(c, 100, 228, "* 1000", fr))
+    lt = c.obj(100, 284, "<")
+    c.connect(tf, 1, lt, 1)
+    rp = rnd(c, 30, 284, 25, rng=1000, seed="tp_seed")
+    c.connect(tf, 0, rp, 0)
+    c.connect(rp, 0, lt, 0)
+    c.connect(lt, 0, add, 0)
+    c.connect(add, 0, un, 0)
     c.connect(fl(c, 250, 118, "f 4", c.obj(250, 96, "r tp_mutnow"), "tp_nburst"), 0, un, 0)
     c.connect(c.obj(400, 30, "r tp_len"), 0, c.obj(400, 52, "v tp_vlen"), 0)
 
@@ -738,9 +775,18 @@ def mutate(Canvas):
         mo = c.obj(x, y + 498, "moses")
         c.connect(op(c, x + 50, y + 476, "v tp_mth", (tc, 1)), 0, mo, 1)
         c.connect(op(c, x, y + 476, "v tp_ml1", (tc, 0)), 0, mo, 0)
-        # silent -> play: thr + u*(255 - thr)
-        on = op(c, x, y + 520, "t b", (mo, 0))
-        sp = chain(c, x, y + 586, vmul(c, x, y + 542, on, "tp_mu", "tp_mspan"), ["+ 0"])     # right inlet: thr
+        # silent -> play: thr + u*(255 - thr), but only with probability 0.7*fill (else unchanged). Most steps are
+        # silent, so without this heavy mutation just fills the pattern in; this way it settles near the density
+        # Fill implies (playing share ~ 0.7f/(1 + 0.7f)).
+        on = op(c, x, y + 520, "t b b", (mo, 0))
+        lt = c.obj(x - 120, y + 586, "<")
+        c.connect(chain(c, x - 60, y + 542, op(c, x - 60, y + 542, "v tp_vfill", (on, 1)), ["* 700"]), 0, lt, 1)
+        rr = rnd(c, x - 120, y + 564, 26, rng=1000, seed="tp_seed")
+        c.connect(on, 0, rr, 0)
+        c.connect(rr, 0, lt, 0)
+        sel = op(c, x - 120, y + 608, "sel 1 0", lt)
+        setv(c, x - 120, y + 652, "tp_mr", op(c, x - 120, y + 630, "v tp_ml1", (sel, 1)))
+        sp = chain(c, x, y + 586, vmul(c, x, y + 542, (sel, 0), "tp_mu", "tp_mspan"), ["+ 0"])     # right: thr
         # playing -> silent: u * 0.9 * thr
         off = op(c, x + 150, y + 520, "t b", (mo, 1))
         sl = chain(c, x + 150, y + 520, vmul(c, x + 150, y + 542, off, "tp_mu", "tp_mth"), ["* 0.9"])
@@ -785,6 +831,14 @@ def mutate(Canvas):
     for k, A in enumerate("xy"):
         c.connect(op(c, x + 200 + k * 100, y + 44, f"v tp_hd{A}", (tr, k)), 0,
                   c.obj(x + 200 + k * 100, y + 66, f"s tp_d{A}"), 0)
+    # --- vanilla (File double-tap): no mutations, no drift offset; home is kept ---
+    x = 1300
+    tv = op(c, x, y + 22, "t b b b", c.obj(x, y, "r tp_vanilla"))
+    copy(c, x, y + 60, (tv, 2), None, "tp_off")
+    for k, A in enumerate("xy"):
+        z = c.msg(x + 200 + k * 100, y + 44, "0")
+        c.connect(tv, k, z, 0)
+        c.connect(z, 0, c.obj(x + 200 + k * 100, y + 66, f"s tp_d{A}"), 0)
     return c
 
 

@@ -26,7 +26,7 @@ No audio input is used.
    start                          size           size    = MAP Y   sparse -> busy
                                                  density = FILL    how many steps play (bottom of the travel = silence)
    density       [ pitch ]        overlap        overlap = CHAOS   random ghost notes / dropouts on every pass
-                                                 window  = MUTATE  auto re-draws per cycle (CCW = none)
+                                                 window  = MUTATE  auto re-draws every beat (CCW = none, CW = hard)
           blend          window                  blend   = SOUND   808 (CCW) -> 909 (noon) -> crunch (CW)
                                                  pitch   = TUNE    whole kit, 1V/oct (click = normal)
                                                  speed   = DRIFT   map position wanders; still between the two clicks
@@ -41,7 +41,7 @@ No audio input is used.
 | **Source** gate jack | **Back to step 1:** the next clock plays the pattern's first step (send it once per bar or phrase) | — |
 | **Freeze** (button or gate) | **Lock:** no automatic mutation, no drift. Record still mutates | on = locked |
 | **Record** (button or gate) | **Mutate now:** re-draws a burst of steps (4, up to 16 with Window turned up). Every gate edge mutates once. The LED just toggles; ignore it | — |
-| **File** (button) | **Short press: go home.** Brings back the home pattern. **Hold 1 s: store** the current pattern as home. Home at load = the plain map | — |
+| **File** (button) | **Short press: go home.** Brings back the home pattern. **Hold 1 s: store** the current pattern as home. **Double-tap: vanilla**, the plain map with no mutations and no drift (your home is kept). Home at load = the plain map | — |
 | **Source** button | Hold for the alt layer. Its latch does nothing here (the Source gate jack also toggles it) | — |
 
 All six pots have CV jacks. Sweeping **Map X/Y** with an LFO or envelope is the classic way to play this kind of
@@ -96,14 +96,18 @@ neighbours, so every knob position is a groove.
 back down and the pattern is clean again.
 
 **5. Mutate by hand.** Press **Record**: a few steps change, and they stay changed. Press it again for more. Too far?
-A **short File press** brings home back.
+A **short File press** brings home back, and a **double-tap** goes all the way back to the vanilla map.
 
 **6. Find a home.** When a mutated pattern is good, **hold File for a second**: that is now home. Keep mutating; a
 short press returns to it.
 
-**7. Let it evolve.** Turn **window** up: the pattern re-draws a few steps at the end of every cycle (32 steps, or the
-Length you set). Low = slow evolution, high = constant change. Press **Freeze** to hold what you have; press it again
-to carry on.
+**7. Let it evolve, or mutate it hard.** Turn **window** up and the pattern re-draws steps on every beat:
+- low settings: an occasional change, a slow evolution;
+- noon: about one change per beat;
+- fully CW: up to eight per beat, so about two thirds of the hits change from one 2-bar cycle to the next.
+
+It keeps roughly the density Fill sets, so it scrambles the groove rather than just filling it in. Press **Freeze** to
+hold what you have (press again to carry on). Double-tap **File** for vanilla.
 
 **8. Drift.** Turn **Speed** past either click: the map position wanders by itself around where X/Y are set, drifting
 between styles. The further from centre, the faster. Freeze stops it.
@@ -127,7 +131,8 @@ fire the **clap**, and the strongest hat steps are **open** hats (a closed hat c
 Mutations are stored as changes on top of the map, so X/Y still move the groove while your mutations come along. Each
 mutation picks a random lane and step, then does one of three things:
 - **Move** (half of them): swap a playing step with a silent neighbour up to 2 steps away. The hit moves in time.
-- **Flip** (30%): turn a silent step on, or a playing step off.
+- **Flip** (30%): turn a playing step off, or a silent step on. Turning on only happens some of the time (more at
+  high Fill), so heavy mutation keeps about the density Fill sets.
 - **Heal** (20%): remove the change on that step, so heavy mutation doesn't turn into noise.
 
 **Home** stores those changes and the drift position. **Length** shortens the loop to 16, 8 or 4 steps, so it stays
