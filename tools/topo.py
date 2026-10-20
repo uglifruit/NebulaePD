@@ -20,7 +20,6 @@ Engine
 """
 
 import math
-import random
 
 from gloop import press
 from glitch import chain, rnd
@@ -32,10 +31,6 @@ LANES = "KSHP"                 # map lanes: kick, snare (+clap), hats (closed/op
 NODE = len(LANES) * STEPS      # 128 values per node
 ACCENT = 230                   # S level above this layers the clap; H level above this plays the open hat
 VOICES = ["K", "S", "C", "CH", "OH", "P"]
-PARAMS = ["f", "ratio", "index", "idec", "sweep", "stime", "nmix", "ncut", "adec", "ndec"]
-NP = len(PARAMS)
-ANCHORS = 8                    # Sound knob: anchor 0 = the designed kit, 1..7 increasingly far variations
-SEED = 606                     # fixed: the kit anchors are part of the instrument, not random per boot
 LN2 = math.log(2)
 
 # alt-layer defaults (pickup: alt values apply only after the knob moves)
@@ -184,63 +179,51 @@ def map_values():
 
 
 # --- the kit -------------------------------------------------------------------------------------------------------
-# f Hz, ratio (mod/carrier), index (radians), idec ms, sweep (octaves, linear-frequency glide), stime ms,
-# nmix 0..1, ncut Hz (noise band-pass), adec ms (tone), ndec ms (noise). Envelopes are linear ramps cubed.
-KIT = {
-    "K":  (48,   1.0,  0.7,  35, 2.5,  40, 0.05, 2500, 520,  10),
-    "S":  (185,  1.62, 1.3,  45, 0.7,  18, 0.55, 4200, 160, 240),
-    "C":  (1100, 1.41, 0.8,  15, 0.0,   5, 0.90, 1250, 110, 230),
-    "CH": (1650, 1.47, 3.2,  40, 0.0,   2, 0.45, 8500,  55,  60),
-    "OH": (1650, 1.47, 3.2, 300, 0.0,   2, 0.45, 8000, 380, 480),
-    "P":  (150,  1.5,  0.9,  70, 0.8,  70, 0.08, 1800, 320,  30),
+# Analog-model voices after the TR-808/909 recipes. Every parameter has three kit values (808-ish, 909-ish, crunch);
+# the Sound knob (blend) morphs 0 -> 808, 0.5 -> 909, 1 -> crunch, and the sounds only change when it moves.
+# Kinds: hz = Hz (stored log2, x Tune), log = stored log2, oct = octaves (-> 2^v - 1), dec = ms (x Decay), lin.
+KITS = {
+    "K":  [("f", "hz", (48, 55, 62)), ("sweep", "oct", (1.6, 2.3, 3.0)), ("ptime", "lin", (60, 35, 18)),
+           ("decay", "dec", (650, 380, 220)), ("click", "lin", (0.15, 0.45, 0.7)), ("drive", "lin", (1.2, 2.2, 4.0))],
+    "S":  [("f1", "hz", (175, 185, 220)), ("f2", "hz", (260, 330, 410)), ("tdec", "dec", (160, 130, 90)),
+           ("ndec", "dec", (260, 320, 380)), ("snappy", "lin", (0.5, 0.7, 0.9)), ("ncut", "log", (1200, 1800, 2600))],
+    "C":  [("fc", "log", (1000, 1250, 1600)), ("tail", "dec", (180, 250, 380))],
+    "CH": [("metal", "hz", (1.0, 1.12, 1.35)), ("cut", "log", (7000, 8000, 9500)), ("decay", "dec", (45, 60, 35)),
+           ("noise", "lin", (0.15, 0.35, 0.6))],
+    "OH": [("metal", "hz", (1.0, 1.12, 1.35)), ("cut", "log", (6500, 7500, 9000)), ("decay", "dec", (380, 480, 300)),
+           ("noise", "lin", (0.15, 0.35, 0.6))],
+    "P":  [("f", "hz", (160, 200, 330)), ("sweep", "oct", (0.5, 0.8, 1.2)), ("decay", "dec", (260, 200, 120)),
+           ("noise", "lin", (0.05, 0.1, 0.25))],
 }
-LOGP = {"f", "ratio", "ncut"}                      # stored as log2
-# anchor spread at the far end (anchor 7), in stored units; times and index vary multiplicatively (log2)
-SPREAD = dict(f=0.8, ratio=1.0, index=1.2, idec=1.0, sweep=0.8, stime=1.0, nmix=0.25, ncut=0.8, adec=0.8, ndec=0.8)
-MULP = {"index", "idec", "stime", "adec", "ndec"}
-LIMITS = {   # per voice: (lo, hi) in natural units, keeps every anchor recognisable
-    "K":  dict(f=(32, 80), nmix=(0, 0.2), sweep=(0.8, 4), adec=(150, 1200)),
-    "S":  dict(f=(110, 330), nmix=(0.25, 0.9), adec=(60, 400), ndec=(80, 600)),
-    "C":  dict(nmix=(0.7, 1), ncut=(600, 3000), adec=(40, 300), ndec=(80, 600)),
-    "CH": dict(nmix=(0.2, 0.8), ncut=(5000, 13000), adec=(25, 120), ndec=(25, 140), sweep=(0, 0.3)),
-    "OH": dict(nmix=(0.2, 0.8), ncut=(5000, 13000), adec=(200, 900), ndec=(250, 1100), sweep=(0, 0.3)),
-    "P":  dict(f=(70, 500), nmix=(0, 0.4), adec=(100, 800)),
-}
-LEVEL = dict(K=0.9, S=0.5, C=0.65, CH=0.3, OH=0.28, P=0.45)
-NGAIN = dict(K=2.0, S=2.2, C=2.6, CH=2.2, OH=2.2, P=2.0)   # noise branch makeup (bp~ eats level)
-BPQ = dict(K=1.0, S=0.9, C=2.5, CH=1.2, OH=1.2, P=1.5)
-HIP = dict(S=80, C=250, CH=3000, OH=2500, P=40)            # post high-pass per voice (none on the kick)
+ANCHORS = 3
+METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)    # TR-808 hat oscillators (Hz)
+LEVEL = dict(K=0.9, S=0.45, C=0.53, CH=0.38, OH=0.21, P=0.43)   # peaks ~ K .65 S .6 C .5 hats .35 P .45
 PAN = dict(K=0, S=-0.1, C=0.15, CH=0.3, OH=-0.3, P=-0.4)
-CLAP_ENV = "1 0.3 \\, 0 7 0.3 \\, 1 0.3 9 \\, 0 7 9.3 \\, 1 0.3 18 \\, 0 \\$1 18.3"   # three bursts then the tail
-ENV = "1 0.3 \\, 0 \\$1 0.3"
+EXPN = 1024                    # tp_exp: exponential decay (-60 dB, ending at exactly 0) over EXPN points
 CHOKE_MS = 3
+CLAP_BURSTS = "1 \\, 0 7 \\, 1 0 10 \\, 0 7 10 \\, 1 0 20 \\, 0 7 20"     # three 7 ms bursts, 10 ms apart
+CLAP_TAIL = "0 0 28 \\, 1 \\$1 28"                                   # then the tail from 28 ms
+
+
+def snd_base(V):
+    """Offset of voice V's parameters in tp_snd (index = base + param*ANCHORS + anchor)."""
+    return sum(len(KITS[v]) for v in VOICES[:VOICES.index(V)]) * ANCHORS
 
 
 def snd_values():
-    """tp_snd: index = (voice*NP + param)*ANCHORS + anchor."""
-    rng = random.Random(SEED)
     out = []
     for v in VOICES:
-        lim = LIMITS[v]
-        for p, base in zip(PARAMS, KIT[v]):
-            lo, hi = lim.get(p, (None, None))
-            row = []
-            for a in range(ANCHORS):
-                u = rng.uniform(-1, 1)
-                if a == 0:
-                    val = base
-                elif p in LOGP or p in MULP:
-                    val = base * 2 ** (u * SPREAD[p] * (0.3 + 0.7 * a / 7))
-                else:
-                    val = base + u * SPREAD[p] * (0.3 + 0.7 * a / 7)
-                if lo is not None:
-                    val = min(max(val, lo), hi)
-                if p in ("nmix",):
-                    val = min(max(val, 0), 1)
-                if p == "sweep":
-                    val = max(val, 0)
-                row.append(math.log2(val) if p in LOGP else val)
-            out += row
+        for _, kind, vals in KITS[v]:
+            out += [math.log2(a) if kind in ("hz", "log") else a for a in vals]
+    return out
+
+
+def exp_values():
+    """tabread4~ table: point i = e((i - 1)/EXPN), e(u) = (exp(-6.9078 u) - 0.001)/0.999 (1 -> 0), clamped."""
+    out = []
+    for i in range(EXPN + 4):
+        u = min(max((i - 1) / EXPN, 0), 1)
+        out.append(max((math.exp(-6.9078 * u) - 0.001) / 0.999, 0))
     return out
 
 
@@ -300,10 +283,11 @@ def tables(Canvas):
     for i in range(0, len(vals), 128):
         m = c.msg(10 + (i // 128 % 5) * 130, 60 + (i // 640) * 25, f"\\; tp_map {i} " + " ".join(map(str, vals[i:i + 128])))
         c.connect(lb, 0, m, 0)
-    sv = snd_values()
-    for i in range(0, len(sv), 80):
-        m = c.msg(10 + (i // 80) * 100, 220, f"\\; tp_snd {i} " + " ".join(f"{v:.5g}" for v in sv[i:i + 80]))
-        c.connect(lb, 0, m, 0)
+    for nm, vals, x0 in (("tp_snd", snd_values(), 10), ("tp_exp", exp_values(), 300)):
+        for i in range(0, len(vals), 128):
+            m = c.msg(x0 + (i // 128 % 3) * 90, 220 + (i // 384) * 25,
+                      f"\\; {nm} {i} " + " ".join(f"{v:.6g}" for v in vals[i:i + 128]))
+            c.connect(lb, 0, m, 0)
     return c
 
 
@@ -372,7 +356,7 @@ def ui(Canvas):
     # --- knobs ---
     x, y = 10, 330
     r = c.obj(x, y, "r density")
-    chain(c, x, y, r, ["change", "s tp_fill"])
+    chain(c, x, y, r, ["change", "- 0.04", "/ 0.92", "clip 0 1", "s tp_fill"])     # bottom 4% = silent
     r = c.obj(x + 110, y, "r overlap")
     chain(c, x + 110, y, r, ["change", "* 0.5", "s tp_chaos"])
     # window: auto re-draws per cycle round(12*w^2), off below 0.05; Record burst 4 + round(12*w)
@@ -391,8 +375,8 @@ def ui(Canvas):
     c.connect(cg, 0, c.obj(x + 220, y + 222, "s tp_namt"), 0)
     # blend: Sound position 0..7 -> anchor a (0..6) and fraction
     r = c.obj(x + 440, y, "r blend")
-    sp = op(c, x + 440, y + 44, "t f f", chain(c, x + 440, y, r, ["* 7"]))
-    ai = chain(c, x + 500, y + 44, sp, ["int", "clip 0 6"], outlet=1)
+    sp = op(c, x + 440, y + 44, "t f f", chain(c, x + 440, y, r, [f"* {ANCHORS - 1}"]))
+    ai = chain(c, x + 500, y + 44, sp, ["int", f"clip 0 {ANCHORS - 2}"], outlet=1)
     ta = op(c, x + 500, y + 110, "t f f", ai)
     setv(c, x + 560, y + 132, "tp_sa", (ta, 1))
     fr = op(c, x + 440, y + 154, "-", (sp, 0), (ta, 0))
@@ -791,43 +775,30 @@ def mutate(Canvas):
     return c
 
 
-def voice_ctl(c, x, y, V, vi):
-    """tp_trig_V vel -> read the 10 params (Sound-interpolated) into [v tp_V_*] -> round-robin go."""
+def voice_ctl(c, x, y, V):
+    """tp_trig_V vel -> read V's kit parameters (Sound-interpolated) into [v tp_V_*] -> round-robin go."""
+    params = KITS[V]
     t = op(c, x, y + 22, "t f b", c.obj(x, y, f"r tp_trig_{V}"))
-    tp = op(c, x, y + 44, "t" + " b" * NP, (t, 1))         # outlet p = param p; fires 9..0 (sweep before f)
-    for p, name in enumerate(PARAMS):
+    tp = op(c, x, y + 44, "t" + " b" * len(params), (t, 1))
+    base = snd_base(V)
+    for p, (name, kind, _) in enumerate(params):
         px, py = x + p * 120, y + 80
-        idx = op(c, px, py + 22, f"+ {(vi * NP + p) * ANCHORS}", op(c, px, py, "v tp_sa", (tp, p)))
+        idx = op(c, px, py + 22, f"+ {base + p * ANCHORS}", op(c, px, py, "v tp_sa", (tp, p)))
         ti = op(c, px, py + 44, "t f f", idx)
         tv = op(c, px + 60, py + 88, "t f f", op(c, px + 60, py + 66, "tabread tp_snd", (ti, 1)))
         v1 = op(c, px, py + 88, "tabread tp_snd", op(c, px, py + 66, "+ 1", (ti, 0)))
         m = fl(c, px, py + 132, "* 0", op(c, px, py + 110, "-", v1, (tv, 0)), "tp_sfr")
         val = op(c, px, py + 154, "+", m, (tv, 1))
         yy = py + 176
-        if name == "f":
-            tuned = fl(c, px, yy + 44, "* 1", chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp"]), "tp_tune")
-            tf = op(c, px, yy + 66, "t f f b", tuned)
-            mk = c.obj(px, yy + 110, "*")
-            c.connect(op(c, px + 60, yy + 88, f"v tp_{V}_k", (tf, 2)), 0, mk, 1)
-            setv(c, px + 40, yy + 132, f"tp_{V}_F", (tf, 1))
-            c.connect(tf, 0, mk, 0)
-            setv(c, px, yy + 154, f"tp_{V}_FK", mk)
-        elif name == "ratio":
-            setv(c, px, yy + 44, f"tp_{V}_R", chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp"]))
-        elif name == "index":
-            setv(c, px, yy + 22, f"tp_{V}_I", chain(c, px, yy - 22, val, [f"* {1 / (2 * math.pi):.6f}"]))
-        elif name in ("idec", "adec", "ndec"):
-            setv(c, px, yy + 22, f"tp_{V}_{name}", fl(c, px, yy, "* 1", val, "tp_decay"))
-        elif name == "sweep":
-            setv(c, px, yy + 66, f"tp_{V}_k", chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp", "- 1"]))
-        elif name == "stime":
-            setv(c, px, yy, f"tp_{V}_stime", val)
-        elif name == "nmix":
-            tn = op(c, px, yy, "t f f", val)
-            setv(c, px, yy + 88, f"tp_{V}_TG", chain(c, px + 50, yy, tn, ["* -1", "+ 1", f"* {LEVEL[V]:g}"], outlet=1))
-            setv(c, px, yy + 44, f"tp_{V}_NG", chain(c, px, yy, tn, [f"* {LEVEL[V] * NGAIN[V]:g}"]))
-        elif name == "ncut":
-            setv(c, px, yy + 66, f"tp_{V}_NC", chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp", "clip 20 16000"]))
+        if kind == "hz":
+            val = fl(c, px, yy + 44, "* 1", chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp"]), "tp_tune")
+        elif kind == "log":
+            val = chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp"])
+        elif kind == "oct":
+            val = chain(c, px, yy - 22, val, [f"* {LN2:.6f}", "exp", "- 1"])
+        elif kind == "dec":
+            val = fl(c, px, yy, "* 1", val, "tp_decay")
+        setv(c, px, yy + 88, f"tp_{V}_{name}", val)
     tg = op(c, x, y + 400, "t b f", (t, 0))
     setv(c, x + 60, y + 422, f"tp_{V}_vel", (tg, 1))
     rr = c.obj(x, y + 444, "f")
@@ -835,99 +806,204 @@ def voice_ctl(c, x, y, V, vi):
     c.connect(chain(c, x + 60, y + 444, rr, ["+ 1", "mod 2"]), 0, rr, 1)
     sl = op(c, x, y + 466, "sel 0 1", rr)
     if V == "CH":
-        tc = op(c, x + 200, y + 444, "t b", (tg, 0))
-        c.connect(tc, 0, c.obj(x + 200, y + 466, "s tp_ckOH"), 0)
+        c.connect(op(c, x + 200, y + 444, "t b", (tg, 0)), 0, c.obj(x + 200, y + 466, "s tp_ckOH"), 0)
     for k in (0, 1):
         c.connect(sl, k, c.obj(x + k * 100, y + 490, f"s tp_go_{V}{k}"), 0)
 
 
-def subvoice(c, x, y, V, k, noise):
-    """One round-robin half of voice V. Returns its outlet object (a signal sum)."""
+def xenv(c, x, y, lb):
+    """Exponential envelope: [vline~] ramp u (0 -> 1) read through tp_exp. Starts silent (u = 1).
+    Returns (vline~, envelope signal)."""
+    vl = c.obj(x, y, "vline~")
+    one = c.msg(x + 60, y - 22, "1")
+    c.connect(lb, 0, one, 0)
+    c.connect(one, 0, vl, 0)
+    env = op(c, x, y + 66, "tabread4~ tp_exp", op(c, x, y + 44, "+~ 1", op(c, x, y + 22, f"*~ {EXPN}", vl)))
+    return vl, env
+
+
+# go actions (each is called as fn(c, x, y, (trigger, outlet)))
+def a_v(name, dst, inlet=1, scale=None):
+    """[v name] (optionally * scale) -> dst inlet."""
+    def fn(c, x, y, s):
+        o = op(c, x, y, f"v {name}", s)
+        if scale is not None:
+            o = op(c, x, y + 22, f"* {scale:g}", o)
+        c.connect(o, 0, dst, inlet)
+    return fn
+
+
+def a_mul(a, b, dst, inlet=1, scale=1.0):
+    def fn(c, x, y, s):
+        m = vmul(c, x, y, s, a, b)
+        if scale != 1.0:
+            m = op(c, x, y + 66, f"* {scale:g}", m)
+        c.connect(m, 0, dst, inlet)
+    return fn
+
+
+def a_msg(text, *dsts, name=None):
+    """A message (with \\$1 = [v name] if given) -> each dst inlet 0."""
+    def fn(c, x, y, s):
+        m = c.msg(x, y + 22, text)
+        c.connect(op(c, x, y, f"v {name}", s) if name else s[0], 0 if name else s[1], m, 0)
+        for d in dsts:
+            c.connect(m, 0, d, 0)
+    return fn
+
+
+def a_send(name):
+    def fn(c, x, y, s):
+        c.connect(s[0], s[1], c.obj(x, y, f"s {name}"), 0)
+    return fn
+
+
+def osc_sweep(c, x, y, env):
+    """osc~ at f*(1 + k*env): returns (osc~, [*~ 0] for f*k, [+~ 0] for f)."""
+    fk = op(c, x, y, "*~ 0", env)
+    fs = op(c, x, y + 22, "+~ 0", fk)
+    return op(c, x, y + 44, "osc~", fs), fk, fs
+
+
+def half(c, x, y, V, k, lb, noise):
+    """One round-robin half of voice V. Returns its output signal object."""
     pv = f"tp_{V}_"
-    # signal graph
-    penv = c.obj(x, y + 420, "vline~")
-    fm = op(c, x, y + 466, "*~ 0", op(c, x, y + 444, "*~", penv, penv))
-    fs = op(c, x, y + 488, "+~ 0", fm)
-    ph = op(c, x, y + 510, "phasor~", fs)
-    mf = op(c, x + 100, y + 510, "*~ 0", fs)
-    mo = op(c, x + 100, y + 532, "osc~", mf)
-    ienv = c.obj(x + 200, y + 466, "vline~")
-    ii = op(c, x + 200, y + 510, "*~ 0", op(c, x + 200, y + 488, "*~", ienv, ienv))
-    tone = op(c, x, y + 598, "cos~", op(c, x, y + 576, "+~", ph, op(c, x + 100, y + 554, "*~", mo, ii)))
-    aenv = c.obj(x + 300, y + 532, "vline~")
-    tg = op(c, x, y + 642, "*~ 0", op(c, x, y + 620, "*~", tone, cube(c, x + 300, y + 554, aenv)))
-    bp = op(c, x + 400, y + 532, f"bp~ 1000 {BPQ[V]:g}", noise)
-    nenv = c.obj(x + 500, y + 532, "vline~")
-    ng = op(c, x + 400, y + 642, "*~ 0", op(c, x + 400, y + 620, "*~", bp, cube(c, x + 500, y + 554, nenv)))
-    out = op(c, x, y + 670, "+~", tg, ng)
-    # choke (the other half starting, or for the open hat a closed hat)
-    ck = c.msg(x + 600, y + 466, f"0 {CHOKE_MS}")
-    c.connect(c.obj(x + 600, y + 444, f"r tp_ck_{V}{k}"), 0, ck, 0)
+    other = a_send(f"tp_ck_{V}{1 - k}")
+    ck = c.obj(x + 700, y + 22, f"r tp_ck_{V}{k}")
+    if V == "K":
+        pvl, pe = xenv(c, x, y + 300, lb)
+        avl, ae = xenv(c, x + 150, y + 300, lb)
+        osc, fk, fs = osc_sweep(c, x, y + 400, pe)
+        tone = op(c, x, y + 466, "*~", osc, ae)
+        cvl = c.obj(x + 300, y + 300, "vline~")
+        cn = op(c, x + 300, y + 344, "*~", op(c, x + 300, y + 322, "hip~ 1500", noise), cvl)
+        ca = op(c, x + 300, y + 366, "*~ 0", cn)
+        drv = op(c, x, y + 510, "*~ 0", op(c, x, y + 488, "+~", tone, ca))
+        out = op(c, x, y + 650, "*~ 0", softclip(c, x, y + 532, drv))
+        choke = [avl]
+        acts = [other,
+                lambda c_, x_, y_, s: phase(c_, x_, y_, s, [osc]),
+                a_v(pv + "f", fs), a_mul(pv + "f", pv + "sweep", fk), a_v(pv + "click", ca),
+                a_v(pv + "drive", drv), a_v(pv + "vel", out, scale=LEVEL[V]),
+                a_msg("0 \\, 1 \\$1", pvl, name=pv + "ptime"), a_msg("0 \\, 1 \\$1", avl, name=pv + "decay"),
+                a_msg("1 \\, 0 4", cvl)]
+    elif V == "S":
+        pvl, pe = xenv(c, x, y + 300, lb)
+        tvl, te = xenv(c, x + 150, y + 300, lb)
+        nvl, ne = xenv(c, x + 300, y + 300, lb)
+        o1, fk1, fs1 = osc_sweep(c, x, y + 400, pe)
+        o2, fk2, fs2 = osc_sweep(c, x + 100, y + 400, pe)
+        tone = op(c, x, y + 510, "*~", op(c, x, y + 488, "+~", o1, op(c, x + 100, y + 466, "*~ 0.6", o2)), te)
+        tg = op(c, x, y + 532, "*~ 0", tone)
+        h1 = op(c, x + 300, y + 400, "hip~ 1500", noise)
+        h2 = op(c, x + 300, y + 422, "hip~ 1500", h1)
+        nz = op(c, x + 300, y + 466, "*~", op(c, x + 300, y + 444, "lop~ 9000", h2), ne)
+        ng = op(c, x + 300, y + 488, "*~ 0", nz)
+        out = op(c, x, y + 650, "+~", tg, ng)
+        choke = [tvl, nvl]
+
+        def gains(c_, x_, y_, s):
+            t = op(c_, x_, y_, "t b b", s)
+            # noise: vel * level * 1.6 * snappy;  tone: vel * level * (1 - 0.5 snappy)
+            n = vmul(c_, x_ + 60, y_ + 22, (t, 1), pv + "vel", pv + "snappy")
+            c_.connect(op(c_, x_ + 60, y_ + 88, f"* {LEVEL[V] * 1.6:g}", n), 0, ng, 1)
+            sn = chain(c_, x_, y_ + 22, op(c_, x_, y_ + 22, f"v {pv}snappy", (t, 0)), ["* -0.5", "+ 1"])
+            m = op(c_, x_, y_ + 110, "*", sn, None)
+            tv = op(c_, x_, y_ + 66, "t f b", sn)
+            c_.connect(op(c_, x_ + 40, y_ + 88, f"v {pv}vel", (tv, 1)), 0, m, 1)
+            c_.connect(tv, 0, m, 0)
+            c_.connect(op(c_, x_, y_ + 132, f"* {LEVEL[V]:g}", m), 0, tg, 1)
+        acts = [other, lambda c_, x_, y_, s: phase(c_, x_, y_, s, [o1, o2]),
+                a_v(pv + "f1", fs1), a_v(pv + "f1", fk1, scale=0.5), a_v(pv + "f2", fs2), a_v(pv + "f2", fk2, scale=0.5),
+                a_v(pv + "ncut", h1), a_v(pv + "ncut", h2), gains,
+                a_msg("0 \\, 1 15", pvl), a_msg("0 \\, 1 \\$1", tvl, name=pv + "tdec"),
+                a_msg("0 \\, 1 \\$1", nvl, name=pv + "ndec")]
+    elif V == "C":
+        bvl = c.obj(x, y + 300, "vline~")
+        tvl, te = xenv(c, x + 150, y + 300, lb)
+        env = op(c, x, y + 388, "+~", bvl, op(c, x + 150, y + 388, "*~ 0.7", te))
+        bp = op(c, x + 300, y + 300, "bp~ 1250 2", noise)
+        nz = op(c, x + 300, y + 410, "*~", op(c, x + 300, y + 322, "hip~ 400", bp), env)
+        out = op(c, x, y + 650, "*~ 0", nz)
+        choke = [tvl]
+        bz = c.msg(x + 800, y + 44, "0 3")
+        c.connect(ck, 0, bz, 0)
+        c.connect(bz, 0, bvl, 0)
+        acts = [other, a_v(pv + "fc", bp), a_v(pv + "vel", out, scale=LEVEL[V] * 3),
+                a_msg(CLAP_BURSTS, bvl), a_msg(CLAP_TAIL, tvl, name=pv + "tail")]
+    elif V in ("CH", "OH"):
+        sq = None
+        phs = []
+        for i in range(len(METAL)):
+            ph = c.obj(x + i * 90, y + 300, "phasor~ 300")
+            phs.append(ph)
+            s_ = chain(c, x + i * 90, y + 300, ph, ["-~ 0.5", "*~ 1e+09", "clip~ -1 1"])
+            sq = s_ if sq is None else op(c, x + i * 90, y + 388, "+~", sq, s_)
+        mm = op(c, x, y + 410, "*~ 0", op(c, x, y + 400, f"*~ {1 / len(METAL):.4f}", sq))
+        nm = op(c, x + 300, y + 410, "*~ 0", noise)
+        bp = op(c, x, y + 454, "bp~ 8000 1", op(c, x, y + 432, "+~", mm, nm))
+        h1 = op(c, x, y + 476, "hip~ 4000", bp)
+        h2 = op(c, x, y + 498, "hip~ 4000", h1)
+        avl, ae = xenv(c, x + 600, y + 300, lb)
+        out = op(c, x, y + 650, "*~ 0", op(c, x, y + 520, "*~", h2, ae))
+        choke = [avl]
+        acts = [other] + [a_v(pv + "metal", phs[i], 0, scale=f) for i, f in enumerate(METAL)] + [
+            a_v(pv + "cut", bp), a_v(pv + "cut", h1, scale=0.6), a_v(pv + "cut", h2, scale=0.6),
+            lambda c_, x_, y_, s: mixset(c_, x_, y_, s, pv + "noise", mm, nm),
+            a_v(pv + "vel", out, scale=LEVEL[V] * 2), a_msg("0 \\, 1 \\$1", avl, name=pv + "decay")]
+    else:   # P
+        pvl, pe = xenv(c, x, y + 300, lb)
+        avl, ae = xenv(c, x + 150, y + 300, lb)
+        osc, fk, fs = osc_sweep(c, x, y + 400, pe)
+        tone = op(c, x, y + 466, "*~", osc, ae)
+        cvl = c.obj(x + 300, y + 300, "vline~")
+        cn = op(c, x + 300, y + 344, "*~", op(c, x + 300, y + 322, "bp~ 3000 2", noise), cvl)
+        ca = op(c, x + 300, y + 366, "*~ 0", cn)
+        out = op(c, x, y + 650, "*~ 0", op(c, x, y + 488, "+~", tone, ca))
+        choke = [avl]
+        acts = [other, lambda c_, x_, y_, s: phase(c_, x_, y_, s, [osc]),
+                a_v(pv + "f", fs), a_mul(pv + "f", pv + "sweep", fk), a_v(pv + "noise", ca, scale=4),
+                a_v(pv + "vel", out, scale=LEVEL[V]),
+                a_msg("0 \\, 1 40", pvl), a_msg("0 \\, 1 \\$1", avl, name=pv + "decay"), a_msg("1 \\, 0 6", cvl)]
+    # choke: this half fades out (the other half is starting; for the open hat also a closed hat)
+    cm = c.msg(x + 700, y + 44, f"1 {CHOKE_MS}")
+    c.connect(ck, 0, cm, 0)
     if V == "OH":
-        c.connect(c.obj(x + 700, y + 444, "r tp_ckOH"), 0, ck, 0)
-    c.connect(ck, 0, aenv, 0)
-    c.connect(ck, 0, nenv, 0)
-    # go: set everything, then fire the envelopes
-    amsg = CLAP_ENV if V == "C" else ENV
-
-    def env(name, dst, text):
-        def fn(c, x_, y_, s):
-            m = c.msg(x_, y_ + 44, text)
-            c.connect(op(c, x_, y_, f"v {pv}{name}", s), 0, m, 0)
-            c.connect(m, 0, dst, 0)
-        return fn
-
-    def mulset(a, dst):
-        def fn(c, x_, y_, s):
-            c.connect(vmul(c, x_, y_, s, f"{pv}{a}", f"{pv}vel"), 0, dst, 1)
-        return fn
-
-    def phase0(c, x_, y_, s):
-        """Carrier from 0.75 turns (cos~ = 0: the tone starts on a zero crossing), modulator from 0."""
-        z = c.msg(x_, y_, "0.75")
-        c.connect(s[0], s[1], z, 0)
-        c.connect(z, 0, ph, 1)
-        z0 = c.msg(x_ + 50, y_, "0")
-        c.connect(s[0], s[1], z0, 0)
-        c.connect(z0, 0, mo, 1)
-
-    def choke_other(c, x_, y_, s):
-        c.connect(s[0], s[1], c.obj(x_, y_, f"s tp_ck_{V}{1 - k}"), 0)
-
-    trig(c, x, y + 22, c.obj(x, y, f"r tp_go_{V}{k}"), [
-        choke_other,
-        vto(f"{pv}NC", bp, 1),
-        phase0,
-        vto(f"{pv}F", fs, 1),
-        vto(f"{pv}FK", fm, 1),
-        vto(f"{pv}R", mf, 1),
-        vto(f"{pv}I", ii, 1),
-        mulset("TG", tg),
-        mulset("NG", ng),
-        env("stime", penv, "1 \\, 0 \\$1"),
-        env("idec", ienv, "1 \\, 0 \\$1"),
-        env("adec", aenv, amsg),
-        env("ndec", nenv, amsg),
-    ])
+        c.connect(c.obj(x + 800, y + 22, "r tp_ckOH"), 0, cm, 0)
+    for vl in choke:
+        c.connect(cm, 0, vl, 0)
+    trig(c, x, y + 30, c.obj(x, y, f"r tp_go_{V}{k}"), acts)
     return out
 
 
+def phase(c, x, y, s, oscs):
+    """Oscillators from 0.75 turns: osc~ is a cosine, so the tone starts on a rising zero crossing."""
+    m = c.msg(x, y, "0.75")
+    c.connect(s[0], s[1], m, 0)
+    for o in oscs:
+        c.connect(m, 0, o, 1)
+
+
+def mixset(c, x, y, s, name, metal, noise):
+    """[v name] = noise share: metal gain 1 - n, noise gain n."""
+    t = op(c, x, y + 22, "t f f", op(c, x, y, f"v {name}", s))
+    c.connect(t, 1, noise, 1)
+    c.connect(chain(c, x, y + 22, t, ["* -1", "+ 1"]), 0, metal, 1)
+
+
 def voices(Canvas):
-    """Six FM + noise voices, two round-robin halves each, panned -> two outlet~."""
+    """Six analog-model voices, two round-robin halves each, panned -> two outlet~."""
     c = Canvas("#N canvas 0 50 1400 900 %NAME% 0;")
-    c.text(10, 5, "Per voice: params from tp_snd at each hit (Sound-interpolated) -> one of two halves (the other is "
-                  "choked). Tone = cos~(phasor~ + index*osc~), pitch sweep, + band-passed noise. Envelopes cubed.")
+    c.text(10, 5, "Per voice: kit params from tp_snd at each hit (Sound-interpolated) -> one of two halves (the other "
+                  "is choked). Envelopes: vline~ ramp read through tp_exp (exponential).")
+    lb = c.obj(10, 30, "loadbang")
     sums = [None, None]
     for vi, V in enumerate(VOICES):
         x0 = 10 + vi * 2400
-        voice_ctl(c, x0, 30, V, vi)
+        voice_ctl(c, x0, 60, V)
         noise = c.obj(x0 + 1300, 560, "noise~")
-        halves = [subvoice(c, x0 + k * 800, 560, V, k, noise) for k in (0, 1)]
+        halves = [half(c, x0 + k * 1000, 560, V, k, lb, noise) for k in (0, 1)]
         v = op(c, x0, 1300, "+~", halves[0], halves[1])
-        if V in HIP:
-            v = op(c, x0, 1322, f"hip~ {HIP[V]}", v)
-        if V in ("CH", "OH"):
-            v = op(c, x0, 1344, f"hip~ {HIP[V]}", v)       # hats: 2 poles
         th = (PAN[V] + 1) * math.pi / 4
         for ch, g in enumerate((math.cos(th) * math.sqrt(2), math.sin(th) * math.sqrt(2))):
             gm = op(c, x0 + ch * 100, 1370, f"*~ {g:.4f}", v)
@@ -971,8 +1047,9 @@ def topo_patch(Canvas, controls_canvas, test=None):
     c.obj(200, 60, f"table tp_map {25 * NODE}")
     c.obj(350, 60, f"table tp_off {NODE}")
     c.obj(500, 60, f"table tp_home {NODE}")
-    c.obj(650, 60, f"table tp_snd {len(VOICES) * NP * ANCHORS}")
+    c.obj(650, 60, f"table tp_snd {len(snd_values())}")
     c.obj(800, 60, "table tp_thrt 4")
+    c.obj(900, 60, f"table tp_exp {EXPN + 4}")
     c.sub(10, 90, "tables", tables(Canvas))
     c.sub(100, 90, "ui", ui(Canvas))
     c.sub(170, 90, "pos", pos(Canvas))

@@ -26,7 +26,7 @@ For a **new instrument**, see §8.
 | `patches/03_gloop.pd` | Gloop-style 4-head looper. **Confirmed working on hardware.** Guide `patches/03_gloop_README.md`; design `docs/GLOOP.md`; builder `tools/gloop.py` |
 | `patches/04_glitch.pd` | Port of WC #57 Glitch: clock-synced beat-repeater, Glitch + Stutter modes. **Core confirmed working on hardware.** Pitch (transpose glitches, V/oct), Speed (pitch ramp across repeats) and slice-locked pitch-down on pass-through were added afterwards: offline-tested, **awaiting hardware**. Guide `patches/04_glitch_README.md`; design `docs/GLITCH.md`; builder `tools/glitch.py` |
 | `patches/05_spectral.pd` | "Spectral Clouds+" after the owner's WorkshopSpectral (WC port of Kammerl's Spectral Clouds): random log-band gates, probability, smoothing, texture, normal/sealed freeze, plus true stereo + spread, spectral pitch (V/oct, peak-locked), band drift, gather, re-capture, tape on the alt layer. Offline-tested, **awaiting hardware** (main risk: CPU burst per hop, see `docs/SPECTRAL.md`). Guide `patches/05_spectral_README.md`; design `docs/SPECTRAL.md`; builder `tools/spectral.py` |
-| `patches/06_topo.pd` | Clocked drum-pattern generator (Grids-style map, our own data) + 6-voice FM drum synth; mutation (Record burst, Window auto, Speed drift), Freeze = lock, File = home. Offline-tested, **awaiting hardware**. Guide `patches/06_topo_README.md`; design `docs/TOPO.md`; builder `tools/topo.py` |
+| `patches/06_topo.pd` | Clocked drum-pattern generator (Grids-style map, our own data) + 6-voice analog-model (808/909) drum synth; mutation (Record burst, Window auto, Speed drift), Freeze = lock, File = home. First hardware try (2026-10-20): the FM kit sounded like bleeps and Fill CCW kept playing → rebuilt (analog models, 3 kits, Fill dead zone); offline-tested, **awaiting a hardware re-test**. Guide `patches/06_topo_README.md`; design `docs/TOPO.md`; builder `tools/topo.py` |
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
@@ -51,7 +51,7 @@ tools/gen.py    GENERATES every .pd (Canvas builder, echo/drone/template, test s
 tools/gloop.py  03_gloop builder (heads, writer, recorder, takeover, ui; press() helper)
 tools/glitch.py 04_glitch builder (ui, clock, glitch, stutter, shuffle, pass_rate, writer, reader, beat_source)
 tools/spectral.py 05_spectral builder (ui, tables, bands, stft: ana/pool/syn per side, tape, test_source; pickup())
-tools/topo.py   06_topo builder (NODES map, KIT anchors; ui, pos, mapq, thr, steps, mutate, voices, test_clock)
+tools/topo.py   06_topo builder (NODES map, KITS (3 kits); ui, pos, mapq, thr, steps, mutate, voices, test_clock)
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
 tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1
@@ -240,8 +240,9 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
 - **Engine:**
   - The map is `tp_map` (25 nodes × 4 lanes × 32). `[pd mapq]` is a synchronous bilinear query (`s tp_q` → `v tp_qr`).
   - Mutations live in `tp_off`; a move that wouldn't be heard becomes a flip.
-  - The voices are 2-op PM + band-passed noise, two round-robin halves each (click-free phase reset); params come
-    from `tp_snd`, interpolated between 8 anchors at each hit.
+  - The voices are analog models (sine kick with sweep + click + drive, two-mode snare + noise, burst clap, 808
+    six-square metal hats, tom). They have exponential envelopes from the `tp_exp` table and two round-robin halves
+    each (click-free phase reset). Params come from `tp_snd`, interpolated between 3 kits at each hit.
 - **Test lesson:** an action in pattern cycle k is only fully visible in cycle k+1; space test actions two cycles apart.
 
 ## 8. Starting a new instrument (checklist)

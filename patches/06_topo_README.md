@@ -1,6 +1,6 @@
 # 06_topo — Topo drums for the Nebulae (user guide)
 
-A clocked **drum machine that writes its own patterns** and plays them on its **own FM drum synth**. Send it a
+A clocked **drum machine that writes its own patterns** and plays them on its **own analog-style drum synth**. Send it a
 clock and it plays. The patterns come from a map of drum styles that you move through with two knobs (the idea of
 Mutable Instruments' Grids, with our own map). They can **mutate**, by hand or on their own, and you can always go
 back **home**.
@@ -11,7 +11,8 @@ back **home**.
   to busy. Map X/Y blend smoothly between neighbouring patterns.
 - **Mutation:** Record re-draws a few steps; Window re-draws some every cycle; Speed makes the map position drift.
   Freeze locks it all.
-- **Sound:** one knob morphs the whole kit through eight related kits. The sounds never change unless you turn it.
+- **Sound:** one knob morphs between three hand-designed kits: 808-ish, 909-ish, crunchy. The sounds never change
+  unless you turn it.
 
 Install: copy `06_topo.pd` to the **root** of the Nebulae USB drive, then load it from the instrument selector.
 No audio input is used.
@@ -23,10 +24,10 @@ No audio input is used.
 ```
                  [ speed ]                       start   = MAP X   four-on-floor -> electro/funk -> hip-hop -> breaks -> broken
    start                          size           size    = MAP Y   sparse -> busy
-                                                 density = FILL    how many steps play (CCW = silence)
+                                                 density = FILL    how many steps play (bottom of the travel = silence)
    density       [ pitch ]        overlap        overlap = CHAOS   random ghost notes / dropouts on every pass
                                                  window  = MUTATE  auto re-draws per cycle (CCW = none)
-          blend          window                  blend   = SOUND   morph through 8 kits (CCW = the main kit)
+          blend          window                  blend   = SOUND   808 (CCW) -> 909 (noon) -> crunch (CW)
                                                  pitch   = TUNE    whole kit, 1V/oct (click = normal)
                                                  speed   = DRIFT   map position wanders; still between the two clicks
 
@@ -65,6 +66,8 @@ left the knob.
 
 **0. Clean slate.**
 - **Freeze** LED off (tap it if it's lit).
+- **blend** fully CCW (the 808 kit). The Nebulae remembers blend from the last instrument, which usually leaves it
+  fully CW (the crunch kit).
 - **Speed** between its two clicks (no drift). It snaps to the clicks.
 - **Pitch** on its click.
 
@@ -101,9 +104,13 @@ to carry on.
 **8. Drift.** Turn **Speed** past either click: the map position wanders by itself around where X/Y are set, drifting
 between styles. The further from centre, the faster. Freeze stops it.
 
-**9. Sound.** Turn **blend**: CCW is the main kit (deep kick, snappy snare, 909-ish clap, metallic hats). Moving CW
-morphs through seven variations, each further from the original. Any position is repeatable, and the sounds don't
-change unless the knob (or its CV) moves. Pitch tunes the whole kit, and alt **blend** sets the decay.
+**9. Sound.** Turn **blend**:
+- **CCW, 808-ish:** a long boomy kick, a tonal snare, and the 808's six-oscillator metal hats.
+- **Noon, 909-ish:** a punchier, slightly driven kick, a snappier snare, brighter hats.
+- **CW, crunch:** a short, hard-driven kick, a noisy snare, high hats, a rim-like perc.
+
+Positions in between blend the two neighbouring kits, and any position is repeatable. The sounds don't change unless
+the knob (or its CV) moves. Pitch tunes the whole kit, and alt **blend** sets the decay.
 
 ## How the patterns work
 

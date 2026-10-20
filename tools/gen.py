@@ -701,7 +701,7 @@ def topo_pattern_test(wav=None):
     4th cycle = silence, fill 1 for the 5th = busy."""
     return dict(wav=wav, steps=[
         (10, TP0 + " \\; freeze 1"), (1200, "\\; tp_tclk 1"),
-        (13150, "\\; density 0"), (17150, "\\; density 1"), (21150, "\\; pd quit"),
+        (13150, "\\; density 0.03"), (17150, "\\; density 1"), (21150, "\\; pd quit"),
     ])
 
 
