@@ -17,7 +17,7 @@ builder is `tools/topo.py`; the user guide is `patches/06_topo_README.md`. Send 
 | density | fill `clip((density − 0.04)/0.92)`: the bottom 4% is silent (a pot fully CCW reads ~0.01–0.03, and 9s play from fill 0.012) | `tp_fill` |
 | overlap | chaos: level += (random 511 − 255)·overlap·0.5 per step | `tp_chaos` |
 | window | auto-mutations **per beat** (every 4 steps) `8·w³`: the integer part, plus one more with probability equal to the fraction; 0 below 0.05 | `tp_namt` |
-| blend | Sound: position `2·blend` → kit `a = clip(int, 0, 1)` and fraction (808 → 909 → crunch). Past noon also the crunch bus, `c = clip(2·blend − 1)`: mix `clip(4c)`, drive `1 + 5c` into `clip~ ±1`, bit-crush `qi = 2^(15 − 10c)` (16 → 6 bits), `samphold~` at `24000 − 18000c` Hz | `[v tp_sa]`, `tp_sfr`, `tp_cr*` |
+| blend | Sound: position `2·blend` → kit `a = clip(int, 0, 1)` and fraction (808 → 909 → crunch). Past noon also the crunch bus, `c = clip(2·blend − 1)`: mix `clip(4c)`, drive `1 + 5c` into `clip~ ±1`, bit-crush `qi = 2^(15 − 10c)` (16 → 6 bits), `samphold~` at `24000 − 18000c` Hz; wet level `clip(4c)·(0.58 − 0.08c)` (makeup −4.7 .. −6 dB: the clip packs the kit near full scale; this holds a pattern's RMS within ~1.5 dB of the 909 kit across the range, measured) | `[v tp_sa]`, `tp_sfr`, `tp_cr*` |
 | speed | drift rate `3e-5·r²` per step, `r = clip((abs(speed − 0.5) − 0.13)/0.37)`: zero between the clicks | `tp_drate` |
 | pitch | tune ratio `2^((pitch·60 − 36)/12)`, latched per hit | `tp_tune` |
 | start/size/density/overlap_alt | lane fill offsets `v − 0.5` (K, S, H, P) | `tp_fo0..3` |

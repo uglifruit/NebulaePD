@@ -423,8 +423,15 @@ def ui(Canvas):
     # Sound past noon fades in the crunch bus: c = clip(2*blend - 1). Mix clip(4c), drive 1 + 5c (into a hard clip),
     # bits 16 -> 6 (qi = 2^(15 - 10c)), sample rate 24 k -> 6 k
     r = c.obj(x + 900, y + 260, "r blend")
-    tc = op(c, x + 900, y + 304, "t f f f f f", chain(c, x + 900, y + 260, r, ["* 2", "- 1", "clip 0 1", "change"]))
+    tc = op(c, x + 900, y + 304, "t f f f f f f", chain(c, x + 900, y + 260, r, ["* 2", "- 1", "clip 0 1", "change"]))
     chain(c, x + 900, y + 326, tc, ["* 4", "clip 0 1", "s tp_crm"], outlet=0)
+    # wet level = mix * makeup (0.58 - 0.08c, i.e. -4.7 .. -6 dB): the clip packs the kit near full scale, so this
+    # holds the RMS of a pattern at the 909 kit's level across the crunch range (measured)
+    tw = op(c, x + 1350, y + 326, "t f f", (tc, 5))
+    mw = c.obj(x + 1350, y + 414, "*")
+    c.connect(chain(c, x + 1410, y + 326, tw, ["* -0.08", "+ 0.58"], outlet=1), 0, mw, 1)
+    c.connect(chain(c, x + 1350, y + 326, tw, ["* 4", "clip 0 1"]), 0, mw, 0)
+    c.connect(mw, 0, c.obj(x + 1350, y + 436, "s tp_crmw"), 0)
     chain(c, x + 990, y + 326, tc, ["* 5", "+ 1", "s tp_crg"], outlet=1)
     chain(c, x + 1080, y + 326, tc, ["* -10", "+ 15", f"* {LN2:.6f}", "exp", "s tp_crqi"], outlet=2)
     chain(c, x + 1170, y + 326, tc, ["* 10", "- 15", f"* {LN2:.6f}", "exp", "s tp_crq"], outlet=3)
@@ -1118,7 +1125,8 @@ def crunch(c, x, y, src):
     ph = c.obj(x + 450, y + 198, "phasor~ 24000")
     c.connect(rr, 0, ph, 0)
     dec = op(c, x + 300, y + 242, "samphold~", cr, ph)
-    return op(c, x, y + 286, "+~", dry, op(c, x + 300, y + 264, "*~", dec, m))
+    mw = chain(c, x + 450, y + 220, c.obj(x + 450, y + 220, "r tp_crmw"), ["pack f 20", "line~"])
+    return op(c, x, y + 286, "+~", dry, op(c, x + 300, y + 264, "*~", dec, mw))
 
 
 def topo_patch(Canvas, controls_canvas, test=None):

@@ -117,7 +117,8 @@ between styles. The further from centre, the faster. Freeze stops it.
 - **Noon, 909-ish:** a punchier, slightly driven kick, a snappier snare, brighter hats.
 - **CW, crunch:** a short, hard-driven kick, a noisy snare, high hats, a rim-like perc. Past noon a **crunch
   bus** fades in on the whole kit: drive into a hard clip, a bit-crush down to 6 bits, and sample-rate reduction
-  down to 6 kHz, all getting stronger towards CW.
+  down to 6 kHz, all getting stronger towards CW. Its level is compensated, so turning into crunch doesn't make the kit
+  louder.
 
 Positions in between blend the two neighbouring kits, and any position is repeatable. The sounds don't change unless
 the knob (or its CV) moves. Pitch tunes the whole kit, and alt **blend** sets the decay.
