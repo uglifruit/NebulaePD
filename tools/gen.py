@@ -675,6 +675,68 @@ def spectral_recapture_test(wav=None):
     ])
 
 
+TP0 = ("\\; start 0 \\; size 0.5 \\; density 0.5 \\; overlap 0 \\; window 0 \\; blend 0 \\; speed 0.5 \\; pitch 0.6 "
+       "\\; freeze 0 \\; record 0 \\; filestate 0 \\; sourcegate 0")
+
+
+def topo_voices_test(wav=None):
+    """Each voice once (K S C CH OH P, 600 ms apart from 0.5 s), then an open hat choked by a closed hat 150 ms later."""
+    hits = [(500 + 600 * i, f"\\; tp_trig_{v} 1") for i, v in enumerate(["K", "S", "C", "CH", "OH", "P"])]
+    return dict(wav=wav, steps=[(10, TP0)] + hits + [(4100, "\\; tp_trig_OH 1"), (4250, "\\; tp_trig_CH 1"),
+                                                     (5000, "\\; pd quit")])
+
+
+def topo_sound_test(wav=None):
+    """Sound knob: K at blend 0 twice (identical), K at blend 1; S at 1 then 0; CH at 0 then 0.5."""
+    return dict(wav=wav, steps=[
+        (10, TP0), (500, "\\; tp_trig_K 1"), (1000, "\\; tp_trig_K 1"), (1400, "\\; blend 1"), (1500, "\\; tp_trig_K 1"),
+        (2000, "\\; tp_trig_S 1"), (2400, "\\; blend 0"), (2500, "\\; tp_trig_S 1"),
+        (3000, "\\; tp_trig_CH 1"), (3400, "\\; blend 0.5"), (3500, "\\; tp_trig_CH 1"),
+        (4000, "\\; pd quit"),
+    ])
+
+
+def topo_pattern_test(wav=None):
+    """Locked, chaos 0, 16ths every 125 ms from 1.2 s (a 32-step cycle = 4 s): cycles 1-3 identical. Fill 0 for the
+    4th cycle = silence, fill 1 for the 5th = busy."""
+    return dict(wav=wav, steps=[
+        (10, TP0 + " \\; freeze 1"), (1200, "\\; tp_tclk 1"),
+        (13150, "\\; density 0"), (17150, "\\; density 1"), (21150, "\\; pd quit"),
+    ])
+
+
+def topo_mutate_test(wav=None):
+    """Cycles of 4 s from 1.2 s (cycle k starts at 1.2 + 4(k-1) s). An action in cycle k shows in all of cycle k+1.
+    Record (6 s) -> cycle 3 = B; File short (14 s) -> cycle 5 = A; Record (22 s) -> cycle 7 = C; File held 1.3 s
+    (30 s) stores C, Record (31.5 s) -> cycle 9 = D; File short (38 s) -> cycle 11 = C. Window 1 (46 s) -> cycles
+    13, 14 auto-mutated; Freeze (53.5 s) -> cycle 15 = cycle 14."""
+    return dict(wav=wav, steps=[
+        (10, TP0), (1200, "\\; tp_tclk 1"),
+        (6000, "\\; record 1"), (14000, "\\; filestate 1"), (14100, "\\; filestate 0"),
+        (22000, "\\; record 0"), (30000, "\\; filestate 1"), (31300, "\\; filestate 0"),
+        (31500, "\\; record 1"), (38000, "\\; filestate 1"), (38100, "\\; filestate 0"),
+        (46000, "\\; window 1"), (53500, "\\; freeze 1"), (61150, "\\; pd quit"),
+    ])
+
+
+def topo_groove_test(wav=None):
+    """Swing 1 (pitch_alt 0.1 at 1.3 s: odd steps 50 ms late); length 12 (window_alt 0.5 -> 0.35 at 5.3 s); Source
+    gate reset at 8 s (next step 0); drift at full speed from 10 s. At 14 s fill 0.15 and the hats fill offset
+    -0.18 (density_alt swept 0.5 -> 0.32 like a knob): kick and snare stay, no hats."""
+    return dict(wav=wav, steps=[
+        (10, TP0), (1200, "\\; tp_tclk 1"), (1300, "\\; pitch_alt 0.1"),
+        (5300, "\\; window_alt 0.5"), (5320, "\\; window_alt 0.35"),
+        (8000, "\\; sourcegate 1"), (8005, "\\; sourcegate 0"),
+        (10000, "\\; speed 1"), (14000, "\\; density 0.15")] + [
+        (14000 + 5 * i, f"\\; density_alt {0.5 - 0.02 * i:g}") for i in range(10)] + [
+        (17000, "\\; pd quit"),
+    ])
+
+
+TOPO_TESTS = [("voices", topo_voices_test), ("sound", topo_sound_test), ("pattern", topo_pattern_test),
+              ("mutate", topo_mutate_test), ("groove", topo_groove_test)]
+
+
 SPECTRAL_TESTS = [("calib", spectral_calib_test), ("bands", spectral_bands_test), ("freeze", spectral_freeze_test),
                   ("pitch", spectral_pitch_test), ("gather", spectral_gather_test), ("tape", spectral_tape_test),
                   ("drift", spectral_drift_test), ("recapture", spectral_recapture_test)]
@@ -684,6 +746,7 @@ if __name__ == "__main__":
     import gloop
     import glitch
     import spectral
+    import topo
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
@@ -691,6 +754,7 @@ if __name__ == "__main__":
     write("patches/03_gloop.pd", gloop.gloop_patch(Canvas, controls_canvas))
     write("patches/04_glitch.pd", glitch.glitch_patch(Canvas, controls_canvas))
     write("patches/05_spectral.pd", spectral.spectral_patch(Canvas, controls_canvas))
+    write("patches/06_topo.pd", topo.topo_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
@@ -710,3 +774,7 @@ if __name__ == "__main__":
         if wavdir:
             write(f"{wavdir}/s_{name}.pd",
                   spectral.spectral_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/s_{name}.wav")))
+    for name, scen in TOPO_TESTS:
+        write(f"sim/test_06_{name}.pd", topo.topo_patch(Canvas, controls_canvas, test=scen()))
+        if wavdir:
+            write(f"{wavdir}/d_{name}.pd", topo.topo_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/d_{name}.wav")))

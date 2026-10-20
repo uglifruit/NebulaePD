@@ -4,7 +4,7 @@ Read [`HANDOFF.md`](HANDOFF.md) before doing anything in this repo. It covers pr
 constrain every patch, the generate → batch-test → commit workflow, tool gotchas, and a new-instrument checklist (§8).
 
 Key rules:
-- `.pd` files are generated: edit `tools/gen.py` or an instrument builder (`tools/gloop.py`, `tools/glitch.py`, `tools/spectral.py`, …),
+- `.pd` files are generated: edit `tools/gen.py` or an instrument builder (`tools/gloop.py`, `tools/glitch.py`, `tools/spectral.py`, `tools/topo.py`, …),
   then run `python tools/gen.py`.
 - Test offline (`pd -nogui -batch -r 48000`) before handing a patch to the owner, who tests on real hardware.
   - Record WAVs with `tabwrite~` + `soundfiler`, **not** `writesf~` (it drops audio in batch mode).
