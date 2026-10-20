@@ -81,10 +81,11 @@ def lerp(c, x, y, a, b, rname):
     return op(c, x, y + 44, "+~", a, m)
 
 
-def pickup(c, x, y, knob, dst, convert, move=0.02, jump=0.2):
+def pickup(c, x, y, knob, dst, convert, move=0.02, jump=0.2, rebase=None):
     """Alt knob -> [s dst] only after it moves `move` from where it was when its stream (re)started (alt values only
-    stream while Source is held, and the first ones are the stored values). A jump > `jump` (alt reset) re-baselines.
-    Same logic as gloop.takeover, for one destination."""
+    stream while Source is held, and the first ones are the stored values). A jump > `jump` (alt reset) re-baselines,
+    and so does a bang on [r rebase] (07_shimmer's alt-layer reset). Same logic as gloop.takeover, for one
+    destination."""
     r = c.obj(x, y, f"r {knob}")
     t = c.obj(x, y + 22, "t f f b f")
     last = c.obj(x + 120, y + 44, "f")
@@ -122,6 +123,8 @@ def pickup(c, x, y, knob, dst, convert, move=0.02, jump=0.2):
     c.connect(tm, 0, idl, 0)
     c.connect(idl, 0, si, 0)
     c.connect(si, 0, rb, 0)
+    if rebase:
+        c.connect(c.obj(x + 290, y + 66, f"r {rebase}"), 0, rb, 0)
     last_obj = chain(c, x, y + 176, spg, convert + [f"s {dst}"])
     return last_obj
 

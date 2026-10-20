@@ -259,7 +259,8 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
 - **Buttons:** Freeze = hold (loop shimmer paused); File held = momentary freeze; Source = Pre/Loop shimmer;
   Record = swell; Reset = clear (360 ms flush).
 - **Alt:** start = low cut; size = room 0.5–2×; density = shimmer tone LP; overlap = mod rate; window = A/B balance;
-  blend = duck; pitch_alt = detune ±25 cents. Pickup, as 05.
+  blend = duck; pitch_alt = detune ±25 cents. Pickup, as 05. **Source + Record = alt layer back to defaults**
+  (re-arms the pickups first via `pickup(..., rebase=)`, else the ~1 ms alt stream overwrites the reset).
 - **Engine:** tank + shifter in one canvas (a subpatch is sorted as a unit). Lines 0/1 crossfade cos θ/sin θ into the
   shifter, whose output re-enters through the diffuser (energy-balanced). Shifter has **no makeup gain**: with
   1/√0.75, steady tones on the 2000/W Hz comb gain 1.33 per pass and cascades grow.

@@ -30,6 +30,10 @@ Copy `07_shimmer.pd` to the USB root. Patch audio into the inputs; the output is
 ### Alt layer (hold Source)
 An alt knob takes effect only once you move it.
 
+**Lost? Hold Source and press Record:** every alt setting below goes back to its default. The knobs then do nothing
+until you move them again. Detune follows the Pitch encoder's own value as soon as you turn it again, so also click
+Pitch while holding Source (the Nebulae's own alt reset) to zero it on the module side.
+
 | Control | Function | Default |
 |---|---|---|
 | alt **Start** | Low cut, 20 Hz → 1 kHz, on the reverb input and the shimmer loop | 80 Hz |

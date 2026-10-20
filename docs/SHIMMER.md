@@ -54,6 +54,12 @@ adc~ -> [duck] (envelope of the dry input -> wet gain signal)
 - **Speed → Voice B:** zone code 0 = off (0.36–0.64). Codes 1–3 = (0.36 − s)/0.12 → −5, −12, −24. Codes 4–8 =
   (s − 0.64)/0.072 → +5, +7, +12, +19, +24. `[change]` sits before the sends.
 - **Alt knobs** use `spectral.pickup()`. pitch_alt (detune) is applied directly, since it's an accumulator.
+- **Alt reset (Source + Record):** `record_alt` toggles once per press (as in 03_gloop's alt clear). A primed press
+  first bangs `sh_altrb`, which is pickup()'s `rebase` hook: it closes every spigot and re-baselines. Only then does
+  it send `ALT_RESET`, the same values the patch loads with. The order matters: while Source is held each alt knob
+  streams about every millisecond, so an open pickup would overwrite the reset at once. This was checked with a
+  scratch run that streamed values every 10 ms: the values hold until the knob moves again, then pick up from the
+  knob.
 
 ## Old-Pd notes
 - There are no `!-` or `!/` objects in vanilla (they come from Max). Use `* -1, + a` and `pow -1`.

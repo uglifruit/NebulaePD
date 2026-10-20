@@ -39,6 +39,10 @@ MAKEUP = 1.0                   # not 1/sqrt(0.75): steady tones at multiples of 
 FLUSH = 360                                                # ms of zero feedback on Clear (> longest line + shifter)
 SPEED_L = [-5, -12, -24]                                   # Voice B, left of the left click (inner -> outer)
 SPEED_R = [5, 7, 12, 19, 24]                               # right of the right click
+# alt-layer defaults as sh_* values (at load, and on Source + Record): low cut 80 Hz, room 1x, shimmer tone 6 kHz,
+# mod rate 0.4 Hz, A/B balance equal, no duck, no detune
+ALT_RESET = ("\\; sh_lc 80 \\; sh_scale 1 \\; sh_stone 6000 \\; sh_mrate 0.4 \\; sh_wa 0.5 \\; sh_dk 0 "
+             "\\; sh_det 0")
 ALT_DEF = dict(start_alt=math.log(4) / math.log(50), size_alt=0.5, density_alt=math.log(6) / math.log(16),
                overlap_alt=math.log(8) / math.log(100), window_alt=0.5, blend_alt=0.0)
 
@@ -85,10 +89,14 @@ def ui(Canvas):
     lb = c.obj(1200, 30, "loadbang")
     c.connect(chain(c, 1200, 30, lb, ["delay 1000"]), 0, c.msg(1200, 80, "\\; sh_primed 1"), 0)
     c.connect(lb, 0, c.msg(700, 30,
-              "\\; sh_rt 5 \\; sh_scale 1 \\; sh_dampw 6000 \\; sh_frz 0 \\; sh_clr 1 \\; sh_clrw 1 \\; sh_pd 0 "
-              "\\; sh_d 0 \\; sh_pm 0 \\; sh_ov 0 \\; sh_mrate 0.4 \\; sh_stA 12 \\; sh_stB 12 \\; sh_det 0 "
-              "\\; sh_bon 0 \\; sh_wa 0.5 \\; sh_lc 80 \\; sh_stone 6000 \\; sh_dk 0 \\; sh_swell 0 "
-              "\\; sh_gd 0.7071 \\; sh_gw 0.7071"), 0)
+              "\\; sh_rt 5 \\; sh_dampw 6000 \\; sh_frz 0 \\; sh_clr 1 \\; sh_clrw 1 \\; sh_pd 0 "
+              "\\; sh_d 0 \\; sh_pm 0 \\; sh_ov 0 \\; sh_stA 12 \\; sh_stB 12 \\; sh_bon 0 \\; sh_swell 0 "
+              "\\; sh_gd 0.7071 \\; sh_gw 0.7071 " + ALT_RESET), 0)
+    # Source + Record (record_alt toggles once per press) = alt layer back to defaults: re-arm the pickups first
+    # (while Source is held every alt knob streams, and a picked-up one would overwrite the reset at once)
+    tar = op(c, 1000, 160, "t b b", press(c, 1000, 90, "record_alt", primed="sh_primed"))
+    c.connect(tar, 1, c.msg(1100, 182, "\\; sh_altrb bang"), 0)
+    c.connect(tar, 0, c.msg(1000, 204, ALT_RESET), 0)
 
     # --- primary knobs ---
     x, y = 10, 60
@@ -259,12 +267,13 @@ def ui(Canvas):
 
     # --- alt layer (pickup by movement) ---
     x, y = 10, 1600
-    pickup(c, x, y, "start_alt", "sh_lc", [f"* {math.log(50):.5f}", "exp", "* 20"])
-    pickup(c, x + 330, y, "size_alt", "sh_scale", [f"* {math.log(4):.5f}", "exp", "* 0.5"])
-    pickup(c, x + 660, y, "density_alt", "sh_stone", [f"* {math.log(16):.5f}", "exp", "* 1000"])
-    pickup(c, x, y + 330, "overlap_alt", "sh_mrate", [f"* {math.log(100):.5f}", "exp", "* 0.05"])
-    pickup(c, x + 330, y + 330, "window_alt", "sh_wa", [])
-    pickup(c, x + 660, y + 330, "blend_alt", "sh_dk", ["* -2.7631", "exp", "* -1", "+ 1"])
+    rb = "sh_altrb"
+    pickup(c, x, y, "start_alt", "sh_lc", [f"* {math.log(50):.5f}", "exp", "* 20"], rebase=rb)
+    pickup(c, x + 330, y, "size_alt", "sh_scale", [f"* {math.log(4):.5f}", "exp", "* 0.5"], rebase=rb)
+    pickup(c, x + 660, y, "density_alt", "sh_stone", [f"* {math.log(16):.5f}", "exp", "* 1000"], rebase=rb)
+    pickup(c, x, y + 330, "overlap_alt", "sh_mrate", [f"* {math.log(100):.5f}", "exp", "* 0.05"], rebase=rb)
+    pickup(c, x + 330, y + 330, "window_alt", "sh_wa", [], rebase=rb)
+    pickup(c, x + 660, y + 330, "blend_alt", "sh_dk", ["* -2.7631", "exp", "* -1", "+ 1"], rebase=rb)
     return c
 
 
