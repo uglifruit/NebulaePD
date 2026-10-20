@@ -21,7 +21,7 @@ builder is `tools/topo.py`; the user guide is `patches/06_topo_README.md`. Send 
 | speed | drift rate `3e-5·r²` per step, `r = clip((abs(speed − 0.5) − 0.13)/0.37)`: zero between the clicks | `tp_drate` |
 | pitch | tune ratio `2^((pitch·60 − 36)/12)`, latched per hit | `tp_tune` |
 | start/size/density/overlap_alt | lane fill offsets `v − 0.5` (K, S, H, P) | `tp_fo0..3` |
-| window_alt | length `1 + round(31·v)` | `tp_len` |
+| window_alt | length `2^(int(3.999·v) + 2)` = 4, 8, 16, 32 (always 4/4; odd meters only from Source-gate resets) | `tp_len` |
 | blend_alt | decay ×`exp((v − 0.5)·2·ln 4)` (0.25..4) | `tp_decay` |
 | speed_alt (routed only in 06: `controls_canvas(extra_alt=["speed_alt"])`) | swing `clip(abs(v − 23)/8)`: the click (23 = 0 dB) = straight, ±8 detents = 12/8. `pickup(move=0.5, jump=1000)`: only after it changes. It is also the module's input gain (`amixer Capture`), which carries over to other instruments | `tp_swing` |
 | pitch_alt | unused. It used to be swing, but its stored value (from other instruments) started a swing as soon as Source was held | — |
@@ -130,6 +130,7 @@ Group the prints into cycles to compare patterns. Checked offline:
 | sound | the same blend gives identical kick spectra; blend 1 (crunch) → K 62 Hz with drive harmonics, a brighter S; blend 0.5 → the 909 hats |
 | pattern | locked, chaos 0: cycles 1–3 identical (29 hits, house node); density 0.03 (dead zone) → 0 hits; fill 1 → 56 hits |
 | mutate | Record → the next cycle differs; File short → the plain map; File held 1.3 s stores; Record → differs; File short → the stored pattern; Window 1 → a new pattern each cycle; Freeze → repeats |
-| groove | alt Speed 23 → 31 → odd steps 41.67 ms late at 125 ms (12/8); holding Source with a stored 27 or 26 → no swing; length 12 → 12-step cycles; Source gate → the next step is 0; Speed 1 → the pattern drifts; fill 0.15 + hats offset −0.18 → kick/snare only |
+| meter | Length 32 and a Source-gate pulse every 12 steps → 12-step loops; the pulses stop → back to 32 |
+| groove | alt Speed 23 → 31 → odd steps 41.67 ms late at 125 ms (12/8); holding Source with a stored 27 or 26 → no swing; window_alt 0.35 → 8-step cycles; Source gate → the next step is 0; Speed 1 → the pattern drifts; fill 0.15 + hats offset −0.18 → kick/snare only |
 
 A 61 s render takes ~1.5 s on the desktop, about 3× lighter per second than 05_spectral.

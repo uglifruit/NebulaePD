@@ -722,7 +722,8 @@ def topo_mutate_test(wav=None):
 
 
 def topo_groove_test(wav=None):
-    """Swing 12/8 (alt Speed 23 -> 31 at 1.3 s: odd steps 125/3 = 41.7 ms late); length 12 (window_alt 0.5 -> 0.35 at 5.3 s); Source
+    """Swing 12/8 (alt Speed 23 -> 31 at 1.3 s: odd steps 125/3 = 41.7 ms late); length 8 (window_alt 0.5 -> 0.35 at 5.3 s,
+    the second of the 4/8/16/32 zones); Source
     gate reset at 8 s (next step 0); drift at full speed from 10 s. At 14 s fill 0.15 and the hats fill offset
     -0.18 (density_alt swept 0.5 -> 0.32 like a knob): kick and snare stay, no hats."""
     return dict(wav=wav, steps=[
@@ -735,8 +736,18 @@ def topo_groove_test(wav=None):
     ])
 
 
+def topo_meter_test(wav=None):
+    """Odd meters only by clocked reset: Length stays 32, and a Source gate pulse every 12 steps (1.5 s, between
+    clocks) from 1.2 s -> 12-step loops. Then the pulses stop -> back to 32."""
+    pulses = []
+    for k in range(1, 7):
+        t = 1200 + 1500 * k - 60
+        pulses += [(t, "\\; sourcegate 1"), (t + 5, "\\; sourcegate 0")]
+    return dict(wav=wav, steps=[(10, TP0), (1200, "\\; tp_tclk 1")] + pulses + [(18000, "\\; pd quit")])
+
+
 TOPO_TESTS = [("voices", topo_voices_test), ("sound", topo_sound_test), ("pattern", topo_pattern_test),
-              ("mutate", topo_mutate_test), ("groove", topo_groove_test)]
+              ("mutate", topo_mutate_test), ("groove", topo_groove_test), ("meter", topo_meter_test)]
 
 
 SPECTRAL_TESTS = [("calib", spectral_calib_test), ("bands", spectral_bands_test), ("freeze", spectral_freeze_test),

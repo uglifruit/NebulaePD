@@ -236,7 +236,7 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
 - **Buttons:** Reset = clock (one 16th per pulse); Source gate jack (`sourcegate`) = back to step 1; Freeze = lock;
   Record (any latch change) = mutate burst; File short = recall home, held 1 s = store home.
 - **Knobs:** start/size = map X/Y; density = fill; overlap = chaos; window = auto-mutate; blend = Sound (kit morph);
-  speed = drift (still between the clicks); pitch = tune. Alt: fill offsets K/S/H/P, window = length, blend = decay;
+  speed = drift (still between the clicks); pitch = tune. Alt: fill offsets K/S/H/P, window = length 4/8/16/32 (odd meters only via Source-gate resets), blend = decay;
   alt Speed (`speed_alt`) = swing, 23 = straight, ±8 = 12/8 (only after it moves). pitch_alt is unused. Sound past
   noon also fades in a crunch bus (drive/clip, bit-crush, sample-rate reduction).
 - **Engine:**

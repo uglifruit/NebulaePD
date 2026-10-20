@@ -396,7 +396,8 @@ def ui(Canvas):
     x, y = 10, 560
     for i, knob in enumerate(["start_alt", "size_alt", "density_alt", "overlap_alt"]):
         pickup(c, x + i * 300, y, knob, f"tp_fo{i}", ["- 0.5"])
-    pickup(c, x, y + 260, "window_alt", "tp_len", ["* 31", "+ 1.5", "int"])
+    # Length: 4/4 lengths only (4, 8, 16, 32 steps in four zones). Odd meters come from Source-gate resets.
+    pickup(c, x, y + 260, "window_alt", "tp_len", ["* 3.999", "int", "+ 2", f"* {LN2:.6f}", "exp", "+ 0.5", "int"])
     pickup(c, x + 300, y + 260, "blend_alt", "tp_decay", ["- 0.5", f"* {2 * math.log(4):.6f}", "exp"])
     # Speed encoder on the alt layer (speed_alt 0..32, 1 per detent, click = 23 = 0 dB input gain): swing.
     # Click = straight, 8 detents either way = 12/8. It only follows once moved or clicked, so a gain another

@@ -55,7 +55,7 @@ sequencer. **Fill** CV makes builds and breakdowns. **Pitch** tracks 1V/oct for 
 | size | **Snare + clap fill** offset | centre |
 | density | **Hats fill** offset | centre |
 | overlap | **Perc fill** offset | centre |
-| window | **Length** 1 – 32 steps | 32 (fully CW) |
+| window | **Length** 4 / 8 / 16 / 32 steps (four zones; always 4/4) | 32 (top quarter) |
 | blend | **Decay**: the whole kit ×0.25 (tight) – ×4 (boomy) | ×1 at centre |
 | speed encoder | **Swing**: click = straight; 8 detents either way = full **12/8** (triplet); in between = in between | straight |
 
@@ -130,8 +130,10 @@ mutation picks a random lane and step, then does one of three things:
 - **Flip** (30%): turn a silent step on, or a playing step off.
 - **Heal** (20%): remove the change on that step, so heavy mutation doesn't turn into noise.
 
-**Home** stores those changes and the drift position. **Length** shortens the cycle, which is good for odd meters:
-12 steps for 3/4, 20 for 5/4.
+**Home** stores those changes and the drift position. **Length** shortens the loop to 16, 8 or 4 steps, so it stays
+in 4/4. **Odd meters come only from a clocked reset:** send a trigger to the **Source gate** jack every N steps.
+For example every 12 steps for 3/4 or 12/8, or every 20 for 5/4. Stop the trigger and the loop goes back to the
+full Length.
 
 ## Differences from Grids
 
