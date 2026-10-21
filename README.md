@@ -15,24 +15,4 @@ desktop test harness.
 - `reference/` — official Nebulae development PDF; `upstream/` — files copied from
   [QB_Nebulae_V2](https://github.com/Qu-Bit-Electronix/QB_Nebulae_V2) (MIT, © 2019 Qu-Bit Electronix; see `upstream/UPSTREAM_LICENSE`)
 
-Local clones for study (gitignored): `external/QB_Nebulae_V2`, `external/NebulaePatches` (TheTechnobear).
-
-Status: all patches load cleanly in Pd 0.57 headless. **03_gloop is confirmed working on a Pi 4 Nebulae (fw v2.1.2).**
-00/01/02 have not been reported on hardware yet. New sessions: start with [`HANDOFF.md`](HANDOFF.md).
-
-## 02_echo — stereo tape echo with freeze
-Live-input effect. Vanilla objects only (`delwrite~`/`vd~`/`lop~`/`hip~`/`clip~`), chosen to work on old Pd versions.
-
-| Control | Function |
-|---|---|
-| start | delay time, 10 ms – 2 s (exponential); changes glide over 250 ms like tape |
-| size | feedback, 0 – 0.98 |
-| density | tone: low-pass in the feedback loop, ~80 Hz – 12 kHz (plus a fixed 40 Hz high-pass) |
-| overlap | wow depth, 0 – 8 ms |
-| window | wow rate, 0.05 – 6 Hz |
-| pitch | stereo spread: right delay = left × (1 + 0.5 × pitch); click position 0.6 gives a 1.3× offset |
-| blend | dry/wet |
-| freeze | holds the loop: input muted, feedback 1, filter bypassed — repeats sustain indefinitely |
-
-Unused: speed, record, file, source, reset, all alt controls.
-Desktop test: `pd -nogui -batch -r 48000 -open sim/test_02_echo.pd` renders a blip through it (prints L/R levels).
+Patches working - except Spectral, which clicks.
