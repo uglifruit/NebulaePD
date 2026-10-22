@@ -1,0 +1,143 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+nebconfigend
+
+; gendyn_orc.instr - GENDYN (Xenakis dynamic stochastic synthesis) written in plain orchestra code.
+; Original GENDYN: Christopher Konopka (Qu-Bit), V1 port by Chris Erin. MIT, QB_Nebulae_V2/Instruments/GENDYN.
+; The original and instr/demos/gendyn_fixed.instr both boot-loop the owner's module (see docs/INSTR.md). This
+; version drops the only opcodes no working instrument uses (gendy, butterlp): the gendy algorithm and the
+; 4750 Hz Butterworth low-pass are ported line for line from Csound's Opcodes/gendy.c and butter.c into a
+; setksmps-1 UDO, the same construct the factory Granular Looper runs. Buffer config copied from that looper.
+; Also fixed: Pitch below 0 (the hardware allows -0.3) made the minimum frequency negative, so the
+; waveform phase ran backwards and the output ramped without limit (peak > 17000 after 2 min).
+;
+; Controls (as the original): Pitch = min frequency, Speed = max frequency (13-880 Hz),
+; Window = distribution (linear, cauchy, logist, hyperbcos, arcsine, expon), Start = amp distribution
+; parameter, Size = duration distribution parameter, Density = amp step scale, Overlap = duration step
+; scale, Blend = control points (2-20). Output is stereo (original: left only).
+; Mapping fixes: in the original, port approached Blend/Window targets from below and int() rounded down,
+; so Blend at 0 silently played 20 points (1 point = near-DC) and the expon distribution was unreachable.
+
+giGdAmp ftgen 0, 0, 32, -2, 0     ; control point amplitudes, -1..1
+giGdDur ftgen 0, 0, 32, -2, 0     ; control point durations, 0..1
+
+; gendy_distribution(): one stochastic step. kwhich 0-5, ka = distribution parameter, ku = uniform 0..1
+opcode GdDist, k, kkk
+kwhich, ka, ku xin
+kwhich = int(kwhich)
+if ka > 1 then
+    ka = 1
+elseif ka < 0.0001 then
+    ka = 0.0001
+endif
+kres = 2 * ku - 1                      ; 0 = linear (and any other value): uniform -1..1
+if kwhich == 1 then                  ; cauchy
+    kc = taninv(10 * ka)
+    kres = (1 / ka) * tan(kc * (2 * ku - 1)) * 0.1
+elseif kwhich == 2 then              ; logist
+    kc = 0.5 + 0.499 * ka
+    kc = log((1 - kc) / kc)
+    kx = (ku - 0.5) * 0.998 * ka + 0.5
+    kres = log((1 - kx) / kx) / kc
+elseif kwhich == 3 then              ; hyperbcos
+    kc = tan(1.5692255 * ka)
+    kx = tan(1.5692255 * ka * ku) / kc
+    kres = log(kx * 0.999 + 0.001) * -0.2895296 - 1
+elseif kwhich == 4 then              ; arcsine
+    kres = sin(3.1415927 * (ku - 0.5) * ka) / sin(1.5707963 * ka)
+elseif kwhich == 5 then              ; expon
+    kc = log(1 - 0.999 * ka)
+    kres = (log(1 - 0.999 * ka * ku) / kc) * 2 - 1
+endif
+xout kres
+endop
+
+; gendy (a-rate) + butterlp 4750 Hz, one sample per k-cycle. Outputs raw and low-passed signal.
+opcode Gendyn, aa, kkkkkkkkk
+kamp, kdist, kadpar, kddpar, kminf, kmaxf, kascl, kdscl, knum xin
+setksmps 1
+kphase init 1
+kamp0 init 0
+kamp1 init 0
+kspeed init 0
+kidx init 0
+kz1 init 0
+kz2 init 0
+kone init 1                          ; k-rate arg so rnd() draws a new value each call
+; random start shape, as gendyset()
+indx = 0
+initpts:
+    tableiw birnd(1), indx, giGdAmp
+    tableiw rnd(1), indx, giGdDur
+    loop_lt indx, 1, 32, initpts
+; Butterworth low-pass coefficients (butter.c lobut)
+ic = 1 / tan(3.1415927 * 4750 / sr)
+ic1 = 1 / (1 + sqrt(2) * ic + ic * ic)
+ic2 = 2 * ic1
+ic4 = 2 * (1 - ic * ic) * ic1
+ic5 = (1 - sqrt(2) * ic + ic * ic) * ic1
+
+if kphase >= 1 then
+    kphase = kphase - 1
+    kn = int(knum + 0.5)
+    if kn < 1 then
+        kn = 1
+    elseif kn > 20 then
+        kn = 20
+    endif
+    kidx = (kidx + 1) % kn
+    kamp0 = kamp1
+    kd1 GdDist kdist, kadpar, rnd(kone)
+    kold table kidx, giGdAmp
+    kx = kold + kascl * kd1 + 1      ; fold into -1..1 (amplitude mirror)
+    kx = kx - 4 * floor(kx / 4)
+    if kx > 2 then
+        kx = 4 - kx
+    endif
+    kamp1 = kx - 1
+    tablew kamp1, kidx, giGdAmp
+    kd2 GdDist kdist, kddpar, rnd(kone)
+    kold table kidx, giGdDur
+    kx = kold + kdscl * kd2          ; fold into 0..1 (time mirror)
+    kx = kx - 2 * floor(kx / 2)
+    if kx > 1 then
+        kx = 2 - kx
+    endif
+    tablew kx, kidx, giGdDur
+    ; frequencies are clamped positive here, so the phase always moves forward
+    klo = (kminf < 13 ? 13 : kminf)
+    khi = (kmaxf < 13 ? 13 : kmaxf)
+    kspeed = (klo + (khi - klo) * kx) * kn / sr
+    if kspeed > 0.99 then
+        kspeed = 0.99
+    endif
+endif
+kout = kamp * ((1 - kphase) * kamp0 + kphase * kamp1)
+kphase = kphase + kspeed
+kt = kout - ic4 * kz1 - ic5 * kz2
+klp = kt * ic1 + ic2 * kz1 + ic1 * kz2
+kz2 = kz1
+kz1 = kt
+araw upsamp kout
+alp upsamp klp
+xout araw, alp
+endop
+
+instr 1
+kp = (gkpitch < 0 ? 0 : gkpitch)
+kdist = int(gkwindow * 5.999)        ; 6 equal zones (original: expon was unreachable)
+kadpar portk 0.001 + gkloopstart * 0.999, 0.06
+kddpar portk 0.001 + gkloopsize * 0.999, 0.06
+kminf  portk 13 + kp * 867, 0.06
+kmaxf  portk 13 + gkspeed * 867, 0.06
+kascl  portk 0.01 + gkdensity * 0.99, 0.06
+kdscl  portk 0.01 + gkoverlap * 0.99, 0.06
+knum   portk 2 + gkblend * 18, 0.06, 20
+
+araw, alp Gendyn 0.5, kdist, kadpar, kddpar, kminf, kmaxf, kascl, kdscl, knum
+aout balance alp, araw
+outs aout, aout
+endin

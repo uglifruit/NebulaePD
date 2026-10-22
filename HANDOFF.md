@@ -1,6 +1,6 @@
 # Handoff — NebulaePD (for a new Claude instance)
 
-Last updated 2026-10-20. Read this first, then `docs/PROTOCOL.md`, then the doc for whatever you're touching.
+Last updated 2026-10-22. Read this first, then `docs/PROTOCOL.md`, then the doc for whatever you're touching.
 For a **new instrument**, see §8.
 
 ## 1. What this is
@@ -31,7 +31,7 @@ For a **new instrument**, see §8.
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
-| GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. **Parked by the user.** Both pass in Csound 6.09.1 and 6.18 on the desktop; suspect is `gendy` on the module's build. The next step would be SSH plus `journalctl -u nebulae` |
+| GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |
 
 **Roadmap** (not started):
 - 05_spectral: hardware feedback. If it crackles, rebuild with `N = 1024` in `tools/spectral.py` (verified offline).

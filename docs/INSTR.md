@@ -73,22 +73,37 @@ VERSION block without the mandatory/reversion lines.
 - Csound's own error messages are **not** written here; they go to the systemd journal (`journalctl -u nebulae`).
 
 ## Known issues
-- **GENDYN (`Instruments/GENDYN/gendyn.instr`) boot-loops on the owner's unit.** Investigation (2026-10-18):
-  - Compiles (`compileOrc` = 0) and runs 30 s cleanly in **Csound 6.09.1** (the module's version) at default and
-    extreme knob settings: peak ~0.5, no NaN. Same in 6.18 for 60 s. So it is **not** a parse error or a DSP blow-up
-    in Csound itself, and the "old parser" theory below is now unlikely.
-  - DSP is sound;
-    `gendy` is built into libcsound, so not a missing opcode; its `knum` divide-by-zero guard exists back to 6.07.
-  - So the failure is specific to the module's environment. Constructs used **only** by GENDYN (not by working
-    instruments): `/* */` header with UTF-8 accents (`Generation`), global-space `gk.. init` lines plus a non-global
-    `initcps init 13` in instr 0, a `\` line continuation in the `gendy` call, and `port` writing into its own global.
-  - `instr/demos/gendyn_fixed.instr` removes all of them (plus: stereo `outs`, min/max frequency ordered, nebconfig).
-    **Tested on hardware 2026-10-18: also boot-loops.** So the syntax quirks are ruled out; what both files share is
-    the `gendy` opcode itself (plus butterlp/balance). Next suspect: `gendy` on the module's Csound build/ARM.
-    Parked. (Original note: if it works and the cause matters, bisect by re-adding one construct at a time.
-  - Owner's neb_log (2026-10-18) shows the loop: restarts every ~15 s with buff/cache ~183-188 MiB, so the Pi stays up
-    and the Nebulae service restarts. That fits a crash or exit of the Python/Csound process during instrument start.
-  - Remaining suspects are the real-time side: ALSA/realtime on ARM (double-precision build), CPU/underruns, or
-    something in the Python app. Definitive answer needs the module's log: SSH in and run
-    `journalctl -u nebulae -b` (or `-b -1` after a restart), or check `Code/log/formattedcsd.txt` and `neb_log.txt`.
-  - Original also: mono `out` (left only), pitch above speed inverts min/max frequency (still stable in 6.18).
+- **GENDYN (`Instruments/GENDYN/gendyn.instr`) boot-loops on the owner's unit**, and so does our first rewrite
+  `instr/demos/gendyn_fixed.instr` (tested 2026-10-18). Root cause still unconfirmed (needs the journal, see below).
+  - What is ruled out: parse errors (compiles in 6.09.1 and 6.18), the syntax quirks (`/* */` + UTF-8 header, global
+    `init` lines, `\` continuation, `port` into its own global: the rewrite removed them all), CRLF (every upstream
+    instr is CRLF), a missing opcode (`gendy` and `butterlp` are both in core libcsound 6.03-6.18), a `gendy` change
+    between versions (`Opcodes/gendy.c` is semantically identical 6.03.2-6.18.1), `--realtime` init races (perf waits
+    for `init_done`), and a clean exit (`nebulae.service` is `Restart=on-failure`, runs as root; `sys.exit()` from
+    `run()` exits 0 and would not loop). So it is a **crash** (Csound segfault or a Python exception, non-zero exit).
+  - Opcodes used **only** by GENDYN among all Qu-Bit instruments: `gendy` and `butterlp`. Neither can crash on
+    reading of the C source, which is why the journal is needed.
+  - Real bug found (2026-10-22): the hardware's Pitch range is **-0.30..1.30** (`control.py` HybridData), not 0..1.
+    Pitch < 0 makes `kminfreq` negative, `gendy`'s phase runs backwards and its interpolation ramps without bound:
+    peak 1028 after 8 s, 17000 after 2 min (6.09.1). ALSA output clips, so this is a sound bug, not the crash.
+  - Mapping quirks in the original: `port` approaches targets from below and `gendy` truncates, so Blend at 0 gives
+    `int(0.99..)` = 0 → `gendy` falls back to 20 points (a true 1 point is near-DC), and Window never reaches
+    distribution 5 (expon).
+  - **`instr/gendyn_orc.instr` (2026-10-22, awaiting hardware):** the gendy algorithm and the 4750 Hz Butterworth
+    ported line for line from `gendy.c`/`butter.c` into a `setksmps 1` UDO (the construct the factory Granular
+    Looper uses), so no `gendy`/`butterlp`. Frequencies clamped >= 13 Hz, Blend = 2-20 points (rounded), Window = 6
+    equal zones, stereo out, looper's buffer config. Offline: same RMS/zero-crossing/centroid statistics as the
+    original over 60 s, peak <= 0.73 at every extreme, no NaN. CPU ~3.5x the original (~13% of a desktop core in
+    wasm). If it plays, `gendy` (or `butterlp`) on the module's build was the culprit. If it also loops, the cause is
+    outside the DSP: capture the log.
+  - Original also: mono `out` (left only).
+
+## Capturing the crash log (no SSH): `instr/diag_log.instr`
+`nebulae.service` runs as root and Csound/Python errors go to the systemd journal, which is in RAM (`/var/log` is
+tmpfs) and survives service restarts but not power-off. `diag_log.instr` uses `system_i` (plugin `system_call`) to
+mount the stick and write `neb_diag.txt`: service journal, `dmesg`, Csound/OS versions, `checkfirmware.sh`, then beeps
+at ~10 s. Procedure: let the bad instrument boot-loop a few times, **don't power off**, replace the looping file on the
+stick with `diag_log.instr` under the **same name**, plug it back in; the next service restart loads it. No beep =
+`system_i` missing on that build. The shell script avoids `$` and `;` (Csound macro/comment characters); verified in
+6.09.1 that the string arrives intact (wasm has no `system_i`, so only the module can run it).
+`node tools/run_csound609.js file.csd secs out.wav` also writes a stereo float WAV of the render.

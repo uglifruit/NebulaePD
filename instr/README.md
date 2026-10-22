@@ -13,6 +13,12 @@
 | bowed_drone | bowed string / physical model drone | 45 |
 | fm_grit | extreme-ratio FM + reverb | 60 |
 
-`gendyn_fixed.instr` - rewrite of GENDYN (original boot-loops; see `docs/INSTR.md`). **Also boot-loops on hardware - do not use.**
+`gendyn_orc.instr` - GENDYN without the `gendy`/`butterlp` opcodes (algorithm ported into orchestra code), negative-Pitch
+runaway fixed, Blend 2-20 points, Window reaches all 6 distributions. **Awaiting hardware.**
+
+`diag_log.instr` - writes `neb_diag.txt` (service journal, kernel log, versions) to the USB stick, then beeps. Use it
+to capture why an instrument boot-loops; procedure in `docs/INSTR.md` "Capturing the crash log".
+
+`demos/gendyn_fixed.instr` - first GENDYN rewrite (original boot-loops; see `docs/INSTR.md`). **Also boot-loops on hardware - do not use.**
 Not copied: original GENDYN. Larger upstream instruments (Granular Looper ~1000 lines,
 Realms, Mars Affects, Avalon, One Shot) are in `external/QB_Nebulae_V2/Instruments/` for reading.

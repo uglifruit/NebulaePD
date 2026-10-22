@@ -1,0 +1,52 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+nebconfigend
+
+; diag_log.instr - writes neb_diag.txt to the USB stick: the Nebulae service journal (Csound and Python
+; errors from earlier runs, e.g. a boot loop), kernel log, Csound/OS versions. No SSH needed.
+; Use (see docs/INSTR.md "Capturing the crash log"): while a bad .instr is boot-looping, DON'T power off
+; (the journal lives in RAM). Replace the looping file on the stick with this one under the SAME name,
+; plug it back in, wait for the beep (~10 s after the instrument starts), then read neb_diag.txt.
+; Audio passes through, so the module keeps working while it runs.
+; The shell script avoids '$' and ';' (Csound macro and comment characters).
+
+instr 1
+ires system_i 1, {{( sleep 4
+mkdir -p /mnt/memory
+grep -q " /mnt/memory " /proc/mounts || mount /dev/sda1 /mnt/memory
+{
+echo "=== date"
+date
+uptime
+echo "=== system"
+uname -a
+cat /etc/os-release
+echo "=== csound"
+csound --version 2>&1 | head -n 3
+ls -l /usr/lib/libcsound* /usr/local/lib/libcsound* /usr/lib/*/libcsound* 2>&1
+echo "=== bootinstr"
+cat /home/alarm/QB_Nebulae_V2/Code/config/bootinstr.txt
+echo "=== user instr"
+ls -la /home/alarm/instr
+echo "=== service"
+systemctl status nebulae --no-pager -l 2>&1 | head -n 20
+echo "=== journal nebulae"
+journalctl -u nebulae --no-pager -o short-monotonic -n 8000 2>&1
+echo "=== kernel"
+dmesg 2>&1 | tail -n 300
+echo "=== checkfirmware.sh"
+cat /home/alarm/checkfirmware.sh
+echo "=== end"
+} > /mnt/memory/neb_diag.txt 2>&1
+sync
+umount /mnt/memory ) > /dev/null 2>&1 &}}
+
+; pass-through, plus a short beep at 10 s to say the log has been written
+ainl, ainr inch 1, 2
+kt timeinsts
+abeep oscili (kt > 10 && kt < 10.4 ? 0.2 : 0), 880
+outs ainl + abeep, ainr + abeep
+endin
