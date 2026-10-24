@@ -57,7 +57,4 @@ Pitch while holding Source (the Nebulae's own alt reset) to zero it on the modul
 ## Notes
 - The shimmer decays with the reverb. At high Density the tail is a little shorter than the Size setting, because
   some energy climbs out of range through the shimmer lowpass.
-- The loudest settings (Size and Density fully up, sustained input) are bounded by soft clipping. They're loud but
-  safe, with no runaway.
-- CPU is about the same as 05_spectral. If it crackles on an older Pi, tell me: the chorus and Voice B can be
-  switched off when unused.
+- The loudest settings (Size and Density fully up, sustained input) are bounded by soft clipping. 
