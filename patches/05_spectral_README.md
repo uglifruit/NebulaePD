@@ -1,6 +1,8 @@
 # 05_spectral — Spectral Clouds+ for the Nebulae (user guide)
 
-A spectral instrument in the spirit of **WorkshopSpectral** (the Workshop Computer port of Julius Kammerl's
+WIP: CURRENT CLICKS
+
+A spectral instrument in the spirit of **WorkshopSpectral** (the Workshop Computer adaptation of Julius Kammerl's
 **Spectral Clouds**). It is the same idea, grown up for the Nebulae rather than copied.
 
 The patch splits your sound into **log-spaced frequency bands** and gives each band a random gain. A probability
@@ -252,4 +254,4 @@ Moving the time while repeats are sounding gives the tape-speed swoop.
 
 ## Credits
 
-Julius Kammerl (the Spectral Clouds algorithm), Émilie Gillet (Clouds), and WorkshopSpectral. All MIT.
+Julius Kammerl (the Spectral Clouds algorithm), Émilie Gillet (Clouds), and My WorkshopSpectral card. All MIT.
