@@ -1,6 +1,6 @@
 # 07_shimmer — shimmer reverb
 
-A Strymon BigSky/blueSky-style **shimmer reverb**. A lush 8-line reverb has a pitch shifter in its feedback, so
+A Strymon/Valhalla-style **shimmer reverb**. A lush 8-line reverb has a pitch shifter in its feedback, so
 every pass climbs another interval and the tail blooms into an octave-up halo. Two pitch voices are available, and
 there's an option for the SoS-style "pre" shimmer: one layer, no climb. There's also tank modulation into ensemble
 chorus, freeze, swell, ducking and clear.
