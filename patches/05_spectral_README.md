@@ -1,6 +1,6 @@
 # 05_spectral — Spectral Clouds+ for the Nebulae (user guide)
 
-WIP: CURRENT CLICKS
+WIP: CURRENT CLICKY
 
 A spectral instrument in the spirit of **WorkshopSpectral** (the Workshop Computer adaptation of Julius Kammerl's
 **Spectral Clouds**). It is the same idea, grown up for the Nebulae rather than copied.
