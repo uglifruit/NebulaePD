@@ -273,7 +273,7 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
 - **Knobs:** pitch = V/oct (continuous, click = C4); start = exciter material (sine→tri→saw→square→noise→S&H);
   size = T60 0.05–30 s; density = envelope pluck → bow; window = key-tracked loop damping; overlap = delay
   feedback (to 1.1); blend = delay mix; speed = delay time 20 ms–2 s.
-- **Buttons:** Reset = strike (3 ms late so V/oct lands first); Freeze = hold; Source = audio input as exciter;
+- **Buttons:** Reset = strike (once Pitch has settled, 3–30 ms; alternates two voices); Freeze = hold; Source = audio input as exciter;
   Record = invert (period halved, stays on pitch); File short = V/oct mode Coupled / Res only / Exc only (no LED,
   Coupled at load); File held ≥ 300 ms = delay hold.
 - **Alt:** start = exciter LP; size = L/R spread (cents); density = auto-repeat 0.25–16 Hz; overlap = delay tone
@@ -281,6 +281,10 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
   otherwise); blend = exciter dry ↔ resonator; pitch_alt = ping-pong. Source + Record = alt reset (+ mode Coupled).
 - **Engine:**
   - `[pd res]` runs at `block~ 16`, so the loop can be ≥ 17 samples (top 2.6 kHz, 1.3 kHz inverted).
+  - It has two alternating voices per side. A strike takes the other voice, so the old note keeps its pitch.
+  - The ringing voice follows Pitch through `[pipe 40]`, and a strike clears the queue.
+  - The strike waits for Pitch to settle (3–30 ms), because the firmware slews Pitch CV with a one-pole plus
+    hysteresis.
   - `vd~` gives exactly the requested delay: the measured residual is 0.
   - D = period − τ_lop(f) + τ_hip(f), so Window doesn't detune. g = 10^(−3T/T60)/|H(f)|, capped at 1.
   - Levels: exciter × (1 + periods per strike)^−0.75; audio input × √(1 − G); a control-rate auto-level (env~

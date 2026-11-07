@@ -21,7 +21,7 @@ Copy `08_resonator.pd` to the USB root. The output is stereo. The audio inputs a
 
 | Button / jack | Function |
 |---|---|
-| **Reset** (button or gate jack) | **Strike**: fires the exciter envelope. Patch a trigger or clock here. Strikes wait 3 ms so a V/oct change sent with the gate lands first |
+| **Reset** (button or gate jack) | **Strike**: fires the exciter envelope on the other of two resonators, so the previous note rings on at its own pitch under the new one. Patch a trigger or clock here. The strike waits until Pitch has settled (3 ms normally, ~15 ms after a big V/oct jump, 30 ms at most) |
 | **Freeze** (LED) | **Hold**: the resonator rings forever at its current tone, and new strikes are shut out. Pitch still bends the held note |
 | **Source** (LED) | **Audio in**: your input becomes the exciter instead of the internal one. Drums, voice and synths ring at the resonator's pitch |
 | **Record** (LED) | **Invert** the feedback. The tone becomes hollow and clarinet-like (odd harmonics only), and it stays on the same note |
@@ -66,6 +66,11 @@ back to Coupled. The knobs then do nothing until you move them again.
    ringing pitch while the drums play on.
 
 ## Notes
+- **Two voices.** Each strike alternates between two resonators. The ringing note keeps its pitch, and a third
+  note takes over the older voice. A Pitch change that comes within 40 ms before a strike belongs to the new
+  note. Slower moves (bends, a frozen note, the audio-input drone) still bend the ringing voice, 40 ms late.
+- **Why the strike waits:** the Nebulae smooths the Pitch CV before Pd sees it (a big jump arrives as a ramp over
+  10–30 ms). Striking during that ramp swoops the attack, so the strike waits for Pitch to stop moving.
 - Pitch is accurate: it measured within 0.01 cents offline from 92 Hz to 2.5 kHz, and within about 1 cent with
   Window fully CCW. The damping is compensated, so turning Window doesn't detune.
 - With Window CCW, high notes are short whatever Size says. Each trip round the loop loses energy in the damping
@@ -77,7 +82,7 @@ back to Coupled. The knobs then do nothing until you move them again.
   If it crackles on the module, tell me: the top can drop to about 1.3 kHz to save CPU.
 
 ## Differences from the ECHON
-- One voice, not six. A new strike re-excites the same string, which is still ringing.
+- Two alternating voices, not six (monophonic playing; the previous note rings on).
 - There's no 12 dB resonator input filter as a fixed knob. alt Start does that job, and Window is the 6 dB loop
   filter.
 - No LFO/mod matrix. Every knob has its own CV jack instead.
