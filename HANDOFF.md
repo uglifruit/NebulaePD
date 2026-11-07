@@ -39,6 +39,13 @@ For a **new instrument**, see §8.
 - 04_glitch: hardware feedback on Pitch/Speed/pass-through pitch-down.
 - 07_shimmer: hardware feedback (CPU on the Pi, shimmer smoothness, swell threshold vs. Eurorack levels).
 - 08_resonator: hardware feedback (CPU of the block~ 16 resonator; fall back to block~ 32 if it crackles; tuning by ear, levels, auto-level feel).
+  - **Hardware, 2026-11-07:** good, except big V/oct jumps glide (the firmware's Pitch slew, §4).
+  - **Fix attempt `41ec4be`, reverted in `daebe62`:** two alternating voices, a settle-wait and a 40 ms pitch lag. The
+    owner found it worse. The likely reason: its "stale after 4 ms" rule fired between slow poll updates, so it never
+    waited, and the lag made the new note scoop 40 ms after the attack. The voice code is in that commit if needed.
+  - **Owner is considering a firmware tweak (separate conversation):** Pitch `filtCoeff` 0.33 → 0.95 in stock
+    `control.py`, as Technobear did. Keep it revertible: back up the original file first, and keep the stock update
+    zip to hand.
 - 06_topo: hardware feedback (sound balance, clock feel). Later idea from the owner: Source cycles through named sample
   kits. But the Source latch also toggles on the Source gate jack (06's step-1 reset), so reset would have to move.
 - Gloop effects pass: delay, reverb, bit crush, wavefold, tape saturation/hiss/age, tilt EQ. The user picked "core first".
@@ -77,8 +84,14 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - Sample rate is 48 kHz (both looper patches assume it, and both work on hardware).
 - **Control protocol:**
   - TCP to `[netreceive 3000]`, FUDI `name value;`.
-  - **Every primary value is resent about every 1 ms, changed or not.** Use `[change]` for button edges, and ignore edges
-    for about 1 s after load (stored latch states arrive straight away). `gloop.press(..., primed=...)` does both.
+  - **Every primary value is resent once per poll loop, changed or not.** Use `[change]` for button edges, and ignore
+    edges for about 1 s after load (stored latch states arrive straight away). `gloop.press(..., primed=...)` does both.
+  - **The poll rate is NOT measured.** The loop is `sleep(0.001)`, ~26 SPI reads in Python 2, then one TCP send per
+    value (`controlhandler.py` puredata branch, `pdsender.py`). It is probably several ms per pass, not 1 ms. Don't build
+    timing logic on a 1 ms assumption (08_resonator's settle-wait attempt did, and was reverted).
+  - **The firmware slews Pitch CV.** `control.py` HybridData applies a one-pole (`filtCoeff` 0.33 per poll), hysteresis
+    0.001, octave snapping and a stability gate. The CV input also has a smoothing cap. A big V/oct jump arrives as a
+    ramp of about 13 polls. Technobear's fork changes Pitch's coefficient to 0.95 ("we dont want it gliding").
   - **Alt values (`*_alt`) are sent only while Source is held.**
   - `file` is **incremental** (0..number of audio files − 1), not 0/1. Use `filestate` (the raw button) for presses.
     (Note: `controlhandler.py`'s puredata default config lists `file` as latching, so this is unverified. `filestate` is
