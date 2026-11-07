@@ -843,12 +843,111 @@ SHIMMER_TESTS = [("decay", shimmer_decay_test), ("loop", shimmer_loop_test), ("p
                  ("clear", shimmer_clear_test), ("duck", shimmer_duck_test), ("swell", shimmer_swell_test)]
 
 
+RS0 = ("\\; start 0.2 \\; size 0.7 \\; density 0 \\; overlap 0 \\; window 1 \\; blend 0 \\; speed 0.5 \\; pitch 0.6 "
+       "\\; freeze 0 \\; record 0 \\; source 0 \\; filestate 0 \\; rs_sp 0")
+RS_PITCHES = [0.3, 0.45, 0.6, 0.75, 0.9, 1.0, 1.15, 1.25]     # 1.15/1.25: Pitch + CV past the knob's top
+
+
+def hit(ms):
+    return [(ms, "\\; reset 1"), (ms + 5, "\\; reset 0")]
+
+
+def res_tune_test(wav=None, extra=""):
+    """A strike every 1.5 s from 1.2 s, Pitch stepping through RS_PITCHES 100 ms before each (Size 0.7)."""
+    st = [(10, RS0 + extra)]
+    for i, p in enumerate(RS_PITCHES):
+        t = 1200 + 1500 * i
+        st += [(t - 100, f"\\; pitch {p:g}")] + hit(t)
+    return dict(wav=wav, steps=st + [(1200 + 1500 * len(RS_PITCHES), "\\; pd quit")])
+
+
+def res_decay_test(wav=None):
+    """T60: Size 0.3 (0.34 s) at 1.2 s; Size 0.6 (2.33 s) at 4 s; the same at Pitch 0.3 (9 s) and Window 0.5 (14 s)."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; size 0.3")] + hit(1200) + [(3900, "\\; size 0.6")] + hit(4000)
+                + [(8900, "\\; pitch 0.3")] + hit(9000) + [(13900, "\\; pitch 0.6 \\; window 0.5")] + hit(14000)
+                + [(19000, "\\; pd quit")])
+
+
+def res_shapes_test(wav=None):
+    """Start 0, 0.2 .. 1 (each material), one strike per second from 1.2 s (Density 0.3, Size 0.5, Window 0.5)."""
+    st = [(10, RS0 + " \\; density 0.3 \\; size 0.5 \\; window 0.5")]
+    for k in range(6):
+        st += [(1100 + 1000 * k, f"\\; start {k / 5:g}")] + hit(1200 + 1000 * k)
+    return dict(wav=wav, steps=st + [(7500, "\\; pd quit")])
+
+
+def res_ext_test(wav=None):
+    """Audio-input exciter (Source on), 261.6 Hz sine 0.3 for 1-3 s at Size 0.3, 4-6 s at Size 1, noise 0.3 for
+    7-9 s at Size 1: bounded, roughly even."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; source 1 \\; size 0.3"), (1000, "\\; rs_tsin 0.3"),
+                                (3000, "\\; rs_tsin 0"), (3900, "\\; size 1"), (4000, "\\; rs_tsin 0.3"),
+                                (6000, "\\; rs_tsin 0"), (7000, "\\; rs_tnz 0.3"), (9000, "\\; rs_tnz 0"),
+                                (12000, "\\; pd quit")])
+
+
+def res_freeze_test(wav=None):
+    """Strike at 1.2 s, Freeze at 1.6 s: the tone holds to 21 s; a strike at 5 s must not get in."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; size 0.5")] + hit(1200) + [(1600, "\\; freeze 1")] + hit(5000)
+                + [(21000, "\\; pd quit")])
+
+
+def res_delay_test(wav=None):
+    """Wet only (Blend 1), short pluck (Size 0): echoes every 200 ms (Speed 0.5), feedback 0.55. At 4.2 s feedback
+    0.99 and a strike, File held 4.6-8 s = delay hold (repeats flat), then decay."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; blend 1 \\; size 0 \\; overlap 0.5")] + hit(1200)
+                + [(4000, "\\; overlap 0.9")] + hit(4200) + [(4600, "\\; filestate 1"), (8000, "\\; filestate 0"),
+                                                         (11000, "\\; pd quit")])
+
+
+def res_repeat_test(wav=None):
+    """Auto-repeat: density_alt streamed to 0.5 (about 1.9 Hz) from 1.2 s; off again at 5 s."""
+    up = [(1200 + 5 * i, f"\\; density_alt {0.3 + 0.02 * i:g}") for i in range(11)]
+    down = [(5000 + 5 * i, f"\\; density_alt {0.5 - 0.05 * i:g}") for i in range(11)]
+    return dict(wav=wav, steps=[(10, RS0 + " \\; size 0.3")] + up + down + [(7000, "\\; pd quit")])
+
+
+def res_route_test(wav=None):
+    """Prints: V/oct modes (File short presses), a long press = hold only, offset (window_alt), Source + Record =
+    alt reset. Coupled at Pitch 0.7 (370 Hz) -> Res only (exc 261.6) -> Exc only (res 261.6, exc 370), then
+    offset +12 -> the fixed side moves, then the alt reset."""
+    wa = [(5000 + 5 * i, f"\\; window_alt {0.5 + 0.03 * i:g}") for i in range(11)]
+    return dict(wav=wav, steps=[(10, RS0 + " \\; density 0.6"), (1500, "\\; pitch 0.7")] + hit(1600)
+                + [(2000, "\\; filestate 1"), (2100, "\\; filestate 0")] + hit(2600)
+                + [(3000, "\\; filestate 1"), (3100, "\\; filestate 0")] + hit(3600)
+                + [(4000, "\\; filestate 1"), (4600, "\\; filestate 0")] + wa + hit(5600)
+                + [(6500, "\\; record_alt 1")] + [(7500, "\\; pd quit")])
+
+
+def res_runaway_test(wav=None):
+    """Worst case, internal: Size, Window, Overlap, Density, Start at 1, auto-repeat 16 Hz, delay feedback 1.1;
+    invert at 20 s, Freeze 30-45 s. 60 s: bounded, no NaN."""
+    up = [(1200 + 5 * i, f"\\; density_alt {0.5 + 0.05 * i:g}") for i in range(11)]
+    return dict(wav=wav, steps=[(10, RS0 + " \\; size 1 \\; window 1 \\; overlap 1 \\; density 1 \\; start 1 "
+                                      "\\; blend 0.5")] + up
+                + [(20000, "\\; record 1"), (30000, "\\; freeze 1"), (45000, "\\; freeze 0"), (60000, "\\; pd quit")])
+
+
+def res_runext_test(wav=None):
+    """Worst case, audio input: sine 0.9 + noise 0.3 at the resonator pitch, Size 1, delay feedback 1.1. 30 s."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; source 1 \\; size 1 \\; overlap 1 \\; blend 0.5 \\; rs_tsin 0.9 "
+                                      "\\; rs_tnz 0.3"), (30000, "\\; pd quit")])
+
+
+RES_TESTS = [("tune", res_tune_test), ("tunedark", lambda wav=None: res_tune_test(wav, " \\; window 0")),
+             ("tunemid", lambda wav=None: res_tune_test(wav, " \\; window 0.5")),
+             ("tuneinv", lambda wav=None: res_tune_test(wav, " \\; window 0.5 \\; record 1")),
+             ("decay", res_decay_test), ("shapes", res_shapes_test), ("ext", res_ext_test),
+             ("freeze", res_freeze_test), ("delay", res_delay_test), ("repeat", res_repeat_test),
+             ("route", res_route_test), ("runaway", res_runaway_test), ("runext", res_runext_test)]
+
+
 if __name__ == "__main__":
     import gloop
     import glitch
     import spectral
     import topo
     import shimmer
+    import resonator
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
@@ -858,6 +957,7 @@ if __name__ == "__main__":
     write("patches/05_spectral.pd", spectral.spectral_patch(Canvas, controls_canvas))
     write("patches/06_topo.pd", topo.topo_patch(Canvas, controls_canvas))
     write("patches/07_shimmer.pd", shimmer.shimmer_patch(Canvas, controls_canvas))
+    write("patches/08_resonator.pd", resonator.resonator_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
@@ -886,3 +986,8 @@ if __name__ == "__main__":
         if wavdir:
             write(f"{wavdir}/h_{name}.pd",
                   shimmer.shimmer_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/h_{name}.wav")))
+    for name, scen in RES_TESTS:
+        write(f"sim/test_08_{name}.pd", resonator.resonator_patch(Canvas, controls_canvas, test=scen()))
+        if wavdir:
+            write(f"{wavdir}/r_{name}.pd",
+                  resonator.resonator_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/r_{name}.wav")))
