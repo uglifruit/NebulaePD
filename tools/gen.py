@@ -933,42 +933,12 @@ def res_runext_test(wav=None):
                                       "\\; rs_tnz 0.3"), (30000, "\\; pd quit")])
 
 
-def res_jump_test(wav=None):
-    """An octave jump between strikes (Size 0.7): the 261.6 Hz note struck at 1.2 s keeps its pitch under the
-    523.3 Hz one struck at 2.2 s (two voices), then a third strike at 3.2 s (back to 0.6) takes the first voice."""
-    return dict(wav=wav, steps=[(10, RS0)] + hit(1200) + [(2199, "\\; pitch 0.8")] + hit(2200)
-                + [(3199, "\\; pitch 0.6")] + hit(3200) + [(4500, "\\; pd quit")])
-
-
-def res_settle_test(wav=None):
-    """Prints go_ms / fr_at_go. At 1.2 s the gate comes with a firmware-style Pitch ramp 0.6 -> 0.8 (one-pole 0.33
-    per 1 ms update, hysteresis 0.001, 4 decimals, resent every ms): the strike waits for it to settle (~12 ms) and
-    starts near 523.3 Hz. At 2 s a gate with Pitch steady (still streaming): 3 ms. At 2.5 s a gate with no Pitch
-    stream at all: 3 ms (stale)."""
-    st = [(10, RS0)]
-    v = h = 0.6
-    for i in range(80):
-        v += 0.33 * (0.8 - v)
-        if abs(v - h) > 0.001:
-            h = v
-        st.append((1200 + i, f"\\; pitch {round(h, 4):g}"))
-    st += [(1900 + i, "\\; pitch 0.8") for i in range(150)]
-    return dict(wav=wav, steps=st + hit(1200) + hit(2000) + hit(2500) + [(3000, "\\; pd quit")])
-
-
-def res_bend_test(wav=None):
-    """Live bends still reach a ringing voice (LAG_MS late): strike at 1.2 s, Freeze at 1.6 s, Pitch 0.7 at 3 s ->
-    the held note moves to 370 Hz."""
-    return dict(wav=wav, steps=[(10, RS0 + " \\; size 0.5")] + hit(1200) + [(1600, "\\; freeze 1"),
-                                                                       (3000, "\\; pitch 0.7"), (5000, "\\; pd quit")])
-
-
 RES_TESTS = [("tune", res_tune_test), ("tunedark", lambda wav=None: res_tune_test(wav, " \\; window 0")),
              ("tunemid", lambda wav=None: res_tune_test(wav, " \\; window 0.5")),
              ("tuneinv", lambda wav=None: res_tune_test(wav, " \\; window 0.5 \\; record 1")),
              ("decay", res_decay_test), ("shapes", res_shapes_test), ("ext", res_ext_test),
              ("freeze", res_freeze_test), ("delay", res_delay_test), ("repeat", res_repeat_test),
-             ("route", res_route_test), ("jump", res_jump_test), ("settle", res_settle_test), ("bend", res_bend_test), ("runaway", res_runaway_test), ("runext", res_runext_test)]
+             ("route", res_route_test), ("runaway", res_runaway_test), ("runext", res_runext_test)]
 
 
 if __name__ == "__main__":

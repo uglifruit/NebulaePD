@@ -43,16 +43,6 @@ TONE_LO, TONE_HI = 1500.0, 16000.0  # delay tone LP (alt Overlap)
 WOB_MS = 1.5                       # delay wobble depth at the murkiest tone
 DT_LO, DT_HI = 20.0, 2000.0        # delay time (Speed)
 HOLD_MS = 300                      # File held this long = delay hold; shorter = step the V/oct mode
-# strike timing: the firmware slews Pitch CV (one-pole, 0.33 per poll) and the CV input has a cap, so a big jump
-# arrives as a 10-30 ms ramp. A strike waits until Pitch has settled.
-STRIKE_MIN = 3                     # ms after the gate at the earliest
-STRIKE_MAX = 30                    # ms at the latest
-SETTLE_D = 0.0008                  # settled = SETTLE_N updates in a row each moving less than this (1/20 st)
-SETTLE_N = 2
-STALE_MS = 4                       # ... or no Pitch update for this long
-VOICES = 2                         # resonators per side; each strike takes the other one (the old note rings on)
-LAG_MS = 40                        # the ringing voice follows Pitch this late; a strike discards what is queued
-                                   # (a sequencer moves CV just before / with the gate: that move is the new note)
 LN2 = math.log(2)
 TAU = 2 * math.pi
 # alt-layer defaults (load, and Source + Record): input LP open, spread 6 cents, no auto-repeat, delay tone 0.35,
@@ -208,104 +198,6 @@ def watched(c, x, y, names, assigns):
     return program(c, x, y + 100, comp, assigns)
 
 
-def vrecv(c, x, y, name):
-    """[r name] -> [v name]: a '; name value' message sets the variable."""
-    c.connect(c.obj(x, y, f"r {name}"), 0, c.obj(x, y + 22, f"v {name}"), 0)
-
-
-def strike(c, x, y):
-    """Reset press -> rs_go once Pitch has settled (see STRIKE_MIN/MAX, SETTLE_D/N, STALE_MS)."""
-    for i, n in enumerate(("rs_wait", "rs_mind", "rs_stl", "rs_scnt")):
-        vrecv(c, x + 500 + i * 100, y, n)
-    tp = op(c, x, y + 88, "t b b b", press(c, x, y, "reset", True, primed="rs_primed"))
-    c.connect(tp, 2, c.msg(x + 200, y + 110, "\\; rs_wait 1 \\; rs_mind 0"), 0)
-    dmin = op(c, x + 100, y + 132, f"delay {STRIKE_MIN}", (tp, 1))
-    dmax = op(c, x, y + 132, f"delay {STRIKE_MAX}", (tp, 0))
-    tryb = c.obj(x + 300, y + 220, "t b")
-    tmin = op(c, x + 100, y + 154, "t b b", dmin)
-    c.connect(tmin, 1, c.msg(x + 160, y + 176, "\\; rs_mind 1"), 0)
-    c.connect(tmin, 0, tryb, 0)
-    tmax = op(c, x, y + 154, "t b b", dmax)
-    c.connect(tmax, 1, c.msg(x + 40, y + 176, "\\; rs_mind 1 \\; rs_stl 1"), 0)
-    c.connect(tmax, 0, tryb, 0)
-    program(c, x + 300, y + 250, tryb, [("s:rs_tryv", V("rs_wait") * V("rs_mind") * V("rs_stl"))])
-    fire = op(c, x, y + 330, "t b b", op(c, x, y + 308, "sel 1", c.obj(x, y + 286, "r rs_tryv")))
-    stp = c.msg(x + 100, y + 352, "stop")
-    c.connect(fire, 1, stp, 0)
-    c.connect(stp, 0, dmin, 0)
-    c.connect(stp, 0, dmax, 0)
-    c.connect(fire, 1, c.msg(x + 160, y + 352, "\\; rs_wait 0"), 0)
-    c.connect(fire, 0, c.obj(x, y + 374, "s rs_go"), 0)
-    # Pitch stream: count consecutive small steps; a stall (no update for STALE_MS) also counts as settled
-    tf = op(c, x + 500, y + 88, "t b f b", c.obj(x + 500, y + 66, "r pitch"))
-    st = op(c, x + 640, y + 132, f"delay {STALE_MS}", (tf, 2))
-    c.connect(st, 0, c.msg(x + 640, y + 154, "\\; rs_stl 1"), 0)
-    c.connect(st, 0, tryb, 0)
-    c.connect(tf, 1, c.obj(x + 570, y + 110, "v rs_pnow"), 0)
-    PN, PP, SC = V("rs_pnow"), V("rs_pprev"), V("rs_scnt")
-    t2 = op(c, x + 500, y + 132, "t b b", (tf, 0))
-    program(c, x + 500, y + 400, (t2, 1), [
-        ("v:rs_scnt", (SC + 1) * gt(SETTLE_D, fabs(PN - PP))),
-        ("v:rs_pprev", PN),
-        ("v:rs_stl", gt(SC, SETTLE_N - 0.5))])
-    c.connect(t2, 0, tryb, 0)
-    # a strike: switch voice (its D jumps in 1 ms, not 5), hand it the current pitch, then fire the envelope
-    tg = op(c, x, y + 440, "t b b b b b", c.obj(x, y + 418, "r rs_go"))
-    c.connect(tg, 4, c.msg(x + 400, y + 462, "\\; rs_Dms 1 \\; rs_pclr bang"), 0)
-    c.connect(chain(c, x + 300, y + 440, op(c, x + 300, y + 462, "v rs_av", (tg, 3)), ["* -1", "+ 1"]), 0,
-              c.obj(x + 300, y + 528, "s rs_av"), 0)
-    c.connect(op(c, x + 200, y + 462, "v rs_frnow", (tg, 2)), 0, c.obj(x + 200, y + 484, "s rs_frpush"), 0)
-    c.connect(tg, 1, c.msg(x + 100, y + 462, "\\; rs_Dms 5"), 0)
-    c.connect(tg, 0, c.obj(x, y + 462, "s rs_strike"), 0)
-
-
-def voice_route(c, x, y):
-    """rs_av: the voice that follows rs_fr (LAG_MS late, -> rs_frk<k>) and gets the excitation (rs_vg<k>); its
-    rs_icx<k> is the one the exciter uses. A strike clears the lag queue and pushes the current pitch at once."""
-    vrecv(c, x, y, "rs_av")
-    sl = op(c, x + 100, y + 22, "sel 0 1", c.obj(x + 100, y, "r rs_av"))
-    for k in range(VOICES):
-        c.connect(sl, k, c.msg(x + 100 + k * 120, y + 44,
-                               " ".join(f"\\; rs_vg{j} {int(j == k)}" for j in range(VOICES))), 0)
-    fr = op(c, x, y + 88, f"pipe {LAG_MS}", c.obj(x, y + 66, "r rs_fr"))
-    clr = c.msg(x + 60, y + 66, "clear")
-    c.connect(c.obj(x + 60, y + 44, "r rs_pclr"), 0, clr, 0)
-    c.connect(clr, 0, fr, 0)
-    push = c.obj(x + 240, y + 88, "r rs_frpush")
-    for k in range(VOICES):
-        xk = x + k * 120
-        gate = chain(c, xk, y + 110, c.obj(xk, y + 110, "r rs_av"), [f"== {k}"])
-        sp = op(c, xk, y + 176, "spigot", fr, gate)
-        c.connect(push, 0, sp, 0)
-        c.connect(sp, 0, c.obj(xk, y + 198, f"s rs_frk{k}"), 0)
-        spi = op(c, xk, y + 264, "spigot", c.obj(xk, y + 242, f"r rs_icx{k}"), gate)
-        c.connect(spi, 0, c.obj(xk, y + 286, "s rs_icx"), 0)
-
-
-def voice_assigns(k):
-    """Voice k's damping, gain and loop delays from its own pitch rs_frk<k> (clamped as the live one)."""
-    INV, W, RT, FRZ, SPC = V("rs_inv_v"), V("rs_w_v"), V("rs_rt_v"), V("rs_frz_v"), V("rs_sp_v")
-    FR, FC, B, H = V(f"rs_fq{k}"), V(f"rs_fc{k}"), V(f"rs_b{k}"), V(f"rs_H{k}")
-    loss = mn(1, exp(-6.9078 * (1 - 0.5 * INV) / (FR * RT)) / H)          # per-pass gain for T60, capped at 1
-    assigns = [
-        (f"v:rs_fq{k}", mx(FMIN, mn(FMAX * (1 - 0.5 * INV), V(f"rs_frk{k}_v")))),
-        (f"v:rs_fc{k} s:rs_damp{k}", FRZ * 100000 + (1 - FRZ) * FR * exp((1 + 5.5 * W) * LN2)),
-        (f"v:rs_b{k}", 1 - mn(1, FC * (TAU / SR))),
-        (f"v:rs_H{k}", (1 - B) / sqrt(1 - 2 * B * cos(FR * (TAU / SR)) + B * B)),
-        (f"s:rs_g{k}", (FRZ + (1 - FRZ) * loss) * (1 - 2 * INV)),
-        (f"s:rs_icx{k}", mn(1, KX * sqrt(mx(0, 1 - loss * H)))),
-    ]
-    for s_, sgn in ((0, -1), (1, 1)):
-        FS, OM = V(f"rs_fs{k}{s_}"), V(f"rs_om{k}{s_}")
-        assigns += [
-            (f"v:rs_fs{k}{s_}", FR * exp(SPC * (sgn * LN2 / 2400))),
-            (f"v:rs_om{k}{s_}", FS * (TAU / SR)),
-            (f"s:rs_D{k}{s_}", mx(DMIN, SR * (1 - 0.5 * INV) / FS - atan(B * sin(OM) / (1 - B * cos(OM))) / OM
-                                  + atan(HIPF / FS) / OM - KRES) * (1000 / SR)),
-        ]
-    return assigns
-
-
 # --- subpatches ----------------------------------------------------------------------------------------------------
 def ui(Canvas, test=False):
     """Nebulae controls -> rs_* parameters."""
@@ -316,7 +208,6 @@ def ui(Canvas, test=False):
     lb = c.obj(1200, 30, "loadbang")
     c.connect(chain(c, 1200, 30, lb, ["delay 1000"]), 0, c.msg(1200, 80, "\\; rs_primed 1"), 0)
     c.connect(lb, 0, c.msg(700, 30,
-              "\\; rs_av 0 \\; rs_stl 1 \\; rs_wait 0 \\; rs_mind 0 \\; rs_frk1 261.6256 "
               "\\; rs_P 0 \\; rs_inv 0 \\; rs_w 1 \\; rs_rt 1 \\; rs_frz 0 \\; rs_start 0 \\; rs_d 0 "
               "\\; rs_efb 0 \\; rs_hold 0 \\; rs_dt 200 \\; rs_ext 0 \\; rs_pp 0 "
               "\\; rs_gd 1 \\; rs_gw 0 \\; rs_agc 1 \\; rs_kf 1 " + ALT_RESET), 0)
@@ -343,7 +234,8 @@ def ui(Canvas, test=False):
 
     # --- buttons ---
     x, y = 10, 230
-    strike(c, 10, 1000)
+    c.connect(chain(c, x, y, press(c, x, y, "reset", True, primed="rs_primed"), ["delay 3"], dy=88), 0,
+              c.obj(x, y + 120, "s rs_strike"), 0)
     chain(c, x + 130, y, c.obj(x + 130, y, "r freeze"), ["change", "s rs_frz"])
     chain(c, x + 260, y, c.obj(x + 260, y, "r source"), ["change", "s rs_ext"])
     chain(c, x + 390, y, c.obj(x + 390, y, "r record"), ["change", "s rs_inv"])
@@ -370,14 +262,26 @@ def ui(Canvas, test=False):
     # --- derived values ---
     P, O, M = V("rs_P_v"), V("rs_O_v"), V("rs_mode_v")
     INV, W, RT, FRZ, SPC = V("rs_inv_v"), V("rs_w_v"), V("rs_rt_v"), V("rs_frz_v"), V("rs_sp_v")
-    # live resonator pitch -> rs_fr (and [v rs_frnow]); the active voice follows it, the other keeps its own
-    watched(c, 10, 520, ["rs_P", "rs_O", "rs_mode", "rs_inv"], [
-        ("v:rs_frnow s:rs_fr",
-         mx(FMIN, mn(FMAX * (1 - 0.5 * INV), C4 * exp((P * ne(M, 2) + O * eq(M, 2)) * (LN2 / 12)))))])
-    voice_route(c, 10, 760)
-    for k in range(VOICES):
-        watched(c, 300 + k * 250, 760, [f"rs_frk{k}", "rs_inv", "rs_w", "rs_rt", "rs_frz", "rs_sp"],
-                voice_assigns(k))
+    FR, FC, B, H = V("rs_fr"), V("rs_fc"), V("rs_b"), V("rs_H")
+    # resonator: pitch, damping, gain, loop delays
+    loss = mn(1, exp(-6.9078 * (1 - 0.5 * INV) / (FR * RT)) / H)          # per-pass gain for T60, capped at 1
+    assigns = [
+        ("v:rs_fr s:rs_fr", mx(FMIN, mn(FMAX * (1 - 0.5 * INV), C4 * exp((P * ne(M, 2) + O * eq(M, 2)) * (LN2 / 12))))),
+        ("v:rs_fc s:rs_damp", FRZ * 100000 + (1 - FRZ) * FR * exp((1 + 5.5 * W) * LN2)),
+        ("v:rs_b", 1 - mn(1, FC * (TAU / SR))),
+        ("v:rs_H", (1 - B) / sqrt(1 - 2 * B * cos(FR * (TAU / SR)) + B * B)),
+        ("s:rs_g", (FRZ + (1 - FRZ) * loss) * (1 - 2 * INV)),
+        ("s:rs_icx", mn(1, KX * sqrt(mx(0, 1 - loss * H)))),
+    ]
+    for s, sgn in ((0, -1), (1, 1)):
+        FS, OM = V(f"rs_fs{s}"), V(f"rs_om{s}")
+        assigns += [
+            (f"v:rs_fs{s}", FR * exp(SPC * (sgn * LN2 / 2400))),
+            (f"v:rs_om{s}", FS * (TAU / SR)),
+            (f"s:rs_D{s}", mx(DMIN, SR * (1 - 0.5 * INV) / FS - atan(B * sin(OM) / (1 - B * cos(OM))) / OM
+                              + atan(HIPF / FS) / OM - KRES) * (1000 / SR)),
+        ]
+    watched(c, 10, 520, ["rs_P", "rs_O", "rs_mode", "rs_inv", "rs_w", "rs_rt", "rs_frz", "rs_sp"], assigns)
     # exciter pitch (Coupled P+O, Res only O, Exc only P)
     watched(c, 850, 520, ["rs_P", "rs_O", "rs_mode"],
             [("s:rs_fexc", mx(EMIN, mn(EMAX, C4 * exp((P * ne(M, 1) + O * ne(M, 2)) * (LN2 / 12)))))])
@@ -434,18 +338,10 @@ def ui(Canvas, test=False):
     c.connect(chain(c, x, y + 22, tk, ["> 0.02", "change"]), 0, met, 0)
     c.connect(chain(c, x + 100, y + 22, tk, ["max 0.02", "- 0.02", f"* {math.log(64) / 0.98:.5f}", "exp",
                                               "* 0.25", "pow -1", "* 1000"], outlet=1), 0, met, 1)
-    c.connect(met, 0, c.obj(x, y + 220, "s rs_go"), 0)
+    c.connect(met, 0, c.obj(x, y + 220, "s rs_strike"), 0)
     if test:
-        for i, n in enumerate(["rs_fr", "rs_fexc", "rs_mode", "rs_O", "rs_hold", "rs_av"]):
+        for i, n in enumerate(["rs_fr", "rs_fexc", "rs_mode", "rs_O", "rs_hold", "rs_D0", "rs_g"]):
             c.connect(c.obj(10 + i * 110, 2000, f"r {n}"), 0, c.obj(10 + i * 110, 2022, f"print {n[3:]}"), 0)
-        # strike latency after the gate and the pitch the new voice starts at
-        tm = c.obj(700, 2044, "timer")
-        c.connect(c.obj(700, 2000, "r reset"), 0, c.obj(700, 2022, "sel 1"), 0)
-        c.connect(c.n - 1, 0, tm, 0)
-        tg = op(c, 800, 2022, "t b b", c.obj(800, 2000, "r rs_go"))
-        c.connect(tg, 1, tm, 1)
-        c.connect(tm, 0, c.obj(700, 2066, "print go_ms"), 0)
-        c.connect(op(c, 800, 2044, "v rs_frnow", (tg, 0)), 0, c.obj(800, 2066, "print fr_at_go"), 0)
     return c
 
 
@@ -496,34 +392,25 @@ def exciter(Canvas):
 
 
 def res(Canvas):
-    """VOICES pitched feedback loops per side in one block~ 16 canvas; the excitation goes to the active voice
-    (rs_vg<k>, 1 ms crossfade). Out = exciter * (1 - bal) + (sum of the reads) * bal."""
-    c = Canvas("#N canvas 0 50 1300 700 %NAME% 0;")
-    c.text(10, 5, "x * vg + fb -> delwrite~ / vd~ D -> lop~ damping -> hip~ 1 -> x g -> soft clip -> fb. "
+    """Two pitched feedback loops (L/R) in one block~ 16 canvas. Out = exciter * (1 - bal) + read * bal."""
+    c = Canvas("#N canvas 0 50 900 600 %NAME% 0;")
+    c.text(10, 5, "x + fb -> delwrite~ / vd~ D -> lop~ damping -> hip~ 1 -> x g -> soft clip -> fb. "
                   f"block~ {RBLOCK}: the shortest loop is {RBLOCK} samples.")
-    c.obj(1100, 5, f"block~ {RBLOCK}")
-    rdms = c.obj(1100, 30, "r rs_Dms")
-    bal = sig(c, 1100, 60, "rs_bal", 50)
-    nbal = op(c, 1100, 126, "+~ 1", op(c, 1100, 104, "*~ -1", bal))
-    ins = [c.obj(10 + s_ * 540, 30, "inlet~") for s_ in (0, 1)]
-    for s_ in (0, 1):
-        reads = None
-        for k in range(VOICES):
-            x0 = 10 + s_ * 540 + k * 270
-            g = sig(c, x0 + 170, 52, f"rs_g{k}", 20)
-            vg = sig(c, x0 + 170, 110, f"rs_vg{k}", 1)
-            pk = op(c, x0 + 100, 66, "pack f 5", c.obj(x0 + 100, 44, f"r rs_D{k}{s_}"))
-            c.connect(rdms, 0, pk, 1)
-            r = op(c, x0 + 100, 110, f"vd~ rs_r{k}{s_}", op(c, x0 + 100, 88, "line~", pk))
-            z = fl(c, x0 + 100, 154, "lop~ 100000", r, f"rs_damp{k}")
-            h = op(c, x0 + 100, 176, f"hip~ {HIPF:g}", z)
-            f = softclip(c, x0 + 100, 220, op(c, x0 + 100, 198, "*~", h, g))
-            w = op(c, x0, 360, "+~", op(c, x0, 338, "*~", ins[s_], vg), f)
-            c.connect(w, 0, c.obj(x0, 382, f"delwrite~ rs_r{k}{s_} 60"), 0)
-            reads = r if reads is None else op(c, x0, 404, "+~", reads, r)
-        x0 = 10 + s_ * 540
-        o = op(c, x0, 460, "+~", op(c, x0, 438, "*~", ins[s_], nbal), op(c, x0 + 100, 438, "*~", reads, bal))
-        c.connect(o, 0, c.obj(x0, 490, "outlet~"), 0)
+    c.obj(700, 5, f"block~ {RBLOCK}")
+    g = sig(c, 600, 30, "rs_g", 20)
+    bal = sig(c, 700, 30, "rs_bal", 50)
+    nbal = op(c, 700, 96, "+~ 1", op(c, 700, 74, "*~ -1", bal))
+    for s in (0, 1):
+        x0 = 10 + s * 300
+        e = c.obj(x0, 30, "inlet~")
+        r = op(c, x0 + 100, 110, f"vd~ rs_r{s}", sig(c, x0 + 100, 44, f"rs_D{s}", 5))
+        z = fl(c, x0 + 100, 154, "lop~ 100000", r, "rs_damp")
+        h = op(c, x0 + 100, 176, f"hip~ {HIPF:g}", z)
+        f = softclip(c, x0 + 100, 220, op(c, x0 + 100, 198, "*~", h, g))
+        w = op(c, x0, 360, "+~", e, f)
+        c.connect(w, 0, c.obj(x0, 382, f"delwrite~ rs_r{s} 60"), 0)
+        o = op(c, x0, 440, "+~", op(c, x0, 418, "*~", e, nbal), op(c, x0 + 100, 418, "*~", r, bal))
+        c.connect(o, 0, c.obj(x0, 470, "outlet~"), 0)
     return c
 
 

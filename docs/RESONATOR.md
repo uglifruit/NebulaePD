@@ -18,32 +18,6 @@ after it. The owner's choices were:
 out       = softclip(res * gd + bbd * gw) -> dac~
 ```
 
-## Voices and strike timing (hardware report 2026-11-07: big pitch jumps glided)
-There were two causes:
-- **The firmware slews Pitch.** `control.py`'s HybridData runs Pitch through a one-pole (0.33 per poll),
-  hysteresis (0.001) and a stability gate, and the CV input has a cap, so a jump arrives as a 10–30 ms ramp.
-- **One loop retuned the ringing note** like a slide.
-
-The fixes (the owner picked both):
-- **Two voices** (`VOICES = 2`) per side in `[pd res]`. `rs_go` toggles `rs_av`, which sets:
-  - the excitation gates `rs_vg<k>` (1 ms);
-  - which voice receives `rs_fr` → `rs_frk<k>`;
-  - which voice's `rs_icx<k>` the exciter uses.
-
-  Each voice has its own program (`voice_assigns(k)`) computing its damping, gain and D from its own pitch; the
-  shared knobs (Size, Window, Freeze, Invert, spread) apply to both. At takeover the new voice's D moves in
-  1 ms (`rs_Dms`), not 5.
-- **Lag queue:** the active voice gets `rs_fr` through `[pipe LAG_MS]` (40 ms). A strike sends `clear` to it and
-  pushes the current pitch straight to the new voice. Without this, the CV step that comes just before the gate
-  retuned the old note (seen offline: its 261 Hz vanished after an octave jump).
-- **Settle wait:** a strike fires once all of these hold:
-  - at least STRIKE_MIN = 3 ms have passed;
-  - SETTLE_N = 2 consecutive Pitch updates have each moved less than SETTLE_D = 0.0008, or no update has
-    arrived for STALE_MS = 4 ms (offline tests send Pitch once).
-  It fires at STRIKE_MAX = 30 ms at the latest.
-- **Measured** with a firmware-style ramp (0.6 → 0.8, one-pole 0.33/ms, hysteresis): the strike came after
-  14 ms at 521.3 Hz. The target is 523.3, and the last 7 cents follow live. With steady Pitch: 3 ms.
-
 ## Resonator
 - **Block size.** `[pd res]` runs at `block~ 16`, because a feedback loop through `vd~` is at least one block long.
   DMIN = 17 samples, so the top is FMAX = 2600 Hz, or 1300 Hz inverted. The pitch is clamped there rather than
@@ -131,14 +105,10 @@ Vanilla Pd has no `expr`, so `resonator.py` has a small compiler:
 | delay | 200 ms echoes, feedback 0.55, File-held hold | −5.4 dB per echo; hold flat |
 | repeat | alt Density stream to 0.5 | strikes about 1.9 Hz, stop when CCW |
 | route | prints: modes, long press, offset, alt reset | as the routing table; long press = hold only |
-| jump | octave jump with the gate (CV 1 ms before) | old note stays 261.626 Hz under the new 523.25 |
-| settle | firmware-style ramp at the gate; steady; no stream | 14 ms (521.3 Hz); 3 ms; 3 ms |
-| bend | Pitch moved while Freeze holds | held note moves to 369.99 Hz (40 ms late) |
 | runaway | everything max, 16 Hz repeat, invert, freeze, 60 s | peak 0.75, −6.3 dB RMS, no NaN |
 | runext | sine 0.9 + noise on the input, Size 1, feedback 1.1 | peak 0.80, −8.4 dB RMS |
 
-- **CPU proxy:** a 60 s render takes 2.6 s with one voice, against 2.9 s for 07_shimmer's runaway. The second voice
-  adds about 15–20 % (0.84–1.2 s against 0.74–1.0 s in back-to-back runs).
+- **CPU proxy:** a 60 s render takes 2.6 s, against 2.9 s for 07_shimmer's runaway.
 - **Analysis:** pitch is the FFT peak with zero padding and parabolic interpolation; T60 is a single-bin DFT
   envelope with a fitted slope. `wavcheck.py freq` (zero crossings, 25 Hz resolution) is too coarse for cents.
 
