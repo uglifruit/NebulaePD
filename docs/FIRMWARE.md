@@ -11,22 +11,22 @@ Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidd
 
 ## To do
 **Owner (on hardware), in one session:**
+0. Boot the cloned card (written from the image) in the module and play a few instruments. If it works, keep the
+   original card in a drawer as **STOCK** and use the clone from now on. If not, put the original back and tell me.
 1. Stage 0 steps 2–5 below (step 1 is done). For step 3, also copy `firmware/dist/v2_1_2_uf1/neb_candidate.tgz` and
    `neb_candidate_manifest.txt` to the stick root, so the backup run checks uf1 with the module's own Python 2.
    Nothing is installed by this.
 2. Copy the stick's `neb_fwbackup/` folder to `firmware/device/`.
 
 **Next session (Claude), once `firmware/device/` exists:**
-1. Read `inventory_*.txt`:
-   - the "uf1 precheck" section must show `PY2_COMPILE_OK` and `PY2_SELFTEST_OK`;
-   - check the arch, glibc, Pd version, `checkfirmware.sh`, and whether `/boot/config.txt` underclocks the Pi 4.
+1. Read `inventory_*.txt`. The "uf1 precheck" section must show `PY2_COMPILE_OK` and `PY2_SELFTEST_OK`; only then
+   is the uf1 `neb_update.zip` handed over for install. Also note the live CPU clock.
 2. `python tools/pitchlog.py firmware/device/neb_pitchlog_*.txt` gives the real poll rate and stock Pitch slew. Put
    them in HANDOFF §4.
-3. `python tools/fwbuild.py --import-device firmware/device/neb_update.zip`. It stops on conflicts if the unit's
-   tree differs from GitHub's in a file uf1 changes; merge those by hand.
-4. Run `python firmware/tests/test_firmware.py` and `test_fwbuild.py`, then `python tools/fwbuild.py`, which now
-   writes an installable `neb_update.zip`.
-5. Hand over the uf1 install with the hardware test list (Stage 1 below).
+3. Check that `neb_fwbackup/neb_update.zip` matches `firmware/device_image/neb_update.zip` apart from runtime files
+   (calibration, last instrument, settings, `.pyc`). The base was already imported from the SD image; re-import only
+   if the code differs.
+4. Hand over the uf1 install with the hardware test list (Stage 1 below).
 
 **Decided (owner, 2026-11-09):** every Pd patch load resets the alt layer to its defaults. Because of that,
 `pd_alts_at_load` can only send the defaults, which our patches already start with, so it is harmless. It stays off
@@ -60,6 +60,34 @@ as it gains nothing.
   - It is Pi 3-era: its `startup.sh` writes Pi 3 clock settings into `/boot/config.txt` on every boot.
   - The Pi 4 image may differ from it.
   - Revert with **your unit's own backup** (below).
+
+## What the SD image showed (2026-11-09)
+Read offline from `SDImage/nebulae_stock_pi4.img` with WSL `debugfs` (read-only).
+- **System:**
+  - Arch Linux ARM, 32-bit (`linux-rpi 5.15.43`, `kernel7.img`), glibc 2.35, 280 packages, from mid-2022;
+  - **Pd 0.52.2**, Csound 6.11.0, Python 2.7.18;
+  - jack2 1.9.21 and liblo are installed. SuperCollider is not.
+- **The unit's firmware tree is not GitHub's v2.1.2.** Qu-Bit's Pi 4 port (2022) changed five files, all marked
+  `VERSION=v2_1_2`:
+  - `shiftregister.py`: a 10 µs sleep between bit reads, presumably because the Pi 4 is too fast for the button
+    shift register;
+  - `digitaldata.py`: the incremental value is updated in one step, so another thread can't read it half-done;
+  - `nebulae.py` / `controlhandler.py`: an `initial_startup` flag, passed around but its use commented out (no effect);
+  - `localfiles/nebulae.service`: `User=root`.
+
+  `firmware/base` is now this tree (`firmware/device_image/neb_update.zip`, packed from the image with the unit's
+  modes and owners). uf1 was rebased onto it with a three-way merge, which kept all five changes. A uf1 built on
+  GitHub's tree would have dropped them.
+- **`/home/alarm/checkfirmware.sh`** (run by `nebulae.service` at every boot, outside the firmware tree) has its own
+  revert:
+  - if any file in `/home/alarm/mandatory_files.txt` is missing or empty under `Code/`, or the stick root holds a
+    file named **`revert_to_factory_firmware`**, it deletes `QB_Nebulae_V2/` and unpacks
+    `/home/alarm/neb_factory_fw.zip`;
+  - that factory tree is **v1.0.0 (2018)**, older than the Pi 4 port, so it may not run properly on this unit. Use
+    it only if nothing else works, then install v2.1.2 again from USB;
+  - `fwbuild` refuses any build that lacks one of the mandatory files.
+- `/home/alarm/backup/new/neb_update.zip` is the update Qu-Bit installed on 2022-06-02. It differs from GitHub only in
+  `digitaldata.py` and `nebulae.service`; the other three Pi 4 changes were made in place afterwards.
 
 ## Stage 0 — back up, measure, prove the revert path
 Do these in order. Nothing on the module changes until step 5, and step 5 reinstalls exactly what is already
@@ -115,7 +143,8 @@ The log sits in RAM (`/dev/shm`), so **don't power off** before step 3. Another 
 **4. Leave the stick's `neb_fwbackup/` folder in place.** `update.sh` only looks at `neb_update.zip` in the **root**, so it is ignored where it is.
 
 **5. Revert drill (proves the USB path on this Pi 4 before anything is changed).**
-1. Copy `neb_fwbackup/neb_update.zip` to the stick **root**.
+1. Copy `neb_fwbackup/neb_update.zip` (or `firmware/device_image/neb_update.zip`, the same code from the SD image) to
+   the stick **root**.
 2. **Unplug every cable from the module's CV/gate jacks** (forced recalibration), then power on.
 3. Expect:
    - green cycling LEDs (installing);
@@ -125,12 +154,19 @@ The log sits in RAM (`/dev/shm`), so **don't power off** before step 3. Another 
 4. Play a few instruments.
 
 ## Reverting from a custom build (any time)
-- Put `neb_fwbackup/neb_update.zip` in the stick root, unplug all CV/gate cables, and power on.
-- If the module doesn't reach the update step at all, write the SD image back (step 1).
+In order of preference:
+1. **Swap cards:** put the STOCK card back in the Pi 4. Seconds, nothing to install.
+2. **USB:** put `neb_fwbackup/neb_update.zip` or `firmware/device_image/neb_update.zip` in the stick root, unplug all
+   CV/gate cables, and power on.
+3. **SD image:** write `SDImage/nebulae_stock_pi4.img` to a card (Win32 Disk Imager **Write**, or Raspberry Pi
+   Imager "Use custom" with OS customisation off).
+4. Emergency only: a file named `revert_to_factory_firmware` in the stick root makes `checkfirmware.sh` install the
+   factory v1.0.0 tree (see above). Then do 2.
 
 ## Stage 1 — uf1 (`v2_1_2_uf1`)
 Built from `firmware/src` by `tools/fwbuild.py`. `git diff --no-index firmware/base firmware/src` is the whole
-change set. **Not yet installable:** the base is still Qu-Bit's GitHub v2.1.2 until the unit's backup arrives.
+change set. The base is the unit's own tree (from the SD image), so `fwbuild` writes an installable
+`neb_update.zip`. **Hold it until the on-module Python 2 precheck passes** (Stage 0 step 3 with `neb_candidate.tgz`).
 
 ### What changes for the player
 - **Instrument selector** (hold Speed 1.5 s, as stock):
@@ -191,13 +227,20 @@ change set. **Not yet installable:** the base is still Qu-Bit's GitHub v2.1.2 un
 
 ### Developer workflow
 ```bash
-python firmware/tests/test_firmware.py   # 26 logic tests: stock modules via firmware/tests/py2shim.py, hardware stubbed
-python firmware/tests/test_fwbuild.py    # packer fidelity (base repack == Qu-Bit zip), guards, --import-device
+python firmware/tests/test_firmware.py   # 27 logic tests: stock modules via firmware/tests/py2shim.py, hardware stubbed
+python firmware/tests/test_fwbuild.py    # 15: base repack == unit tree, Pi 4 changes kept, guards, --import-device
 python tools/fwbuild.py --check          # guards only
 python tools/fwbuild.py                  # -> firmware/dist/v2_1_2_uf1/ (+ neb_candidate.* for the on-module check)
 python tools/fwbuild.py --from base      # the base, repacked (a revert zip for the base)
-python tools/fwbuild.py --import-device firmware/device/neb_update.zip
+python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --source-name sd-image-2026-11-09
 ```
+- `--import-device` makes a unit tree the base. Each file that both uf1 and the unit changed gets a three-way merge
+  (`git merge-file`, previous base as ancestor):
+  - clean merges are taken;
+  - a conflict is written with markers to `firmware/dist/merge/<path>` and nothing else is written;
+  - edit that file until no markers are left, then run the import again, which takes it.
+
+  Runtime files and the `.pyc` files Python 2 wrote on the unit are left out.
 - Edit `firmware/src` only. `firmware/base` is the reference tree.
 - `firmware/` is stored without line-ending conversion (`.gitattributes`).
 - The tests run with bytecode writing off, so `firmware/src` gets no new `__pycache__`.
@@ -211,7 +254,8 @@ python tools/fwbuild.py --import-device firmware/device/neb_update.zip
 3. Selector: 7+ Pd files on the stick. Check the paging and LEDs, Reset to load, booting into file 7 opens page 2,
    and `_helper.pd` is hidden.
 4. `99_pitchlog` capture again (compare with Stage 0), and 08_resonator by ear on big V/oct jumps.
-5. Revert drill: the Stage 0 backup zip goes back to v2_1_2. Then reinstall uf1.
+5. Revert drill: the Stage 0 backup zip goes back to v2_1_2. Then reinstall uf1. (The STOCK card is the faster
+   way back, but this proves the USB path from uf1.)
 
 ## Status
 - 2026-11-09: Stage 0 tools written and offline-tested. **Not yet run on hardware.**
@@ -222,3 +266,10 @@ python tools/fwbuild.py --import-device firmware/device/neb_update.zip
   - `fw_backup.instr` gained the on-module Python 2 precheck (its shell path is tested here; python2 itself runs only
     on the module).
   - **Not compiled with Python 2 yet. Not installed.**
+- 2026-11-09: SD imaged (Stage 0 step 1) and read offline. The unit's tree, which includes Qu-Bit's Pi 4 changes, is
+  now the base. uf1 was rebased with a three-way merge.
+  - 27 logic tests and 15 build tests pass.
+  - `pdsender.connect()` now closes a failed socket. On Windows, a timed-out attempt could otherwise connect later,
+    which made the retry test fail.
+  - Installable `neb_update.zip` sha256 `802db7e19d695a891b75b45b210bc0e6e38fcbde547c3451fcb9928da7c4682d`.
+  - **Still not compiled with Python 2. Not installed.**

@@ -1,4 +1,4 @@
-source=github-v2.1.2-zip
-provisional=yes
-archive=external/QB_Nebulae_V2/FirmwareUpdates/v_2_1_2/neb_update.zip
-note=Qu-Bit FirmwareUpdates/v_2_1_2/neb_update.zip extracted byte-for-byte. Replace with the unit backup (neb_fwbackup/neb_update.zip) before building an installable zip.
+source=sd-image-2026-11-09
+provisional=no
+archive=firmware/device_image/neb_update.zip
+note=the unit's own tree; runtime files (calibration, last instrument, settings, logs, bytecode compiled on the unit) left out

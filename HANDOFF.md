@@ -33,9 +33,13 @@ For a **new instrument**, see §8.
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
 | Custom firmware | `docs/FIRMWARE.md` (its **To do** list comes first). Plan: Stage 0 → uf1 → uf1b (Pd back-channel) → uf2 (SuperCollider).
-  - **Stage 0** (written and offline-tested, **not yet run on hardware**): `instr/fw_backup.instr` (revert package + inventory, plus an on-module Python 2 precheck of `neb_candidate.tgz`); `patches/99_pitchlog.pd` + `tools/pitchlog.py`.
-  - **uf1** (written in `firmware/src` on the *provisional* GitHub base; 26 + 10 desktop tests pass; **not Python-2-compiled, not installable yet**): paged selector (Next = page, Reset = load, Pitch = cursor, Pitch LED = page colour), Pitch coeff 0.95 via `neb_options.txt`, Pd connect retry + batched sends, flat run loop, Pd exit wait, calibration/settings carried over updates, Pd externals + hidden `_` files, stock bug fixes. Every Pd patch load resets the alt layer to defaults (owner's call); `pd_alts_at_load` is built but off.
-  - **Waiting for** the owner's `neb_fwbackup/` → `firmware/device/`, then `tools/fwbuild.py --import-device` |
+  - **Stage 0:** step 1 done 2026-11-09. The SD card is imaged (`SDImage/`, gitignored) and cloned to a spare card;
+    the clone's boot test is pending. The image was read offline, giving most of the inventory and the unit's own
+    firmware tree. Still to run on hardware: `instr/fw_backup.instr` (backup + inventory + on-module Python 2 precheck of
+    `neb_candidate.tgz`) and `patches/99_pitchlog.pd` + `tools/pitchlog.py`.
+  - **uf1** (`firmware/src`, rebased on the unit's tree incl. Qu-Bit's Pi 4 changes; 27 + 15 desktop tests pass;
+    installable build exists but **held until the on-module Python 2 precheck passes**): paged selector (Next = page, Reset = load, Pitch = cursor, Pitch LED = page colour), Pitch coeff 0.95 via `neb_options.txt`, Pd connect retry + batched sends, flat run loop, Pd exit wait, calibration/settings carried over updates, Pd externals + hidden `_` files, stock bug fixes. Every Pd patch load resets the alt layer to defaults (owner's call); `pd_alts_at_load` is built but off.
+  - **Waiting for** the owner's Stage 0 session (`neb_fwbackup/` → `firmware/device/`) |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |
 
 **Roadmap** (not started):
@@ -54,7 +58,7 @@ For a **new instrument**, see §8.
 - Gloop effects pass: delay, reverb, bit crush, wavefold, tape saturation/hiss/age, tilt EQ. The user picked "core first".
 - Optional soft limiter on the gloop output.
 - Csound work.
-- Custom firmware (`docs/FIRMWARE.md`): Stage 0 on hardware next. uf1b adds opt-in Pd LEDs/EOL via port 3001.
+- Custom firmware (`docs/FIRMWARE.md`): Stage 0 steps 2–5 on hardware next, then the uf1 install. uf1b adds opt-in Pd LEDs/EOL via port 3001.
 
 ## 3. Repo layout
 ```
@@ -75,8 +79,10 @@ tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks o
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1
 docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, FIRMWARE, GLOOP, GLITCH, SPECTRAL, TOPO, SHIMMER, RESONATOR
 reference/      Qu-Bit dev reference PDF;  upstream/  a few MIT files copied from Qu-Bit's repo
-firmware/       base/ (reference tree + SOURCE.txt), src/ (base + uf1 edits), tests/ (py2shim, test_firmware,
-                test_fwbuild), device/ (the unit's backup, once it exists), dist/ (gitignored build output)
+firmware/       base/ (the unit's tree + SOURCE.txt), src/ (base + uf1 edits), tests/ (py2shim, test_firmware,
+                test_fwbuild), device_image/neb_update.zip (the unit's tree packed from the SD image = base + runtime
+                files; a revert package), device/ (fw_backup output, once it exists), dist/ (gitignored build output)
+SDImage/        (gitignored) nebulae_stock_pi4.img, the whole SD card (docs/FIRMWARE.md has its hash)
 external/       (gitignored) clones of Qu-Bit-Electronix/QB_Nebulae_V2 and TheTechnobear/NebulaePatches - re-clone if missing
 tools/csound609/ (gitignored) unzipped csound-emscripten-6.09.1 from the Csound 6.09.1 GitHub release
 ```
@@ -132,20 +138,33 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - `check_calibration.py` crashes with a NameError after calibrating, so hold-Pitch never reset the settings.
   - The forced calibration in `update.sh` imports `control.py`/`controlhandler.py`, but the install (`tar` + `mv`)
     happens before any Python.
+- **This unit (read from its SD image, 2026-11-09):**
+  - 32-bit Arch Linux ARM (kernel 5.15, glibc 2.35), **Pd 0.52.2**, Csound 6.11.0, Python 2.7.18, jack2. No
+    SuperCollider.
+  - `/boot/config.txt` = the firmware's Pi 3-era `localfiles/config.txt`: the Pi 4 runs at 1200 MHz, not 1500.
+  - Its firmware tree is **not** GitHub's v2.1.2. Qu-Bit's Pi 4 port changed `shiftregister.py` (a 10 µs sleep per
+    bit), `digitaldata.py` (an incremental value updated in one step), `nebulae.py`/`controlhandler.py` (an unused
+    `initial_startup` flag) and `nebulae.service`. **Never build or revert from GitHub's tree.** `firmware/base` is the
+    unit's.
+  - `/home/alarm/checkfirmware.sh` (outside the tree) reverts to a **v1.0.0 (2018)** factory tree if a file in
+    `/home/alarm/mandatory_files.txt` is missing/empty or the stick holds `revert_to_factory_firmware`. `fwbuild`
+    guards the mandatory files.
 - **LEDs:** Pd **cannot** set any LED.
   - `ui.py` draws them all: button LEDs show each button's latch/flash state; the Speed and Pitch RGB LEDs show those
     encoders.
   - The only usable "display" is latch state. That's why 03_gloop selects the head from the Source and Freeze toggles,
     and 04_glitch shows mode/force/freeze on Source/Record/Freeze.
 - **Csound:**
-  - `Code/nebulae/ctcsound.py` is byte-identical to the Csound **6.09.1** release, but firmware updates don't touch
-    Csound, and the Pi 4 image is newer, so the library version on this unit is unconfirmed.
+  - `Code/nebulae/ctcsound.py` is byte-identical to the Csound **6.09.1** release. The library on this unit is
+    **6.11.0** (package list in the SD image). `tools/run_csound609.js` tests in 6.09.1, which is older, so it is the
+    safe side.
   - The orchestra wrapper is `conductor.py`; `instr2csd.py` mirrors it.
 - **Boot loop mechanism:** `bootinstr.txt` remembers the last instrument. `nebulae.py` never checks `compileOrc`, and a
   crash makes systemd restart the app, so it loads the same instrument again.
   - Recovery: overwrite the bad file with a working one under the same name (owner-verified).
   - In `neb_log.txt`, a loop shows as blocks every ~15 s with buff/cache ~185 MiB: the app is restarting, not the Pi.
-- **Pd version on the module: unknown.** Write for old vanilla Pd:
+- **Pd on the owner's unit is 0.52.2** (SD image, 2026-11-09). Other units may differ. The old-Pd rules below are
+  proven on hardware, so keep them. Relax one only after checking that 0.52 has the feature:
   - no `expr`, and no signal into `lop~`'s cutoff inlet (send floats);
   - `[*~ <arg>]` when the right inlet takes floats (argless `*~` wants a signal);
   - `[table]` rather than `[array define]`;

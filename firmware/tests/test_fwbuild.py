@@ -11,7 +11,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import fwbuild  # noqa: E402
 
-STOCK = os.path.join(REPO, "external", "QB_Nebulae_V2", "FirmwareUpdates", "v_2_1_2", "neb_update.zip")
+SOURCE_ARCHIVE = os.path.join(REPO, fwbuild.read_source()["archive"])   # the unit's tree the base came from
 
 
 def members(data_or_path):
@@ -28,19 +28,32 @@ class TestPack(unittest.TestCase):
     def setUpClass(cls):
         cls.base = fwbuild.tree(os.path.join(fwbuild.FW, "base"))
         cls.src = fwbuild.tree(os.path.join(fwbuild.FW, "src"))
-        cls.meta, cls.default = fwbuild.archive_meta(STOCK)
+        cls.meta, cls.default = fwbuild.archive_meta(SOURCE_ARCHIVE)
 
-    def test_base_repack_equals_stock_zip(self):
-        if not os.path.isfile(STOCK):
-            self.skipTest("external/ clone missing")
-        a = members(fwbuild.pack(self.base, self.meta, self.default))
-        b = members(STOCK)
+    def test_source_is_the_unit(self):
+        self.assertEqual(fwbuild.read_source()["provisional"], "no")
+        self.assertTrue(os.path.isfile(SOURCE_ARCHIVE), SOURCE_ARCHIVE)
+
+    def test_base_repack_equals_unit_tree(self):
+        """Every non-runtime file of the unit's archive, byte for byte and with its mode, and nothing else."""
+        def files(m):
+            return {n: v for n, v in m.items() if v[0] != tarfile.DIRTYPE}
+        a = files(members(fwbuild.pack(self.base, self.meta, self.default)))
+        b = {n: v for n, v in files(members(SOURCE_ARCHIVE)).items()
+             if not fwbuild.is_runtime(n[len("QB_Nebulae_V2/"):])}
         self.assertEqual(sorted(a), sorted(b))
         for name in b:
-            self.assertEqual(a[name][0], b[name][0], name)
             self.assertEqual(a[name][2], b[name][2], name)
-            if b[name][0] != tarfile.DIRTYPE:
-                self.assertEqual(a[name][1], b[name][1], name)
+            self.assertEqual(a[name][1], b[name][1], name)
+
+    def test_pi4_changes_kept(self):
+        """Qu-Bit's Pi 4 changes on the unit (not on GitHub) must survive into uf1."""
+        sr = self.src["Code/nebulae/shiftregister.py"]
+        self.assertIn(b"time.sleep(0.00001)", sr)
+        self.assertEqual(sr, self.base["Code/nebulae/shiftregister.py"])
+        self.assertEqual(self.src["Code/nebulae/digitaldata.py"], self.base["Code/nebulae/digitaldata.py"])
+        self.assertIn(b"bank='factory', initial_startup=False):", self.src["Code/nebulae/controlhandler.py"])
+        self.assertEqual(self.src["Code/nebulae/nebulae.py"].count(b"initial_startup=initial_startup"), 2)
 
     def test_uf1_archive_layout(self):
         data = fwbuild.pack(self.src, self.meta, self.default, version="v2_1_2_uf1")
@@ -49,7 +62,8 @@ class TestPack(unittest.TestCase):
         self.assertTrue(all(n == "QB_Nebulae_V2" or n.startswith("QB_Nebulae_V2/") for n in m))
         cfg = m["QB_Nebulae_V2/Code/config.txt"][2].decode()
         self.assertIn("VERSION=v2_1_2_uf1\n", cfg)
-        self.assertEqual(m["QB_Nebulae_V2/Code/scripts/update.sh"][1], 0o755)
+        self.assertEqual(m["QB_Nebulae_V2/Code/scripts/update.sh"][1], self.meta["QB_Nebulae_V2/Code/scripts/update.sh"][0])
+        self.assertTrue(m["QB_Nebulae_V2/Code/scripts/update.sh"][1] & 0o111)          # unit's mode, executable
         self.assertEqual(m["QB_Nebulae_V2/Code/nebulae/instrpager.py"][1], 0o644)
         for rel, data_ in self.src.items():
             if rel != "Code/config.txt":
@@ -61,8 +75,10 @@ class TestPack(unittest.TestCase):
         os.makedirs(os.path.dirname(out), exist_ok=True)
         with open(out, "wb") as f:
             f.write(fwbuild.pack(self.src, self.meta, self.default, version="v2_1_2_uf1"))
-        r = subprocess.run(["C:/Program Files/Git/usr/bin/tar.exe", "-tvzf", "/c" + out.replace("\\", "/")[2:]],
-                           capture_output=True, text=True)
+        tar = "C:/Program Files/Git/usr/bin/tar.exe"
+        env = dict(os.environ, PATH=os.path.dirname(tar) + os.pathsep + os.environ.get("PATH", ""))  # finds gzip
+        r = subprocess.run([tar, "-tvzf", "/c" + out.replace("\\", "/")[2:]], capture_output=True, text=True,
+                           env=env)
         os.remove(out)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("QB_Nebulae_V2/Code/nebulae/ufmigrate.py", r.stdout)
@@ -108,6 +124,12 @@ class TestGuard(unittest.TestCase):
             src[rel] = b"x"
             self.assertTrue(fwbuild.guard(self.base, src)[0], rel)
 
+    def test_mandatory_files(self):
+        """An empty mandatory file would make checkfirmware.sh revert the unit to factory v1.0.0."""
+        src = dict(self.src)
+        src["Code/nebulae/ui.py"] = b""
+        self.assertTrue(any("mandatory" in e for e in fwbuild.guard(self.base, src)[0]))
+
     def test_removed_crlf_nonascii(self):
         src = dict(self.src)
         src.pop("Code/nebulae/settings.py")
@@ -142,7 +164,7 @@ class TestImportDevice(unittest.TestCase):
     def device_zip(self, extra):
         files = dict(self.base)
         files.update(extra)
-        meta, default = fwbuild.archive_meta(STOCK)
+        meta, default = fwbuild.archive_meta(SOURCE_ARCHIVE)
         p = os.path.join(self.tmp, "neb_update.zip")
         with open(p, "wb") as f:
             f.write(fwbuild.pack(files, meta, default))
@@ -168,12 +190,42 @@ class TestImportDevice(unittest.TestCase):
         self.assertEqual(len(changed) + len(added), 11)
         self.assertEqual(fwbuild.read_source()["provisional"], "no")
 
-    def test_conflict_stops(self):
+    def test_device_bytecode_skipped(self):
+        p = self.device_zip({"Code/nebulae/ui.pyc": b"\x03\xf3\r\n"})
+        fwbuild.import_device(p)
+        self.assertNotIn("Code/nebulae/ui.pyc", fwbuild.tree(os.path.join(fwbuild.FW, "base")))
+
+    def test_clean_merge(self):
+        """The unit changed a file uf1 also changed, in a different place: merged, both changes kept."""
+        src0 = fwbuild.tree(os.path.join(fwbuild.FW, "src"))
         p = self.device_zip({"Code/nebulae/ui.py": self.base["Code/nebulae/ui.py"] + b"# pi4 tweak\n"})
-        before = fwbuild.tree(os.path.join(fwbuild.FW, "src"))
+        fwbuild.import_device(p)
+        ui = fwbuild.tree(os.path.join(fwbuild.FW, "src"))["Code/nebulae/ui.py"]
+        self.assertTrue(ui.endswith(b"# pi4 tweak\n"))
+        self.assertIn(b"import instrpager", ui)
+        self.assertEqual(ui, src0["Code/nebulae/ui.py"] + b"# pi4 tweak\n")
+
+    def conflicting_zip(self):
+        rel = "Code/nebulae/control.py"
+        src = fwbuild.tree(os.path.join(fwbuild.FW, "src"))[rel]
+        line = next(l for l in self.base[rel].splitlines(True) if l not in src.splitlines(True))
+        return rel, self.device_zip({rel: self.base[rel].replace(line, line.rstrip(b"\n") + b"  # pi4\n", 1)})
+
+    def test_conflict_stops_then_resolved_copy_is_used(self):
+        rel, p = self.conflicting_zip()
+        before = [fwbuild.tree(os.path.join(fwbuild.FW, d)) for d in ("base", "src")]
         with self.assertRaises(SystemExit):
             fwbuild.import_device(p)
-        self.assertEqual(fwbuild.tree(os.path.join(fwbuild.FW, "src")), before)   # nothing written
+        self.assertEqual([fwbuild.tree(os.path.join(fwbuild.FW, d)) for d in ("base", "src")], before)
+        merge_file = os.path.join(fwbuild.FW, fwbuild.MERGE_DIR, *rel.split("/"))
+        with open(merge_file, "rb") as f:
+            self.assertIn(b"<<<<<<< uf1", f.read())
+        with self.assertRaises(SystemExit):                       # markers still there: still refused
+            fwbuild.import_device(p)
+        with open(merge_file, "wb") as f:
+            f.write(before[1][rel] + b"# resolved\n")
+        fwbuild.import_device(p)
+        self.assertEqual(fwbuild.tree(os.path.join(fwbuild.FW, "src"))[rel], before[1][rel] + b"# resolved\n")
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ class DigitalData(object):
                     print "You long pressed a button"
                     self.longtouch_cb()
                 self.time_held = 0
-        
+
     def getRawValues(self, controltype, skip_update=False):
         if controltype == "gate":
             src = self.gate_src
@@ -139,7 +139,7 @@ class DigitalData(object):
                 state = 0
             if switch.prevState() == True:
                 prev = 1
-            else: 
+            else:
                 prev = 0
         elif src == "SR":
             if switch.state(pin) == True:
@@ -148,7 +148,7 @@ class DigitalData(object):
                 state = 0
             if switch.prevState(pin) == True:
                 prev = 1
-            else: 
+            else:
                 prev = 0
             if controltype == "gate": # Flip for Hardware
                 if state == 1:
@@ -161,10 +161,10 @@ class DigitalData(object):
                     prev = 1
         elif src == "NONE":
             state = 0
-            prev = 0 
-            
+            prev = 0
+
         return state, prev
-            
+
 
     def handle_button(self):
         if self.ignore_button == False:
@@ -192,11 +192,11 @@ class DigitalData(object):
                     self.b_state = 0
             elif self.mode == "momentary":
                 ### ONLY RISING
-                if raw_button == 1: 
+                if raw_button == 1:
                     self.b_state = 1
                 else:
                     self.b_state = 0
-            elif self.mode == "incremental": 
+            elif self.mode == "incremental":
                 if action == 1:
                     self.b_state = 1
             #if self.ignore_button == True:
@@ -226,7 +226,7 @@ class DigitalData(object):
                     self.g_state = 1
                 else:
                     self.g_state = 0
-            elif self.mode == "incremental": 
+            elif self.mode == "incremental":
                 #if raw_gate == 1 and raw_prev_gate == 0:
                 if action == 1:
                     self.g_state = 1
@@ -235,24 +235,27 @@ class DigitalData(object):
 
 
     def handle_incremental_value(self):
+        s = self.state
         g = self.g_state
         b = self.b_state
         self.g_state = 0
         self.b_state = 0
         if g == 1 or b == 1:
             if self.inc_order == 0:
-                self.state += 1
-                if self.state >= self.maximum:
-                    self.state = 0
+                s += 1
+                if s >= self.maximum:
+                    s = 0
             elif self.inc_order == 1:
-                self.state -= 1
-                if self.state < 0:
-                    self.state = self.maximum - 1
+                s -= 1
+                if s < 0:
+                    s = self.maximum - 1
             elif self.inc_order == 2:
-                self.state = random.randint(0, self.maximum - 1)
-        if self.state > self.maximum:
-            self.state = 0
-        
+                s = random.randint(0, self.maximum - 1)
+        if s > self.maximum:
+            s = 0
+
+        self.state = s
+
     def getValue(self):
         self.prev_state = self.state
         self.handle_button()
@@ -343,7 +346,7 @@ class DigitalData(object):
 
             if self.ignore_gate is True or  "_alt" in self.name:
                 g_trig = False
-            
+
             if self.ignore_button is True:
                 b_trig = False
 
@@ -356,10 +359,10 @@ class DigitalData(object):
                     self.button_pressed = False
                     self.time_held = 0
                 if self.state == 0:
-                    self.state = 1 
+                    self.state = 1
                 else:
                     self.state = 0
-            
+
         elif self.mode == "triggered":
             if self.gate_src is "GPIO":
                 self.gate_switch.update()
@@ -374,7 +377,7 @@ class DigitalData(object):
                     self.button_switch.update()
                     if self.edge == "rising":
                         b_trig = self.button_switch.state()
-                    else: 
+                    else:
                         b_trig = self.button_switch.fallingEdge()
                     if self.button_switch.risingEdge() is True:
                         self.button_pressed = True
@@ -382,7 +385,7 @@ class DigitalData(object):
                     if self.button_pressed is True:
                         self.time_held += 1
                     if self.longtouch_cb is not None:
-                        if self.time_held > self.long_press_time: 
+                        if self.time_held > self.long_press_time:
                             if self.edge == "falling":
                                 b_trig = False
                             self.button_pressed = False
@@ -402,14 +405,14 @@ class DigitalData(object):
                         self.time_held = 0
                     if self.button_pressed is True:
                         self.time_held += 1
-                    if self.time_held > self.long_press_time: 
+                    if self.time_held > self.long_press_time:
                         b_trig = False
                         self.button_pressed = False
                         self.time_held = 0
                         print "You long pressed a button!"
                         if self.longtouch_cb is not None:
                             self.longtouch_cb()
-                    
+
             if self.ignore_gate is True or  "_alt" in self.name:
                 g_trig = False
             if self.ignore_button is True:

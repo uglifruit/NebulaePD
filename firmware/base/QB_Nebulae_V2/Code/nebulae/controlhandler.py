@@ -30,7 +30,11 @@ RECORD_GATE_PIN = 24
 
 # Main Class. Holds all ControlChannels
 class ControlHandler(object):
-    def __init__(self, csound, numberFiles, configData, instr='a_granularlooper', bank='factory'):
+    def __init__(self, csound, numberFiles, configData, instr='a_granularlooper', bank='factory', initial_startup=False):
+        # Initial ignore for spurious shift input
+        self.initial_timeout = int(round(time.time() * 1000))
+        self.initial_startup = initial_startup
+
         self.csound = csound # Share csound instance with object
         GPIO.setmode(GPIO.BCM) # init GPIO
         GPIO.setwarnings(False) # silence GPIO warnings (this is probably not the best.)
@@ -55,7 +59,7 @@ class ControlHandler(object):
         self.prep_mode_change = False
         self.prep_mode_change_time = self.now
         self.modeChangeValues = {}
-        self.writer = wavewriter.WaveWriter() 
+        self.writer = wavewriter.WaveWriter()
         self.writing_buffer = False
         self.buffer_failure = False
         self.performance_thread = None
@@ -78,7 +82,7 @@ class ControlHandler(object):
         self.channels = [
             control.ControlChannel(self.csound, "speed", self.settings.load("speed"), "hybrid", 1),
             control.ControlChannel(self.csound, "pitch", self.settings.load("pitch"), "hybrid", 4),
-            control.ControlChannel(self.csound, "start", self.settings.load("start"), "analog", 0), 
+            control.ControlChannel(self.csound, "start", self.settings.load("start"), "analog", 0),
             control.ControlChannel(self.csound, "size", self.settings.load("size"), "analog", 6),
             control.ControlChannel(self.csound, "blend",self.settings.load("blend"),"analog", 1, cvchn=3),
             control.ControlChannel(self.csound, "density", self.settings.load("density"), "analog", 2),
@@ -90,11 +94,11 @@ class ControlHandler(object):
             control.ControlChannel(self.csound, "file", self.settings.load("file"), "digital", data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=NEXT_GATE_PIN,button_pin=libSR.PIN_NEXT,config=digitalConfig.get("file"),maximum=self.numFiles),
             control.ControlChannel(self.csound, "source", self.settings.load("source"), "digital",data_channel=BUTTON_GATE_SR, sr=self.shiftReg, gate_pin=libSR.PIN_SOURCE_GATE,button_pin=libSR.PIN_SOURCE, config=digitalConfig.get("source")),
             control.ControlChannel(self.csound, "filestate", 0, "digital",data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=NEXT_GATE_PIN,button_pin=libSR.PIN_NEXT, config=digitalConfig.get("filestate")) ,
-            control.ControlChannel(self.csound, "sourcegate", 0, "digital",data_channel=BUTTON_GATE_SR, sr=self.shiftReg, gate_pin=libSR.PIN_SOURCE_GATE,button_pin=libSR.PIN_SOURCE, config=digitalConfig.get("sourcegate")) ] 
+            control.ControlChannel(self.csound, "sourcegate", 0, "digital",data_channel=BUTTON_GATE_SR, sr=self.shiftReg, gate_pin=libSR.PIN_SOURCE_GATE,button_pin=libSR.PIN_SOURCE, config=digitalConfig.get("sourcegate")) ]
         self.altchannels = [
             control.ControlChannel(self.csound, "speed_alt", self.settings.load("speed_alt"), "hybrid", -1, maximum=32),
             control.ControlChannel(self.csound, "pitch_alt", self.settings.load("pitch_alt"), "hybrid", -1),
-            control.ControlChannel(self.csound, "start_alt", self.settings.load("start_alt"), "analog", 0, cvchn=-1), 
+            control.ControlChannel(self.csound, "start_alt", self.settings.load("start_alt"), "analog", 0, cvchn=-1),
             control.ControlChannel(self.csound, "size_alt", self.settings.load("size_alt"), "analog", 6, cvchn=-1),
             control.ControlChannel(self.csound, "blend_alt", self.settings.load("blend_alt"),"analog", 1, cvchn=-1),
             control.ControlChannel(self.csound, "density_alt", self.settings.load("density_alt"), "analog", 2, cvchn=-1),
@@ -103,7 +107,7 @@ class ControlHandler(object):
             control.ControlChannel(self.csound, "reset_alt", self.settings.load("reset_alt"), "digital",data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=RESET_GATE_PIN,button_pin=libSR.PIN_RESET, config=digitalConfig.get("reset_alt")),
             control.ControlChannel(self.csound, "freeze_alt", self.settings.load("freeze_alt"), "digital",data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=FREEZE_GATE_PIN,button_pin=libSR.PIN_FREEZE, config=digitalConfig.get("freeze_alt")),
             control.ControlChannel(self.csound, "source_alt", self.settings.load("source_alt"), "digital",data_channel=BUTTON_GATE_SR, sr=self.shiftReg, gate_pin=libSR.PIN_SOURCE_GATE,button_pin=libSR.PIN_SOURCE, config=digitalConfig.get("source_alt")),
-            control.ControlChannel(self.csound, "record_alt", self.settings.load("record_alt"), "digital",data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=RECORD_GATE_PIN,button_pin=libSR.PIN_RECORD, config=digitalConfig.get("record_alt")), 
+            control.ControlChannel(self.csound, "record_alt", self.settings.load("record_alt"), "digital",data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=RECORD_GATE_PIN,button_pin=libSR.PIN_RECORD, config=digitalConfig.get("record_alt")),
             control.ControlChannel(self.csound, "file_alt", self.settings.load("file_alt"), "digital", data_channel=BUTTON_SR_GATE_GPIO, sr=self.shiftReg, gate_pin=NEXT_GATE_PIN,button_pin=libSR.PIN_NEXT,config=digitalConfig.get("file_alt"), maximum=3)
             ]
 
@@ -150,7 +154,7 @@ class ControlHandler(object):
         #self.writeThread = threading.Thread(target=self.writeBufferToAudioFile())
         self.writeThread = threading.Thread(target=self.dummyThread())
         self.writeThread.start()
-    
+
 
 
     # Pass Csound Performance Thread Pointer
@@ -202,7 +206,7 @@ class ControlHandler(object):
 
     def setInstrSelOffset(self, offset):
         self.instr_sel_offset = offset
-    
+
     def setInstrSelNumFiles(self, numfiles):
         self.instr_sel_numfiles = numfiles
 
@@ -217,7 +221,7 @@ class ControlHandler(object):
 
     def mode(self):
         return self.control_mode
-    
+
     def enterNormalMode(self):
         print "entering normal"
         for chn in self.channels:
@@ -246,13 +250,13 @@ class ControlHandler(object):
             print "Connecting to PD Socket"
             self.pdSock.connect()
         self.control_mode = "puredata"
-    
+
     def enterSecondaryMode(self):
         #self.modeChangeControl = "pitch"
         #self.altchanneldict[self.modeChangeControl + "_alt"].setIgnoreNextButton()
         if self.control_mode == "normal" or self.control_mode == "puredata":
             print "entering secondary"
-            self.resistNormalSettings() 
+            self.resistNormalSettings()
             if not self.pdSock.is_connected() and self.control_mode == "puredata":
                 print "Connecting to PD Socket"
                 self.pdSock.connect()
@@ -278,7 +282,7 @@ class ControlHandler(object):
         for i in range(0, 8):
             #self.altchannels[i].setValue(self.altchannels[i].getPotValue())
             self.altchannels[i].setModeChangeValue(self.channels[i].getPotValue())
-         
+
 
     def resistSecondarySettings(self):
         for i in range(0, 8):
@@ -316,7 +320,7 @@ class ControlHandler(object):
             self.defaultConfig["sourcegate"] = ["triggered", "rising"]
             self.defaultConfig["ksmps"] = ["128"]
             self.defaultConfig["sr"] = ["44100"]
-            
+
 
     def restoreAltToDefault(self):
         nowvals = dict()
@@ -353,7 +357,7 @@ class ControlHandler(object):
         #    if self.eol_state is True:
         #        self.eol_gate_timer += 1
         #        if self.eol_gate_timer > 2:
-        #           GPIO.output(self.eol_pin, True) 
+        #           GPIO.output(self.eol_pin, True)
         #           self.eol_state = False
         else:
             GPIO.output(self.eol_pin, True)
@@ -368,7 +372,7 @@ class ControlHandler(object):
                 if self.getValue("source") == 1:
                     self.setValue("pitch", 0.6)
                     self.setValue("speed", 0.625)
-        
+
 
     def getEditFunctionFlag(self, name):
         if self.editFunctionFlag.has_key(name):
@@ -384,18 +388,24 @@ class ControlHandler(object):
         if self.editFunctionFlag.has_key(name):
             self.editFunctionFlag[name] = True
 
-    def updateAll(self): 
+    def updateAll(self):
         #GPIO.output(self.eol_pin, False) # For debugging
         numChanged = 0
         self.now = int(round(time.time() * 1000))
+
+        # if self.initial_startup:
+        #     if self.now - self.initial_timeout >= 5000:
+        #         self.shiftReg.update()
+        # else:
         self.shiftReg.update()
+
         self.sourceStateCtrl.update()
         #print "source state: " + str(self.sourceStateCtrl.getValue())
-        if self.sourceStateCtrl.getValue() == 1 and self.sourceStateCtrl.getPrevValue() == 0: 
+        if self.sourceStateCtrl.getValue() == 1 and self.sourceStateCtrl.getPrevValue() == 0:
             self.prep_mode_change = True
             self.prep_mode_change_time = self.now
             #for chn in self.channeldict:
-        elif self.sourceStateCtrl.getValue() == 0: 
+        elif self.sourceStateCtrl.getValue() == 0:
             for chn in self.channels:
                 self.modeChangeValues[chn.name] = chn.getValue()
             if self.sourceStateCtrl.getPrevValue() == 1:
@@ -415,7 +425,7 @@ class ControlHandler(object):
             self.handleRecordStatus()
         #self.printAllControls()
         if self.control_mode == "secondary controls":
-            if self.prev_control_mode == "puredata":          
+            if self.prev_control_mode == "puredata":
                 time.sleep(0.001)
                 msgs = []
                 for chn in self.channels:
@@ -441,7 +451,7 @@ class ControlHandler(object):
                     chn.update()
                     self.settings.save(chn.name, chn.getValue())
                 if self.currentInstr == "a_granularlooper":
-                    self.channeldict["file"].input.setIncOrder(self.altchanneldict["file_alt"].getValue()) 
+                    self.channeldict["file"].input.setIncOrder(self.altchanneldict["file_alt"].getValue())
             in_scalar = self.altchanneldict["speed_alt"].getValue()
             self.setInputLevel(in_scalar)
             #if self.altchanneldict["reset_alt"].curVal == True and self.altchanneldict["reset_alt"].prevVal == False:
@@ -460,7 +470,7 @@ class ControlHandler(object):
                     sel_idx = idx + self.instr_sel_offset
                     if sel_idx < self.instr_sel_numfiles:
                         self.instr_sel_idx = sel_idx
-                
+
         elif self.control_mode == "puredata":
             time.sleep(0.001)
             msgs = []
@@ -484,7 +494,7 @@ class ControlHandler(object):
                 self.channeldict["source"].setIgnoreGate(True)
             else:
                 self.channeldict["source"].setIgnoreGate(False)
-                        
+
             for chn in self.channels:
                 if chn.name != "sourcegate":
                     chn.setIgnoreHID(False)
@@ -505,16 +515,16 @@ class ControlHandler(object):
                         self.settings.save(chn.name, chn.getStaticVal())
                     else:
                         self.settings.save(chn.name, chn.getValue())
-                    if chn.source == "digital" and chn.name != "file": 
+                    if chn.source == "digital" and chn.name != "file":
                         if filestate == 1 or filestate == True:
                             if chn.hasChanged() == True and chn.getTrigSource() == "button":
                                 if chn.name == "reset":
                                     self.setEditFunctionFlag(chn.name)
                                 elif chn.name == "source":
-                                    self.setEditFunctionFlag(chn.name) 
+                                    self.setEditFunctionFlag(chn.name)
                                     self.channeldict[chn.name].setIgnoreNextButton()
                                 elif chn.name == "freeze":
-                                    self.setEditFunctionFlag(chn.name) 
+                                    self.setEditFunctionFlag(chn.name)
                                     self.channeldict[chn.name].setIgnoreNextButton()
                                     self.channeldict[chn.name].setValue(1 - self.channeldict[chn.name].getValue())
                                     #self.writeBufferToAudioFile()

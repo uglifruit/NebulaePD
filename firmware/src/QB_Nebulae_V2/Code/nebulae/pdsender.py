@@ -32,6 +32,12 @@ class PdSend():
 
         except:
             self.connected = False
+            # close now: a timed-out attempt must not complete later behind our back (Windows keeps retrying)
+            try:
+                self.pd.close()
+            except:
+                pass
+            self.pd = None
             print('Connection failed - open PD with [netreceive ' + str(self.sport) + '] at least!')
         return self.connected
 

@@ -9,6 +9,7 @@ Guards (the update path must survive any custom build, so a revert always works)
   - Code/scripts, Code/localfiles, Code/config, Code/misc, Code/log and the Python files run during boot/update
     before the app (bootleds.py, calibration_collector.py) are identical to the base;
   - check_calibration.py differs from the base only by the added `import neb_globals` line;
+  - the unit's mandatory files (checkfirmware.sh's list) are present and non-empty;
   - new files are only Code/nebulae/*.py; no new .pyc or __pycache__;
   - changed/new .py files are ASCII with LF line ends.
 The base must come from the unit itself (firmware/base/SOURCE.txt: provisional=no). With the provisional GitHub
@@ -32,6 +33,11 @@ VERSION = "v2_1_2_uf1"
 PROTECTED_DIRS = ["Code/scripts/", "Code/localfiles/", "Code/config/", "Code/misc/", "Code/log/"]
 PROTECTED_FILES = ["Code/nebulae/bootleds.py", "Code/nebulae/calibration_collector.py", "Code/config.txt"]
 ONE_LINE_FIX = ("Code/nebulae/check_calibration.py", "import neb_globals\n")
+# /home/alarm/mandatory_files.txt on the unit (outside the tree): checkfirmware.sh reverts to the factory v1.0.0
+# tree if any of these is missing or empty under Code/
+MANDATORY = ["nebulae/bootleds.py", "nebulae/conductor.py", "nebulae/controlhandler.py", "nebulae/nebulae.py",
+             "nebulae/ui.py", "scripts/enable_inputs.sh", "scripts/mountfs.sh", "scripts/startup.sh",
+             "scripts/sys_opt.sh", "scripts/update.sh"]
 
 
 def tree(root):
@@ -60,6 +66,9 @@ def read_source():
 
 def guard(base, src):
     errors, changed, added = [], [], []
+    for m in MANDATORY:
+        if not src.get("Code/" + m):
+            errors.append("mandatory file missing or empty (checkfirmware.sh would revert to factory): Code/" + m)
     for rel in sorted(set(base) - set(src)):
         errors.append("removed from src: " + rel)
     for rel in sorted(src):
@@ -143,6 +152,34 @@ def pack(files, meta, default, version=None, mtime=1767225600):
 RUNTIME = ["Code/config/bootinstr.txt", "Code/config/nebsettings.txt", "Code/config/buffer_cnt.txt",
            "Code/config/neb_options.txt", "Code/config/uf_migrated", "Code/misc/calibration_data.txt"]
 RUNTIME_DIRS = ["Code/log/"]
+MERGE_DIR = "dist/merge"     # under firmware/: conflict files from --import-device, resolved by hand
+
+
+def is_runtime(rel):
+    """Runtime state, or bytecode Python 2 wrote next to a module on the unit (Code/nebulae/x.pyc)."""
+    if rel in RUNTIME or any(rel.startswith(d) for d in RUNTIME_DIRS):
+        return True
+    return rel.startswith("Code/nebulae/") and rel.endswith(".pyc") and rel.count("/") == 2
+
+
+def merge3(ours, base, theirs):
+    """git merge-file: (merged bytes, number of conflicts)."""
+    import subprocess
+    import tempfile
+    d = tempfile.mkdtemp()
+    paths = []
+    for tag, data in (("uf1", ours), ("previous-base", base), ("unit", theirs)):
+        p = os.path.join(d, tag)
+        with open(p, "wb") as f:
+            f.write(data)
+        paths.append(p)
+    r = subprocess.run(["git", "merge-file", "-p", "-L", "uf1", "-L", "previous-base", "-L", "unit"] + paths,
+                       capture_output=True)
+    import shutil
+    shutil.rmtree(d)
+    if r.returncode < 0 or r.returncode > 127:
+        raise RuntimeError("git merge-file failed: " + r.stderr.decode(errors="replace"))
+    return r.stdout, r.returncode
 
 
 def write_tree(root, files):
@@ -157,39 +194,62 @@ def write_tree(root, files):
             f.write(data)
 
 
-def import_device(archive):
-    """Make the unit's backup the base and carry the uf1 changes over. Stops on conflicts (a file uf1 changed that
-    also differs between the provisional base and the unit): those need a manual merge."""
+def import_device(archive, source_name="unit-backup"):
+    """Make the unit's tree the base and carry the uf1 changes over. A file uf1 changed that the unit also changed
+    gets a three-way merge (previous base = common ancestor). Clean merges are taken. Conflicts are written with
+    markers to firmware/dist/merge/<path>, and nothing else is written; resolve the file there (no markers left)
+    and run the import again, which then takes the resolved copy."""
     with tarfile.open(archive) as t:
         dev = {}
         for m in t.getmembers():
             if m.isfile() and m.name.startswith("QB_Nebulae_V2/"):
                 rel = m.name[len("QB_Nebulae_V2/"):]
-                if rel in RUNTIME or any(rel.startswith(d) for d in RUNTIME_DIRS):
+                if is_runtime(rel):
                     continue
                 dev[rel] = t.extractfile(m).read()
     old = tree(os.path.join(FW, "base"))
     src = tree(os.path.join(FW, "src"))
     _, changed, added = guard(old, src)
     differs = sorted(r for r in set(old) | set(dev) if old.get(r) != dev.get(r))
-    print("unit tree vs provisional base: %d files differ" % len(differs))
+    print("unit tree vs previous base: %d files differ" % len(differs))
     for rel in differs:
         print("  %s %s" % ("+" if rel not in old else "-" if rel not in dev else "~", rel))
-    conflicts = [r for r in changed + added if r in differs]
-    if conflicts:
-        print("CONFLICTS (uf1 changed these and the unit's copy differs) - merge by hand, nothing written:")
-        for r in conflicts:
-            print("  " + r)
-        sys.exit(1)
     new_src = dict(dev)
     for rel in changed + added:
         new_src[rel] = src[rel]
+    unresolved = []
+    for rel in [r for r in changed + added if r in differs]:
+        resolved = os.path.join(FW, MERGE_DIR, *rel.split("/"))
+        if rel in added or rel not in dev:
+            unresolved.append((rel, "uf1 adds it, the unit has or lacks its own copy"))
+            continue
+        if os.path.isfile(resolved):
+            with open(resolved, "rb") as f:
+                data = f.read()
+            if b"<<<<<<<" not in data and b">>>>>>>" not in data:
+                new_src[rel] = data
+                print("  merged (resolved copy): " + rel)
+                continue
+        merged, n = merge3(src[rel], old[rel], dev[rel])
+        if n == 0:
+            new_src[rel] = merged
+            print("  merged (clean): " + rel)
+        else:
+            os.makedirs(os.path.dirname(resolved), exist_ok=True)
+            with open(resolved, "wb") as f:
+                f.write(merged)
+            unresolved.append((rel, "%d conflict(s), see %s" % (n, os.path.relpath(resolved, REPO))))
+    if unresolved:
+        print("CONFLICTS - nothing written. Resolve these, then run the import again:")
+        for rel, why in unresolved:
+            print("  %s: %s" % (rel, why))
+        sys.exit(1)
     write_tree(os.path.join(FW, "base"), dev)
     write_tree(os.path.join(FW, "src"), new_src)
     rel_archive = os.path.relpath(os.path.abspath(archive), REPO).replace("\\", "/")
     with open(os.path.join(FW, "base", "SOURCE.txt"), "w", newline="\n") as f:
-        f.write("source=unit-backup\nprovisional=no\narchive=%s\nnote=the unit's own tree from fw_backup.instr, "
-                "runtime files (calibration, last instrument, settings, logs) left out\n" % rel_archive)
+        f.write("source=%s\nprovisional=no\narchive=%s\nnote=the unit's own tree; runtime files (calibration, last "
+                "instrument, settings, logs, bytecode compiled on the unit) left out\n" % (source_name, rel_archive))
     print("base <- %s (%d files); src = base + %d uf1 changes. Run the tests, then build." % (
         rel_archive, len(dev), len(changed) + len(added)))
 
@@ -200,10 +260,11 @@ def main():
     ap.add_argument("--version", default=VERSION)
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--import-device", metavar="NEB_UPDATE_ZIP",
-                    help="replace the base with the unit's backup (firmware/device/neb_update.zip)")
+                    help="replace the base with the unit's tree (firmware/device_image/neb_update.zip)")
+    ap.add_argument("--source-name", default="unit-backup", help="source= label for SOURCE.txt on import")
     a = ap.parse_args()
     if a.import_device:
-        import_device(a.import_device)
+        import_device(a.import_device, a.source_name)
         return
     source = read_source()
     provisional = source.get("provisional", "yes") != "no"

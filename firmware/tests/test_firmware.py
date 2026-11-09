@@ -228,10 +228,14 @@ class TestPdSender(unittest.TestCase):
                 c.settimeout(2)
                 data = b""
                 while not data.endswith(b"b 2;"):
-                    data += c.recv(100)
+                    chunk = c.recv(100)
+                    if not chunk:                        # peer closed: stop instead of spinning
+                        break
+                    data += chunk
                 got.append(data)
                 c.close()
             t = threading.Thread(target=accept)
+            t.daemon = True                              # a failure must not hang the test run
             t.start()
             time.sleep(0.3)
             self.assertTrue(s.retry())
