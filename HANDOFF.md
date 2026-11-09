@@ -32,6 +32,7 @@ For a **new instrument**, see §8.
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
+| Custom firmware | Plan in `docs/FIRMWARE.md`: Stage 0 → uf1 (paged selector, Pitch coeff 0.95, fixes) → uf1b (Pd back-channel) → uf2 (SuperCollider). **Stage 0 tools written + offline-tested, not yet run on hardware:** `instr/fw_backup.instr` (backup = revert package + inventory to the stick), `patches/99_pitchlog.pd` + `tools/pitchlog.py` (poll rate / Pitch slew). Waiting for the owner's `neb_fwbackup/` folder → `firmware/device/` |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |
 
 **Roadmap** (not started):
@@ -43,15 +44,14 @@ For a **new instrument**, see §8.
   - **Fix attempt `41ec4be`, reverted in `daebe62`:** two alternating voices, a settle-wait and a 40 ms pitch lag. The
     owner found it worse. The likely reason: its "stale after 4 ms" rule fired between slow poll updates, so it never
     waited, and the lag made the new note scoop 40 ms after the attack. The voice code is in that commit if needed.
-  - **Owner is considering a firmware tweak (separate conversation):** Pitch `filtCoeff` 0.33 → 0.95 in stock
-    `control.py`, as Technobear did. Keep it revertible: back up the original file first, and keep the stock update
-    zip to hand.
+  - **Custom firmware uf1 will set Pitch `filtCoeff` 0.33 → 0.95** (as Technobear did), tunable from the stick. See
+    `docs/FIRMWARE.md`. Measure before/after with `99_pitchlog`.
 - 06_topo: hardware feedback (sound balance, clock feel). Later idea from the owner: Source cycles through named sample
   kits. But the Source latch also toggles on the Source gate jack (06's step-1 reset), so reset would have to move.
 - Gloop effects pass: delay, reverb, bit crush, wavefold, tape saturation/hiss/age, tilt EQ. The user picked "core first".
 - Optional soft limiter on the gloop output.
 - Csound work.
-- Possible custom-firmware LED mod. Only offered so far; the user chose stock firmware.
+- Custom firmware (`docs/FIRMWARE.md`): Stage 0 on hardware next. uf1b adds opt-in Pd LEDs/EOL via port 3001.
 
 ## 3. Repo layout
 ```
@@ -65,10 +65,11 @@ tools/spectral.py 05_spectral builder (ui, tables, bands, stft: ana/pool/syn per
 tools/topo.py   06_topo builder (NODES map, KITS (3 kits); ui, pos, mapq, thr, steps, mutate, voices, test_clock)
 tools/shimmer.py 07_shimmer builder (ui, reverb (FDN + shifter taps + diffuser), chorus, duck, swell, test_source)
 tools/resonator.py 08_resonator builder (E/program/watched control-math compiler; ui, exciter, res, bbd, test_source)
+tools/pitchlog.py    99_pitchlog builder + analyzer (poll rate, Pitch jump response) for logs from the module
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
 tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1
-docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, GLOOP, GLITCH, SPECTRAL, TOPO, SHIMMER, RESONATOR
+docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, FIRMWARE, GLOOP, GLITCH, SPECTRAL, TOPO, SHIMMER, RESONATOR
 reference/      Qu-Bit dev reference PDF;  upstream/  a few MIT files copied from Qu-Bit's repo
 external/       (gitignored) clones of Qu-Bit-Electronix/QB_Nebulae_V2 and TheTechnobear/NebulaePatches - re-clone if missing
 tools/csound609/ (gitignored) unzipped csound-emscripten-6.09.1 from the Csound 6.09.1 GitHub release

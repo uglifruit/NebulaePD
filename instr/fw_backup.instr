@@ -1,0 +1,140 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+nebconfigend
+
+; fw_backup.instr - backs up the module's own firmware to the USB stick and records what the OS image contains.
+; Nothing on the module is changed: it only reads, and writes to the stick (and flag files in /dev/shm).
+; See docs/FIRMWARE.md (Stage 0).
+;
+; Writes to the stick, in the folder neb_fwbackup/:
+;   neb_update.zip    - tar.gz of /home/alarm/QB_Nebulae_V2 in the layout update.sh installs = the REVERT PACKAGE.
+;                       Made on the first run only. Later runs never overwrite it.
+;   backup_old.tgz    - /home/alarm/backup/old (the tree the last update replaced), first run only, if present
+;   checkfirmware.sh, boot_config.txt, nebulae.service - copies of the boot files (first run only)
+;   inventory_<date>.txt   - OS, CPU, versions, packages, libraries, disk, boot files, backup log
+;   code_sha256_<date>.txt - sha256 of every file in the firmware tree
+;   neb_pitchlog_<date>.txt - the last 99_pitchlog capture, if there is one
+; (<date> is the module's clock, which has no RTC. It only keeps runs apart.)
+;
+; Sounds: audio passes through. When the job ends, a pattern repeats every 4 s:
+;   three short high beeps = done, backup verified.   one long low tone = something failed (see inventory_*.txt).
+;   nothing at all after ~2 minutes = system_i is missing on this build.
+; The shell script avoids dollar signs and semicolons (Csound macro and comment characters).
+
+gkfwstate init 0
+
+instr 1
+idone system_i 1, {{rm -f /dev/shm/neb_fw_ok /dev/shm/neb_fw_fail /dev/shm/neb_fw_pending}}
+ires system_i 1, {{( sleep 4
+mkdir -p /mnt/memory
+grep -q " /mnt/memory " /proc/mounts || mount /dev/sda1 /mnt/memory
+mkdir -p /mnt/memory/neb_fwbackup
+cd /home/alarm
+{
+echo "=== run"
+date
+uptime
+id
+echo "=== backup"
+if [ -f /mnt/memory/neb_fwbackup/neb_update.zip ]
+then
+echo "BACKUP_PRESENT - not overwritten"
+else
+tar -czf /mnt/memory/neb_fwbackup/neb_update.zip QB_Nebulae_V2 && echo TAR_OK || echo TAR_FAILED
+if [ -d /home/alarm/backup/old ]
+then
+tar -czf /mnt/memory/neb_fwbackup/backup_old.tgz -C /home/alarm/backup old && echo OLD_OK || echo OLD_FAILED
+fi
+cp /home/alarm/checkfirmware.sh /mnt/memory/neb_fwbackup/checkfirmware.sh
+cp /boot/config.txt /mnt/memory/neb_fwbackup/boot_config.txt
+cp /etc/systemd/system/nebulae.service /mnt/memory/neb_fwbackup/nebulae.service
+fi
+sync
+gzip -t /mnt/memory/neb_fwbackup/neb_update.zip && echo GZIP_OK && touch /dev/shm/neb_fw_pending
+ls -l /mnt/memory/neb_fwbackup
+sha256sum /mnt/memory/neb_fwbackup/neb_update.zip
+echo "entries:"
+tar -tzf /mnt/memory/neb_fwbackup/neb_update.zip | wc -l
+tar -tzf /mnt/memory/neb_fwbackup/neb_update.zip | head -n 5
+echo "=== pitchlog"
+ls -l /dev/shm/neb_pitchlog.txt /tmp/neb_pitchlog.txt
+cp /dev/shm/neb_pitchlog.txt /mnt/memory/neb_fwbackup/neb_pitchlog_`date +%y%m%d_%H%M%S`.txt || cp /tmp/neb_pitchlog.txt /mnt/memory/neb_fwbackup/neb_pitchlog_`date +%y%m%d_%H%M%S`.txt
+echo "=== system"
+uname -a
+uname -m
+cat /proc/device-tree/model
+echo
+cat /etc/os-release
+cat /etc/arch-release
+ldd --version | head -n 1
+getconf GNU_LIBC_VERSION
+file /bin/ls /usr/bin/pd /usr/bin/python2
+echo "=== cpu"
+grep -E "model name|Hardware|Revision|Model" /proc/cpuinfo
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
+/opt/vc/bin/vcgencmd get_config int || vcgencmd get_config int
+/opt/vc/bin/vcgencmd measure_clock arm || vcgencmd measure_clock arm
+echo "=== versions"
+python2 --version
+python2 -m pip --version
+timeout 10 pd -nogui -noaudio -version
+timeout 10 csound --version 2>&1 | head -n 3
+echo "=== which"
+which jackd jack_control sclang scsynth pd csound python2 pacman tar gzip sha256sum timeout file
+echo "=== libraries"
+ls -l /usr/lib/libsndfile* /usr/lib/libfftw3* /usr/lib/libjack* /usr/lib/libreadline* /usr/lib/libyaml-cpp* /usr/lib/libboost_* /usr/lib/libavahi* /usr/lib/libasound* /usr/lib/libportaudio* /usr/lib/libstdc++* /usr/local/lib
+ls -d /usr/share/SuperCollider /usr/local/share/SuperCollider /usr/lib/SuperCollider
+echo "=== packages"
+pacman -Q
+echo "=== disk and memory"
+df -h
+free -h
+du -sh /home/alarm/QB_Nebulae_V2 /home/alarm/backup /home/alarm/audio /home/alarm/pd /home/alarm/instr
+cat /proc/mounts
+echo "=== home"
+ls -la /home/alarm /home/alarm/QB_Nebulae_V2 /home/alarm/QB_Nebulae_V2/Code
+ls -la /home/alarm/backup /home/alarm/backup/old /home/alarm/backup/new
+cat /home/alarm/QB_Nebulae_V2/Code/config.txt
+cat /home/alarm/backup/old/QB_Nebulae_V2/Code/config.txt
+echo "=== checkfirmware.sh"
+cat /home/alarm/checkfirmware.sh
+echo "=== boot config.txt"
+cat /boot/config.txt
+echo "=== nebulae.service"
+cat /etc/systemd/system/nebulae.service
+systemctl status nebulae --no-pager -l 2>&1 | head -n 15
+echo "=== end"
+} > /mnt/memory/neb_fwbackup/inventory_`date +%y%m%d_%H%M%S`.txt 2>&1
+cd /home/alarm/QB_Nebulae_V2 && find . -type f -exec sha256sum {} + > /mnt/memory/neb_fwbackup/code_sha256_`date +%y%m%d_%H%M%S`.txt 2>&1
+sync
+cd /
+umount /mnt/memory
+mv /dev/shm/neb_fw_pending /dev/shm/neb_fw_ok || touch /dev/shm/neb_fw_fail ) > /dev/null 2>&1 &}}
+kpoll metro 1
+schedkwhen kpoll, 0, 1, 2, 0, 0.01
+; result sounds, repeating every 4 s once the job has finished
+kph phasor 0.25
+kt = kph * 4
+kok = (gkfwstate == 1 && (kt < 0.12 || (kt > 0.3 && kt < 0.42) || (kt > 0.6 && kt < 0.72)) ? 0.2 : 0)
+kfail = (gkfwstate == 2 && kt < 1.5 ? 0.2 : 0)
+kok portk kok, 0.004
+kfail portk kfail, 0.01
+aok oscili kok, 1320
+afail oscili kfail, 220
+ainl, ainr inch 1, 2
+outs ainl + aok + afail, ainr + aok + afail
+endin
+
+; polls the flag files once a second
+instr 2
+iok system_i 1, {{test -f /dev/shm/neb_fw_ok}}
+ifail system_i 1, {{test -f /dev/shm/neb_fw_fail}}
+if iok == 0 then
+gkfwstate init 1
+elseif ifail == 0 then
+gkfwstate init 2
+endif
+endin

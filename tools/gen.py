@@ -948,6 +948,7 @@ if __name__ == "__main__":
     import topo
     import shimmer
     import resonator
+    import pitchlog
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
     write("patches/01_drone.pd", drone_patch())
@@ -958,6 +959,7 @@ if __name__ == "__main__":
     write("patches/06_topo.pd", topo.topo_patch(Canvas, controls_canvas))
     write("patches/07_shimmer.pd", shimmer.shimmer_patch(Canvas, controls_canvas))
     write("patches/08_resonator.pd", resonator.resonator_patch(Canvas, controls_canvas))
+    write("patches/99_pitchlog.pd", pitchlog.pitchlog_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))
     write("sim/test_02_echo_spread.pd", echo_patch(test=dict(pitch=1, overlap=0.5, window=0.5, freeze_at=99999)))
@@ -991,3 +993,8 @@ if __name__ == "__main__":
         if wavdir:
             write(f"{wavdir}/r_{name}.pd",
                   resonator.resonator_patch(Canvas, controls_canvas, test=scen(wav=f"{wavdir}/r_{name}.wav")))
+    if wavdir:
+        for name, coeff in [("033", 0.33), ("095", 0.95)]:
+            write(f"{wavdir}/p_pitchlog_{name}.pd", pitchlog.pitchlog_patch(
+                Canvas, controls_canvas, test=dict(path=f"{wavdir}/p_pitchlog_{name}.txt", capture_ms=3000,
+                                                   poll_ms=4, coeff=coeff)))
