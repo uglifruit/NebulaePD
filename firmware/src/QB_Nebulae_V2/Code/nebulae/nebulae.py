@@ -204,6 +204,10 @@ class Nebulae(object):
         print 'sleeping'
         time.sleep(2)
         self.c_handle = ch.ControlHandler(None, self.orc_handle.numFiles(), None, self.new_instr, bank="puredata")
+        # uf1: every Pd patch starts with the alt layer at its defaults (input gain included), as Csound instruments
+        # do on a change. Pd mode never saves alt values, so the stored ones were left over from a Csound instrument.
+        print("Pd patch load -- Resetting Secondary Settings")
+        self.c_handle.restoreAltToDefault()
         self.c_handle.setCsoundPerformanceThread(None)
         self.c_handle.enterPureDataMode()
         self.loadUI()

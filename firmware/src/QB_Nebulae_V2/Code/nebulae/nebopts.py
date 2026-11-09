@@ -5,8 +5,8 @@
 # Format: one `key=value` per line, `#` starts a comment. Known keys:
 #   pitch_coeff = 0.95     Pitch CV one-pole coefficient per poll (stock firmware: 0.33). 1.0 = no smoothing.
 #   pd_alts_at_load = 0    1 = send every *_alt value once when a Pd patch connects (stock: only while Source is
-#                          held). Off by default: alt values are shared by all Pd patches, so a patch would get the
-#                          previous patch's values at load.
+#                          held). Each Pd load resets them to the defaults first (nebulae.py), so this only tells a
+#                          patch the defaults it already starts with: off by default.
 import os
 
 OPTIONS_PATH = "/home/alarm/QB_Nebulae_V2/Code/config/neb_options.txt"

@@ -459,6 +459,15 @@ class TestPdMode(unittest.TestCase):
         primary = [c.name for c in ch.channels]
         self.assertEqual([self.names(b) for b in ch.pdSock.sent], [primary] * 3)
 
+    def test_restore_alt_to_default(self):
+        ch = self.make(False)
+        for chn in ch.altchannels:
+            chn.setValue(0.77)
+        ch.restoreAltToDefault()
+        got = dict((c.name, c.getValue()) for c in ch.altchannels)
+        self.assertEqual(got["speed_alt"], 23)                       # input gain back to 0 dB
+        self.assertEqual(set(v for k, v in got.items() if k != "speed_alt"), {0})
+
     def test_alts_once_per_connection(self):
         ch = self.make(True)
         for _ in range(3):
@@ -502,10 +511,12 @@ class TestFlatLoop(unittest.TestCase):
             def __init__(self, *a, **k):
                 state["depths"].append(len(inspect.stack()))
                 self.instr_sel_idx, self.bank = 0, "factory"
+                self.pd, self.restores = k.get("bank") == "puredata", 0
+                state.setdefault("handlers", []).append(self)
             def setCsoundPerformanceThread(self, p): pass
             def enterPureDataMode(self): pass
             def updateAll(self): pass
-            def restoreAltToDefault(self): pass
+            def restoreAltToDefault(self): self.restores += 1
             def printAllControls(self): pass
             def getInstrSelBank(self): return self.bank
             def setInstrSelBank(self, b): self.bank = b
@@ -558,6 +569,9 @@ class TestFlatLoop(unittest.TestCase):
         self.assertEqual(len(d), state["max_switches"] + 1)
         self.assertEqual(min(d), max(d))
         self.assertEqual(state["pd_alive"], 0)
+        pd = [h for h in state["handlers"] if h.pd]
+        self.assertEqual(len(pd), state["max_switches"] // 2)
+        self.assertTrue(all(h.restores == 1 for h in pd))           # every Pd load starts with alts at defaults
 
 
 if __name__ == "__main__":

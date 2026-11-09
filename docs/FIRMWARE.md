@@ -28,10 +28,9 @@ Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidd
    writes an installable `neb_update.zip`.
 5. Hand over the uf1 install with the hardware test list (Stage 1 below).
 
-**Open decision (owner):**
-- `pd_alts_at_load` is built but **off**. Alt values are shared by all Pd patches, so a burst at load would give 07
-  its detune and 08 its ping-pong from the previous patch's `pitch_alt`.
-- Keep it off, or turn it on by adding `pd_alts_at_load=1` to `neb_options.txt`?
+**Decided (owner, 2026-11-09):** every Pd patch load resets the alt layer to its defaults. Because of that,
+`pd_alts_at_load` can only send the defaults, which our patches already start with, so it is harmless. It stays off
+as it gains nothing.
 
 ## How updates work (from upstream source)
 - At boot, `/home/alarm/checkfirmware.sh` runs `Code/scripts/startup.sh`. The script is on the OS image and isn't user-updatable.
@@ -135,13 +134,18 @@ change set. **Not yet installable:** the base is still Qu-Bit's GitHub v2.1.2 un
   - The selector opens on the running instrument's page.
   - Up to 25 files per bank are reachable.
   - File lists are re-read each time the selector opens, so new files on the stick show up without a reboot.
+- **Alt layer reset on every Pd patch load** (including a reload and the patch at boot). Every `*_alt` goes back to
+  `defaultnebsettings.txt`: 0, except input gain `speed_alt` = 23 (0 dB). Alt knobs then need to move before they
+  take over again, as after Source + Pitch click.
+  - Stock did this only for Csound instrument changes.
+  - Pd patches got whatever the last Csound instrument had saved, because Pd mode never saves alt values.
 - **Pitch CV:** the firmware's one-pole goes from 0.33 to **0.95** per poll. A 3-octave jump settles in 2 polls
   instead of 12. Steady CV is still held by the hysteresis and stability gate (±1 LSB noise gives 0 output changes in
   both).
 - **`neb_options.txt`** in the stick root (optional, copied at each instrument load, kept when the stick has none):
   ```
   pitch_coeff = 0.95     # 0.05-1.0; 0.33 = stock glide
-  pd_alts_at_load = 0    # 1 = send all alt values once when a Pd patch starts (see "Open decision")
+  pd_alts_at_load = 0    # 1 = also send the (default) alt values once when a Pd patch connects
   ```
 - **Pd externals:** `.pd_linux`, `.l_arm` and `.l_arm64` files in the stick root are copied next to the patches, so
   `[clds~]`-style objects load (as in Technobear's firmware).

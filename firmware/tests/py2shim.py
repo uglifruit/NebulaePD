@@ -217,7 +217,14 @@ class FakeSettings(object):
 
     def save(self, name, val): pass
 
-    def getDefault(self, name): return 0
+    def getDefault(self, name):
+        # the stock defaults file from the base tree
+        with open(os.path.join(os.path.dirname(BASE), "config", "defaultnebsettings.txt")) as f:
+            for line in f:
+                key, _, val = line.strip().partition(",")
+                if key == name:
+                    return float(val) if "." in val else int(val)
+        return 0
 
 
 def install_hardware_stubs():

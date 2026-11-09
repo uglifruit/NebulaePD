@@ -34,7 +34,7 @@ For a **new instrument**, see §8.
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
 | Custom firmware | `docs/FIRMWARE.md` (its **To do** list comes first). Plan: Stage 0 → uf1 → uf1b (Pd back-channel) → uf2 (SuperCollider).
   - **Stage 0** (written and offline-tested, **not yet run on hardware**): `instr/fw_backup.instr` (revert package + inventory, plus an on-module Python 2 precheck of `neb_candidate.tgz`); `patches/99_pitchlog.pd` + `tools/pitchlog.py`.
-  - **uf1** (written in `firmware/src` on the *provisional* GitHub base; 26 + 10 desktop tests pass; **not Python-2-compiled, not installable yet**): paged selector (Next = page, Reset = load, Pitch = cursor, Pitch LED = page colour), Pitch coeff 0.95 via `neb_options.txt`, Pd connect retry + batched sends, flat run loop, Pd exit wait, calibration/settings carried over updates, Pd externals + hidden `_` files, stock bug fixes. `pd_alts_at_load` is built but off (open decision).
+  - **uf1** (written in `firmware/src` on the *provisional* GitHub base; 26 + 10 desktop tests pass; **not Python-2-compiled, not installable yet**): paged selector (Next = page, Reset = load, Pitch = cursor, Pitch LED = page colour), Pitch coeff 0.95 via `neb_options.txt`, Pd connect retry + batched sends, flat run loop, Pd exit wait, calibration/settings carried over updates, Pd externals + hidden `_` files, stock bug fixes. Every Pd patch load resets the alt layer to defaults (owner's call); `pd_alts_at_load` is built but off.
   - **Waiting for** the owner's `neb_fwbackup/` → `firmware/device/`, then `tools/fwbuild.py --import-device` |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |
 
@@ -101,6 +101,7 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
     ramp of about 13 polls. Technobear's fork changes Pitch's coefficient to 0.95 ("we dont want it gliding").
   - **Alt values (`*_alt`) are sent only while Source is held.** They are stored once for all Pd patches (stock
     resets them only on a Csound instrument change), so a Pd patch sees the previous patch's alt values.
+    Pd mode never saves them either. **uf1 resets the alt layer to defaults on every Pd patch load.**
   - `file` is **incremental** (0..number of audio files − 1), not 0/1. Use `filestate` (the raw button) for presses.
     (Note: `controlhandler.py`'s puredata default config lists `file` as latching, so this is unverified. `filestate` is
     safe either way.)
