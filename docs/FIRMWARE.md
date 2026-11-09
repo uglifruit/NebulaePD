@@ -7,7 +7,7 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 - later, a Pd back-channel (EOL/LEDs) and SuperCollider.
 
 **Stock v2 must always be one step away.** Plan: `Stage 0` (this page, no firmware change) → `uf1` (selector,
-Pitch, fixes) → `uf1b` (back-channel) → `uf2` (SuperCollider).
+Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## How updates work (from upstream source)
 - At boot, `/home/alarm/checkfirmware.sh` runs `Code/scripts/startup.sh`. The script is on the OS image and isn't user-updatable.
