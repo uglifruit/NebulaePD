@@ -17,6 +17,9 @@ nebconfigend
 ;   inventory_<date>.txt   - OS, CPU, versions, packages, libraries, disk, boot files, backup log
 ;   code_sha256_<date>.txt - sha256 of every file in the firmware tree
 ;   neb_pitchlog_<date>.txt - the last 99_pitchlog capture, if there is one
+; If the stick also holds neb_candidate.tgz + neb_candidate_manifest.txt (a uf1 build from tools/fwbuild.py), the
+; inventory also gets a Python 2 check of it, on the module's own python2: py_compile of every uf1-changed file
+; and a short self-test. It is unpacked in /tmp only; nothing is installed.
 ; (<date> is the module's clock, which has no RTC. It only keeps runs apart.)
 ;
 ; Sounds: audio passes through. When the job ends, a pattern repeats every 4 s:
@@ -99,6 +102,35 @@ ls -la /home/alarm /home/alarm/QB_Nebulae_V2 /home/alarm/QB_Nebulae_V2/Code
 ls -la /home/alarm/backup /home/alarm/backup/old /home/alarm/backup/new
 cat /home/alarm/QB_Nebulae_V2/Code/config.txt
 cat /home/alarm/backup/old/QB_Nebulae_V2/Code/config.txt
+echo "=== calibration and uf files"
+cat /home/alarm/QB_Nebulae_V2/Code/misc/calibration_data.txt
+ls -l --time-style=full-iso /home/alarm/QB_Nebulae_V2/Code/misc/calibration_data.txt /home/alarm/QB_Nebulae_V2/Code/config
+cat /proc/uptime
+cat /home/alarm/QB_Nebulae_V2/Code/config/uf_migrated /home/alarm/QB_Nebulae_V2/Code/config/neb_options.txt
+echo "=== uf1 precheck (only with neb_candidate.tgz on the stick, nothing is installed)"
+if [ -f /mnt/memory/neb_candidate.tgz ]
+then
+rm -rf /tmp/ufcheck
+mkdir -p /tmp/ufcheck
+tar -xzf /mnt/memory/neb_candidate.tgz -C /tmp/ufcheck && echo CAND_TAR_OK
+grep "^[MA] .*[.]py" /mnt/memory/neb_candidate_manifest.txt | cut -d " " -f 2 | sed "s#^#/tmp/ufcheck/QB_Nebulae_V2/#" | xargs python2 -m py_compile && echo PY2_COMPILE_OK
+cd /tmp/ufcheck/QB_Nebulae_V2/Code/nebulae && python2 -c "
+import instrpager, nebopts, ufmigrate, pdsender, filehandler
+p = instrpager.InstrPager(12)
+p.goto(7)
+p.nextPage()
+assert (p.page, p.cursor, p.index()) == (2, 1, 11), (p.page, p.cursor)
+assert p.leds() == [0.3, 1.0, 0.0, 0.0, 0.0]
+assert nebopts.get('pitch_coeff', '/nonexistent') == 0.95
+assert pdsender.PdSend.batch(None, ['a 1', 'b 2']) == 'a 1' + chr(59) + 'b 2' + chr(59)
+print('PY2_SELFTEST_OK')
+print('calibration valid for ufmigrate: ' + str(ufmigrate.valid_calibration('/home/alarm/QB_Nebulae_V2/Code/misc/calibration_data.txt')))
+print('boot time: ' + str(ufmigrate.boot_time()))
+"
+cd /home/alarm
+else
+echo "no neb_candidate.tgz - skipped"
+fi
 echo "=== checkfirmware.sh"
 cat /home/alarm/checkfirmware.sh
 echo "=== boot config.txt"

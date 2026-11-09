@@ -4,3 +4,8 @@ __pycache__/
 .claude/
 external/
 tools/csound609/
+firmware/dist/
+!firmware/base/**/__pycache__/
+!firmware/base/**/*.pyc
+!firmware/src/**/__pycache__/
+!firmware/src/**/*.pyc

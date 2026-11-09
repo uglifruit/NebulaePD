@@ -1,0 +1,4 @@
+source=github-v2.1.2-zip
+provisional=yes
+archive=external/QB_Nebulae_V2/FirmwareUpdates/v_2_1_2/neb_update.zip
+note=Qu-Bit FirmwareUpdates/v_2_1_2/neb_update.zip extracted byte-for-byte. Replace with the unit backup (neb_fwbackup/neb_update.zip) before building an installable zip.

@@ -10,4 +10,7 @@ Key rules:
   - Record WAVs with `tabwrite~` + `soundfiler`, **not** `writesf~` (it drops audio in batch mode).
   - Check them with `tools/wavcheck.py` / `tools/wavpeaks.py`.
 - Write for unknown-version vanilla Pd (see HANDOFF.md §4).
+- Custom firmware ([`docs/FIRMWARE.md`](docs/FIRMWARE.md)): edit `firmware/src` only, never `Code/scripts/`,
+  `Code/localfiles/` or the boot-path Python files (the USB revert depends on them). Build with `tools/fwbuild.py`;
+  run `firmware/tests/` first. Never hand the owner a build made from a provisional base.
 - Offer design choices as options with a recommendation. Commit after changes. Push only when asked.

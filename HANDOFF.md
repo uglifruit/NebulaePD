@@ -32,7 +32,10 @@ For a **new instrument**, see §8.
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
-| Custom firmware | Plan in `docs/FIRMWARE.md`: Stage 0 → uf1 (paged selector, Pitch coeff 0.95, fixes) → uf1b (Pd back-channel) → uf2 (SuperCollider). **Stage 0 tools written + offline-tested, not yet run on hardware:** `instr/fw_backup.instr` (backup = revert package + inventory to the stick), `patches/99_pitchlog.pd` + `tools/pitchlog.py` (poll rate / Pitch slew). Waiting for the owner's `neb_fwbackup/` folder → `firmware/device/` |
+| Custom firmware | `docs/FIRMWARE.md` (its **To do** list comes first). Plan: Stage 0 → uf1 → uf1b (Pd back-channel) → uf2 (SuperCollider).
+  - **Stage 0** (written and offline-tested, **not yet run on hardware**): `instr/fw_backup.instr` (revert package + inventory, plus an on-module Python 2 precheck of `neb_candidate.tgz`); `patches/99_pitchlog.pd` + `tools/pitchlog.py`.
+  - **uf1** (written in `firmware/src` on the *provisional* GitHub base; 26 + 10 desktop tests pass; **not Python-2-compiled, not installable yet**): paged selector (Next = page, Reset = load, Pitch = cursor, Pitch LED = page colour), Pitch coeff 0.95 via `neb_options.txt`, Pd connect retry + batched sends, flat run loop, Pd exit wait, calibration/settings carried over updates, Pd externals + hidden `_` files, stock bug fixes. `pd_alts_at_load` is built but off (open decision).
+  - **Waiting for** the owner's `neb_fwbackup/` → `firmware/device/`, then `tools/fwbuild.py --import-device` |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |
 
 **Roadmap** (not started):
@@ -66,11 +69,14 @@ tools/topo.py   06_topo builder (NODES map, KITS (3 kits); ui, pos, mapq, thr, s
 tools/shimmer.py 07_shimmer builder (ui, reverb (FDN + shifter taps + diffuser), chorus, duck, swell, test_source)
 tools/resonator.py 08_resonator builder (E/program/watched control-math compiler; ui, exciter, res, bbd, test_source)
 tools/pitchlog.py    99_pitchlog builder + analyzer (poll rate, Pitch jump response) for logs from the module
+tools/fwbuild.py     custom firmware: guards + reproducible neb_update.zip from firmware/src; --import-device
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
 tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1
 docs/           ARCHITECTURE, PROTOCOL, DEPLOY, INSTR, FIRMWARE, GLOOP, GLITCH, SPECTRAL, TOPO, SHIMMER, RESONATOR
 reference/      Qu-Bit dev reference PDF;  upstream/  a few MIT files copied from Qu-Bit's repo
+firmware/       base/ (reference tree + SOURCE.txt), src/ (base + uf1 edits), tests/ (py2shim, test_firmware,
+                test_fwbuild), device/ (the unit's backup, once it exists), dist/ (gitignored build output)
 external/       (gitignored) clones of Qu-Bit-Electronix/QB_Nebulae_V2 and TheTechnobear/NebulaePatches - re-clone if missing
 tools/csound609/ (gitignored) unzipped csound-emscripten-6.09.1 from the Csound 6.09.1 GitHub release
 ```
@@ -93,7 +99,8 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - **The firmware slews Pitch CV.** `control.py` HybridData applies a one-pole (`filtCoeff` 0.33 per poll), hysteresis
     0.001, octave snapping and a stability gate. The CV input also has a smoothing cap. A big V/oct jump arrives as a
     ramp of about 13 polls. Technobear's fork changes Pitch's coefficient to 0.95 ("we dont want it gliding").
-  - **Alt values (`*_alt`) are sent only while Source is held.**
+  - **Alt values (`*_alt`) are sent only while Source is held.** They are stored once for all Pd patches (stock
+    resets them only on a Csound instrument change), so a Pd patch sees the previous patch's alt values.
   - `file` is **incremental** (0..number of audio files − 1), not 0/1. Use `filestate` (the raw button) for presses.
     (Note: `controlhandler.py`'s puredata default config lists `file` as latching, so this is unverified. `filestate` is
     safe either way.)
@@ -117,6 +124,13 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - `pitch_alt`: an absolute 0..1 accumulator moved by the encoder in about 0.002 steps.
   - Every pot sums its own CV jack (so "CV mod" needs no extra mapping).
 - **Outputs:** stereo audio only. Pd can't drive the gate/EOL output and there are no CV outs.
+- **More firmware facts (read while writing uf1):**
+  - Selector buttons are "triggered": a press reads 1 for a pulse period over several polls. Count rising edges.
+  - `FileHandler(dir, ".pd")` iterates the string's characters. Stock therefore globbed `*.`, `*p` and `*d`.
+  - Its `getIndex` matched any substring of the path.
+  - `check_calibration.py` crashes with a NameError after calibrating, so hold-Pitch never reset the settings.
+  - The forced calibration in `update.sh` imports `control.py`/`controlhandler.py`, but the install (`tar` + `mv`)
+    happens before any Python.
 - **LEDs:** Pd **cannot** set any LED.
   - `ui.py` draws them all: button LEDs show each button's latch/flash state; the Speed and Pitch RGB LEDs show those
     encoders.

@@ -1,3 +1,5 @@
 *.instr text eol=lf
 *.pd text eol=lf
 *.csd text eol=lf
+# firmware trees go onto the Pi byte-for-byte: no line-ending conversion
+firmware/** -text
