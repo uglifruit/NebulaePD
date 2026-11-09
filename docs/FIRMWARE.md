@@ -11,7 +11,7 @@ Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidd
 
 ## To do
 **Owner (on hardware), in one session:**
-1. Stage 0 steps 1–5 below. For step 3, also copy `firmware/dist/v2_1_2_uf1/neb_candidate.tgz` and
+1. Stage 0 steps 2–5 below (step 1 is done). For step 3, also copy `firmware/dist/v2_1_2_uf1/neb_candidate.tgz` and
    `neb_candidate_manifest.txt` to the stick root, so the backup run checks uf1 with the module's own Python 2.
    Nothing is installed by this.
 2. Copy the stick's `neb_fwbackup/` folder to `firmware/device/`.
@@ -67,11 +67,26 @@ there.
 
 **1. Image the SD card (last-resort restore).**
 1. Power the case off and take the microSD card out of the Pi 4 on the back of the module.
-2. In Win32 Disk Imager, choose a file name like `nebulae_pi4_stock_YYYYMMDD.img`, tick "Read Only Allocated Partitions" **off**, and click **Read**.
-3. Tick an MD5 hash and note it.
+2. Windows can read only the small boot partition, not the ext4 system partition. **Never accept "Format" or
+   "Scan and fix".**
+3. Run Win32 Disk Imager as administrator and pick the card's boot-partition letter as Device. It reads the whole
+   card anyway. Tick "Read Only Allocated Partitions" and click **Read**.
 4. Put the card back.
 
-To restore later, use **Write** with the same image.
+To restore later, use **Write** with the same image (any card of 8 GB or more).
+
+**Done 2026-11-09:** `SDImage/nebulae_stock_pi4.img` (gitignored; keep a second copy off this PC).
+- 6,211,764,224 bytes, SHA256 `BE1766FA3675FD8FF6B7B37C9C0C778F148D6637925E7BCDD07739BD75AC0C56`.
+- Card layout (29.7 GB card): MBR, p1 200 MB FAT16 `/boot`, p2 6.0 GB ext4 root (4.7 GB used, 1.3 GB free); the
+  rest of the card is unpartitioned. The ext4 superblock carries the "errors seen" flag (state 3), which is common
+  after power-off without shutdown; the image is a faithful copy either way.
+- Facts read from `/boot`:
+  - 32-bit kernel only (`kernel7.img`, no `kernel8.img`), so the userland is presumably armv7h. The inventory will
+    confirm.
+  - `config.txt` is byte-for-byte the Pi 3-era `Code/localfiles/config.txt` (`arm_freq=1200`, `gpu_freq=75`,
+    `core_freq=400`). So this Pi 4 runs underclocked from its 1500 MHz default. Left as is (see "Deliberately not
+    fixed").
+  - `cmdline.txt`: `root=/dev/mmcblk0p2 rw rootwait …`.
 
 **2. Measure the stock Pitch response (`patches/99_pitchlog.pd`).**
 1. Copy `99_pitchlog.pd` to the stick's root and boot.

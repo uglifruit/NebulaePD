@@ -5,6 +5,7 @@ __pycache__/
 external/
 tools/csound609/
 firmware/dist/
+SDImage/
 !firmware/base/**/__pycache__/
 !firmware/base/**/*.pyc
 !firmware/src/**/__pycache__/
