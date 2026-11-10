@@ -2,21 +2,55 @@
 
 Builder: `tools/resonator.py` (prefix `rs_`). User guide: `patches/08_resonator_README.md`.
 
-Goal: one voice of a Morphor ECHON-style instrument (exciter → BBD delay-line resonator) plus a BBD-style echo
-after it. The owner's choices were:
+Goal: a Morphor ECHON-style instrument (exciter → BBD delay-line resonator per voice) plus a BBD-style echo after
+it. The owner's choices were:
 - an internal exciter struck by Reset, with Source swapping in the audio input;
-- dual L/R resonators with spread;
+- **4 voices** (2026-11-10), oldest-note stealing, each note holding the pitch it was struck at. Per the owner's
+  picks: 4 mono voices panned (alt Size = width), an exciter per voice, the audio input into all 4 voices, and the
+  pitch latched at the strike plus a 10 ms catch. (v1 was one stereo voice with L/R spread.);
 - a BBD-style stereo delay, with free time on Speed;
 - three V/oct routing modes on a short File press, where the fixed side sits at C4 + the stepped offset.
 
 ## Signal flow
 ```
-[exciter] phasor~ (rs_fexc) -> 6 shapes x weights -> x env^2 x kf x EXC   | or adc~ x icx (Source)
-          -> hip~ 20 -> lop~ x2 (alt Start) -> x nf (freeze) x agc
-[res]     block~ 16, per side: w = x + softclip(g * hip~1(lop~ damp(vd~ D))) -> delwrite~ ; out = x(1-bal) + read*bal
+[exciter] per voice k: wrap~(t f_k) (t: vline~ from the strike) -> 6 shapes x weights -> x env_k^2 x kf_k x EXC
+          | or mono adc~ x icx_k (Source) -> hip~ 20 -> lop~ x2 (alt Start) -> x nf (freeze) x agc_k -> outlet k
+[res]     block~ 16, per voice: w = x + softclip(g_k * mute_k * hip~1(lop~ damp_k(vd~ D_k))) -> delwrite~ ;
+          out_k = (x(1-bal) + read*mute_k*bal) * VOICE_G, panned (pl_k, pr_k) -> summed L / R
 [bbd]     per side: in*ein (+ping-pong) + softclip(eg * cross(hip~(lop~ tone(vd~ dt + wobble)))) -> delwrite~ 2100
 out       = softclip(res * gd + bbd * gw) -> dac~
 ```
+
+## Voices (2026-11-10)
+- **Allocation:** `rs_go` (a strike, or the auto-repeat metro) advances `rs_av` = (av + 1) mod 4. Taking the voices in
+  turn always lands on the oldest note, which is oldest-note stealing.
+- **Pitch latch:** live pitches `rs_fr` (resonator) and `rs_fexc` (exciter) are computed as before, but they reach
+  a voice (`rs_frk<k>` / `rs_fek<k>`) only through its catch spigot (`rs_cat<k>`).
+  - At a strike the voice's spigot opens alone, the current values are pushed to it, and `[delay CATCH_MS]` (10 ms)
+    closes every spigot.
+  - After that, Pitch, the offset and the V/oct mode reach only new notes.
+  - The catch is for a CV that lands one poll pass after the gate. The pass is 5.3 ms measured, 4–8 ms range. With
+    uf1's 0.95 Pitch coefficient a jump settles within a pass (expected; the uf1 capture is pending).
+- **Per-voice programs:** `voice_assigns(k)` computes damping, gain, D, `kf` and `icx` from the voice's own pitch.
+  Size, Window, Invert, Freeze and Density reach every voice.
+- **Steal:**
+  - At a strike, `rs_mute<k>` (`vline~`) goes "0 in 0.5 ms, back to 1 in 0.25 ms at D + 0.5". It gates both the read
+    output and the feedback.
+  - Everything written before the mute leaves the line within D (the new period). During that time it is neither
+    recirculated nor heard, so the stolen note is gone completely. The poly test measured C4 at 0.0003 after its
+    steal, against 340–1700 for the other notes.
+  - The strike waits STRIKE_LAG = 0.75 ms, so all of its excitation lands while the loop is open. In the first try
+    the strike started with the mute, which ate its first 1.5 ms (the envelope peak): low plucks were 3× too quiet.
+- **Sample-accurate exciter phase:** `wrap~(t·f)`, where t comes from a `vline~` ramp started at the strike.
+  - A `phasor~` phase reset only takes effect at the next 64-sample block. A pluck shorter than one period then
+    caught a different part of the wave depending on where the strike fell in the block.
+  - Measured with STRIKE_LAG 0.75/1.5/2.5/3.5/5 ms: 92 Hz pluck peaks of 0.11/0.27/0.32/0.17/0.36 with `phasor~`,
+    against 0.338–0.358 with `wrap~(t·f)`. v1 had the same effect, unnoticed.
+- **Auto-level per voice:** `env~` of each voice's own output drives its own excitation gain, and is reset to 0 dB at
+  its strike. One shared AGC on the sum pushed every new note down to −40 dB under a loud chord (steal test: −8 →
+  −37 dB). AGC_DB = 85 (−15 dB RMS per voice).
+- **Pan:** θ_k = (1 + PAN_k·width)·π/4, with PAN = −1, 1, −⅓, ⅓, and gains √2·(cos θ, sin θ). The centre is unity
+  per side, as v1's mono output was. Tests run at width 0.
 
 ## Resonator
 - **Block size.** `[pd res]` runs at `block~ 16`, because a feedback loop through `vd~` is at least one block long.
@@ -40,23 +74,23 @@ out       = softclip(res * gd + bbd * gw) -> dac~
   harmonics vanish (checked: 522 Hz gone, 784 Hz present on a 261 Hz note).
 - **Freeze:** g = 1, damping open, excitation × 0. Over 18 s it holds within 0.3 dB; the slow drain comes from
   hip~ 1 at low notes.
-- **Spread (alt Size):** cents between L and R. At 0 the two sides are sample-identical.
+- (v1's L/R spread is gone: voices are mono and panned.)
 
 ## Exciter
 - **Shapes:** sine `cos~(φ + 0.75)`, tri, saw, square (`spectral.step`), `noise~`, and `samphold~` noise
   clocked by the phasor wrap. Weights are `w_k = max(0, 1 − |5·start − k|)`. Gains are
   SHAPE_K = 0.85/1/1/0.6/2/3, because noise builds up less in a resonator than a tone at its pitch does.
-- **Envelope:** `vline~` "1 A, 0 Dc A", squared. A = 0.5·3000^d ms and Dc = 5·600^d ms. The phasor resets on
-  each strike, so plucks are repeatable.
+- **Envelope:** `vline~` "1 A, 0 Dc A", squared. A = 0.5·3000^d ms and Dc = 5·600^d ms. The phase restarts
+  sample-accurately at each strike (see Voices), so plucks are repeatable.
 - **Level:** `kf = (1 + f_res·(A + Dc/2)/1000)^−0.75`. A strike spanning N periods of a matched tone builds up by
   about N^0.85. Measured pluck peaks are 0.30–0.71 from 92 Hz to 2.5 kHz.
 - **Audio input:** `icx = min(1, KX·√(1 − G))`, with G = g·|H| and KX = 1. That's right for noise-like input.
   A sine exactly on the pitch builds up as 1/(1 − G), which is the auto-level's job.
-- **Auto-level:** `env~ 1024 256` of the resonator output (control rate, so no DSP loop).
-  - Above AGC_DB = 91 (−9 dB RMS), the excitation gain drops by 0.5 × the excess per 5.3 ms and comes back at
-    +0.1 dB per period, with a floor of −40 dB.
-  - It catches bowing, auto-repeat and matched input, and leaves single strikes alone. With the threshold at 88 it
-    pulled down the strike that followed a loud ring.
+- **Auto-level:** per voice, `env~ 1024 256` of that voice's output (control rate, so no DSP loop).
+  - Above AGC_DB = 85 (−15 dB RMS), the voice's excitation gain drops by 0.5 × the excess per 5.3 ms and comes back
+    at +0.1 dB per period, with a floor of −40 dB. It resets to 0 dB at each strike of that voice.
+  - It catches bowing, auto-repeat and audio input, and leaves single strikes alone (a pluck's excitation is over
+    before `env~` reports).
 
 ## Controls
 - **Pitch → P:** `(pitch − 0.6)·60` semitones, continuous (no rounding).
@@ -99,20 +133,26 @@ Vanilla Pd has no `expr`, so `resonator.py` has a small compiler:
 | tunedark | Window CCW, measured in the first 100 ms | −0.8 … −1.0 c |
 | tuneinv | inverted, Window noon | 0.00 c up to 1046 Hz. 1760/2489 clamp to 1300.0 Hz |
 | decay | T60 at Size 0.3 and 0.6, at 261 Hz, 92 Hz and Window noon | 0.341 s / 2.32 s (targets 0.34 / 2.33) |
-| shapes | each material | peaks 0.34–0.57; saw/square edges are the only sample jumps |
-| ext | matched sine and noise on the audio input, Size 0.3 / 1 | −7 … −19 dB RMS, peak ≤ 0.75 |
+| shapes | each material | peaks 0.31–0.45 (S&H 0.15); saw/square edges are the only sample jumps |
+| ext | matched sine and noise on the audio input, Size 0.3 / 1 (4 voices all on C4: the worst case) | −2.6 … −15 dB RMS, peaks ≤ 0.95 (soft clip) |
 | freeze | hold 18 s, a strike during it | ±0.3 dB, strike shut out |
 | delay | 200 ms echoes, feedback 0.55, File-held hold | −5.4 dB per echo; hold flat |
 | repeat | alt Density stream to 0.5 | strikes about 1.9 Hz, stop when CCW |
 | route | prints: modes, long press, offset, alt reset | as the routing table; long press = hold only |
-| runaway | everything max, 16 Hz repeat, invert, freeze, 60 s | peak 0.75, −6.3 dB RMS, no NaN |
-| runext | sine 0.9 + noise on the input, Size 1, feedback 1.1 | peak 0.80, −8.4 dB RMS |
+| runaway | everything max, 16 Hz repeat, invert, freeze, 60 s | peak 0.74, −6.5 dB RMS, no NaN |
+| runext | sine 0.9 + noise on the input, Size 1, feedback 1.1 | peak 0.92, −8.9 dB RMS (4 voices) |
+| poly | C4 E4 G4 B4, then D5 steals C4; Pitch moved with no strike | all 4 ring; C4 gone (0.0003); every note exact (329.628/391.996/493.883/587.329) |
+| catch | Pitch 5 ms after the gate; Pitch 25 ms after a gate | note = E4; note stays G4 (no 740 Hz) |
+| steal | 12 strikes 150 ms apart at Size 1 (8 steal ringing notes) | level holds −5 … −8 dB; no click at any steal (2nd-difference vs local median) |
+| width | width 1, three notes | L/R: −22/−240, −33/−20, −19/−23 dB |
 
-- **CPU proxy:** a 60 s render takes 2.6 s, against 2.9 s for 07_shimmer's runaway.
+- **CPU proxy** (back to back, 60 s runaway): 4 voices 2.4–2.9 s, v1 1.4 s, 07_shimmer 2.7–2.9 s.
 - **Analysis:** pitch is the FFT peak with zero padding and parabolic interpolation; T60 is a single-bin DFT
   envelope with a fitted slope. `wavcheck.py freq` (zero crossings, 25 Hz resolution) is too coarse for cents.
 
 ## Ideas not done
 - `block~ 32` if the Pi struggles (top 1.3 kHz, or 650 Hz inverted).
 - Velocity: a CV-gated strike level (Start's CV jack as an accent).
-- A per-strike pitch latch (sample V/oct at the gate) for sequencers with slow CV.
+- Glide/legato mode (a held voice following Pitch), if wanted: the latch makes every note fixed.
+- Earlier attempt, reverted (41ec4be/daebe62): two voices, a settle-wait and a 40 ms pitch lag, built on a guessed
+  1 ms poll rate.

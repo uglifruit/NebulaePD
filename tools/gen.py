@@ -844,7 +844,7 @@ SHIMMER_TESTS = [("decay", shimmer_decay_test), ("loop", shimmer_loop_test), ("p
 
 
 RS0 = ("\\; start 0.2 \\; size 0.7 \\; density 0 \\; overlap 0 \\; window 1 \\; blend 0 \\; speed 0.5 \\; pitch 0.6 "
-       "\\; freeze 0 \\; record 0 \\; source 0 \\; filestate 0 \\; rs_sp 0")
+       "\\; freeze 0 \\; record 0 \\; source 0 \\; filestate 0 \\; rs_wd 0")
 RS_PITCHES = [0.3, 0.45, 0.6, 0.75, 0.9, 1.0, 1.15, 1.25]     # 1.15/1.25: Pitch + CV past the knob's top
 
 
@@ -933,12 +933,48 @@ def res_runext_test(wav=None):
                                       "\\; rs_tnz 0.3"), (30000, "\\; pd quit")])
 
 
+RS_CHORD = [0.6, 0.6 + 4 / 60, 0.6 + 7 / 60, 0.6 + 11 / 60, 0.6 + 14 / 60]    # C4 E4 G4 B4, then D5 steals C4
+
+
+def res_poly_test(wav=None):
+    """4-note polyphony (Size 0.8): C4 E4 G4 B4 struck 0.5 s apart from 1.2 s (Pitch set 1 ms before each gate),
+    then D5 at 3.2 s steals the oldest (C4). At 4 s Pitch moves without a strike: no ringing note may move."""
+    st = [(10, RS0 + " \\; size 0.8")]
+    for i, pv in enumerate(RS_CHORD):
+        t = 1200 + 500 * i
+        st += [(t - 1, f"\\; pitch {pv:.6f}")] + hit(t)
+    return dict(wav=wav, steps=st + [(4000, "\\; pitch 0.3"), (6000, "\\; pd quit")])
+
+
+def res_catch_test(wav=None):
+    """Pitch catch: gate at 1.2 s with Pitch arriving 5 ms after it (one pass late) -> the note is E4; gate at 2.2 s
+    with Pitch moving 25 ms after it -> the note stays G4 (the move only reaches the next note)."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; size 0.8")] + hit(1200) + [(1205, f"\\; pitch {RS_CHORD[1]:.6f}"),
+                (2150, f"\\; pitch {RS_CHORD[2]:.6f}")] + hit(2200) + [(2225, "\\; pitch 0.9"), (3500, "\\; pd quit")])
+
+
+def res_steal_test(wav=None):
+    """Stealing ringing notes: Size 1 (30 s), 12 strikes 150 ms apart cycling 5 pitches (every strike from the 5th
+    steals a loud ringing voice). No clicks, bounded."""
+    st = [(10, RS0 + " \\; size 1 \\; density 0.2")]
+    for i in range(12):
+        t = 1200 + 150 * i
+        st += [(t - 1, f"\\; pitch {RS_CHORD[i % 5]:.6f}")] + hit(t)
+    return dict(wav=wav, steps=st + [(4500, "\\; pd quit")])
+
+
+def res_width_test(wav=None):
+    """Width 1 (rs_wd): voice 0 (first strike) hard left, voice 1 hard right, voice 2 near left."""
+    return dict(wav=wav, steps=[(10, RS0 + " \\; rs_wd 1")] + hit(1200) + [(1999, f"\\; pitch {RS_CHORD[2]:.6f}")]
+                + hit(2000) + [(2799, f"\\; pitch {RS_CHORD[4]:.6f}")] + hit(2800) + [(3800, "\\; pd quit")])
+
+
 RES_TESTS = [("tune", res_tune_test), ("tunedark", lambda wav=None: res_tune_test(wav, " \\; window 0")),
              ("tunemid", lambda wav=None: res_tune_test(wav, " \\; window 0.5")),
              ("tuneinv", lambda wav=None: res_tune_test(wav, " \\; window 0.5 \\; record 1")),
              ("decay", res_decay_test), ("shapes", res_shapes_test), ("ext", res_ext_test),
              ("freeze", res_freeze_test), ("delay", res_delay_test), ("repeat", res_repeat_test),
-             ("route", res_route_test), ("runaway", res_runaway_test), ("runext", res_runext_test)]
+             ("route", res_route_test), ("poly", res_poly_test), ("catch", res_catch_test), ("steal", res_steal_test), ("width", res_width_test), ("runaway", res_runaway_test), ("runext", res_runext_test)]
 
 
 if __name__ == "__main__":

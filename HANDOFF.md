@@ -28,7 +28,7 @@ For a **new instrument**, see §8.
 | `patches/05_spectral.pd` | "Spectral Clouds+" after the owner's WorkshopSpectral (WC port of Kammerl's Spectral Clouds): random log-band gates, probability, smoothing, texture, normal/sealed freeze, plus true stereo + spread, spectral pitch (V/oct, peak-locked), band drift, gather, re-capture, tape on the alt layer. Offline-tested, **awaiting hardware** (main risk: CPU burst per hop, see `docs/SPECTRAL.md`). Guide `patches/05_spectral_README.md`; design `docs/SPECTRAL.md`; builder `tools/spectral.py` |
 | `patches/06_topo.pd` | Clocked drum-pattern generator (Grids-style map, our own data) + 6-voice analog-model (808/909) drum synth; mutation (Record burst, Window auto, Speed drift), Freeze = lock, File = home. First hardware try (2026-10-20): the FM kit sounded like bleeps and Fill CCW kept playing → rebuilt (analog models, 3 kits, Fill dead zone). **Re-test 2026-10-20: much better, patterns behave as expected on hardware.** Not yet reported: per-kit sound detail, mutation/home/drift in depth. Guide `patches/06_topo_README.md`; design `docs/TOPO.md`; builder `tools/topo.py` |
 | `patches/07_shimmer.pd` | Strymon-style shimmer reverb (owner's reference: BigSky/blueSky): 8-line FDN + 2-voice pitch shifter in the loop (or before it: Source = Pre), tank mod → ensemble chorus, freeze, swell, duck, clear. Offline-tested (RT60, cascade, freeze hold, 60 s runaway, clicks), **awaiting hardware**. Guide `patches/07_shimmer_README.md`; design `docs/SHIMMER.md`; builder `tools/shimmer.py` |
-| `patches/08_resonator.pd` | ECHON-style one-voice exciter → pitched delay-line resonator (block~ 16, dual L/R + spread, damping/DC-blocker phase-compensated tuning, T60-calibrated decay, invert, freeze) → BBD-style stereo delay (glide, wobble, ping-pong, File-held hold). V/oct routing modes Coupled / Res only / Exc only on a short File press. Audio input as exciter (Source). Offline-tested (0.00 c tuning, T60, levels + auto-level, 60 s runaway), **awaiting hardware**. Guide `patches/08_resonator_README.md`; design `docs/RESONATOR.md`; builder `tools/resonator.py` |
+| `patches/08_resonator.pd` | ECHON-style **4-voice** exciter → pitched delay-line resonator per voice (oldest-note stealing; each note latches its pitch at the strike + 10 ms catch; mono voices panned; block~ 16, damping/DC-blocker phase-compensated tuning, T60-calibrated decay, invert, freeze) → BBD-style stereo delay (glide, wobble, ping-pong, File-held hold). V/oct routing modes Coupled / Res only / Exc only on a short File press. Audio input as exciter (Source). v1 (one voice) was played on hardware 2026-11-07: good except V/oct jumps glided. The 4-voice version (2026-11-10, after the owner's firmware Pitch change) is offline-tested (0.00 c tuning, T60, chord + clean steal, pitch latch, 60 s runaway), **awaiting hardware**. Guide `patches/08_resonator_README.md`; design `docs/RESONATOR.md`; builder `tools/resonator.py` |
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
@@ -64,8 +64,11 @@ For a **new instrument**, see §8.
   - **Fix attempt `41ec4be`, reverted in `daebe62`:** two alternating voices, a settle-wait and a 40 ms pitch lag. The
     owner found it worse. The likely reason: its "stale after 4 ms" rule fired between slow poll updates, so it never
     waited, and the lag made the new note scoop 40 ms after the attack. The voice code is in that commit if needed.
-  - **Custom firmware uf1 will set Pitch `filtCoeff` 0.33 → 0.95** (as Technobear did), tunable from the stick. See
+  - **Custom firmware uf1 sets Pitch `filtCoeff` 0.33 → 0.95** (as Technobear did), tunable from the stick. See
     `docs/FIRMWARE.md`. Measure before/after with `99_pitchlog`.
+  - **2026-11-10: rebuilt as 4 voices** at the owner's request (oldest-note stealing, a ringing note keeps its
+    pitch). Hardware questions: CPU (about 2× v1, ≈ 07_shimmer offline), whether the 10 ms catch gets every sequenced
+    note right, chord levels.
 - 06_topo: hardware feedback (sound balance, clock feel). Later idea from the owner: Source cycles through named sample
   kits. But the Source latch also toggles on the Source gate jack (06's step-1 reset), so reset would have to move.
 - Gloop effects pass: delay, reverb, bit crush, wavefold, tape saturation/hiss/age, tilt EQ. The user picked "core first".
@@ -350,18 +353,24 @@ python tools/wavcheck.py spec C:/path/to/scratch/s_pitch.wav 0.5 7 0.5      # rm
 - **Knobs:** pitch = V/oct (continuous, click = C4); start = exciter material (sine→tri→saw→square→noise→S&H);
   size = T60 0.05–30 s; density = envelope pluck → bow; window = key-tracked loop damping; overlap = delay
   feedback (to 1.1); blend = delay mix; speed = delay time 20 ms–2 s.
-- **Buttons:** Reset = strike (3 ms late so V/oct lands first); Freeze = hold; Source = audio input as exciter;
+- **Voices:** 4, taken in turn (= oldest-note stealing). A note latches Pitch at its strike + CATCH_MS (10 ms) and
+  keeps it. The stolen voice's read and feedback are muted for one period of the new note (a clean flush); the
+  strike waits 0.75 ms so its excitation isn't muted. An exciter per voice; its phase is `wrap~(t·f)` from a
+  strike-started `vline~`, because a `phasor~` reset is block-quantised and made pluck levels random.
+- **Buttons:** Reset = strike (3 ms after the gate + 0.75 ms; next voice); Freeze = hold all; Source = audio input
+  into all 4 voices;
   Record = invert (period halved, stays on pitch); File short = V/oct mode Coupled / Res only / Exc only (no LED,
   Coupled at load); File held ≥ 300 ms = delay hold.
-- **Alt:** start = exciter LP; size = L/R spread (cents); density = auto-repeat 0.25–16 Hz; overlap = delay tone
+- **Alt:** start = exciter LP; size = stereo width (voices panned L, R, near L, near R); density = auto-repeat 0.25–16 Hz; overlap = delay tone
   (BBD murk/wobble → clean); window = offset ±36 st stepped (the interval in Coupled, the fixed side's note
   otherwise); blend = exciter dry ↔ resonator; pitch_alt = ping-pong. Source + Record = alt reset (+ mode Coupled).
 - **Engine:**
   - `[pd res]` runs at `block~ 16`, so the loop can be ≥ 17 samples (top 2.6 kHz, 1.3 kHz inverted).
   - `vd~` gives exactly the requested delay: the measured residual is 0.
   - D = period − τ_lop(f) + τ_hip(f), so Window doesn't detune. g = 10^(−3T/T60)/|H(f)|, capped at 1.
-  - Levels: exciter × (1 + periods per strike)^−0.75; audio input × √(1 − G); a control-rate auto-level (env~
-    of the resonator → excitation gain) above −9 dB RMS.
+  - Levels: exciter × (1 + periods per strike)^−0.75; audio input × √(1 − G); a control-rate auto-level per
+    voice (env~ of its output → its excitation gain, reset at its strike) above −15 dB RMS. A shared one silenced
+    new notes under a loud chord.
 - **New tool:** `resonator.py`'s `E`/`program()`/`watched()` compile Python expressions to vanilla control objects
   (no `expr`). Use them for control math in new builders.
 
