@@ -328,3 +328,11 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
   - **Not installed yet.**
 - 2026-11-10: selector redesigned to the owner's spec (Pitch = page, a button loads its patch at once, Pitch or Speed
   click leaves). 30 logic tests and 15 build tests pass.
+- 2026-11-10: **first uf1 install on hardware** (the build before the selector redesign). The module's reports
+  (`firmware/device/inventory_220611_1216*`, `…122146`) show:
+  - `VERSION=v2_1_2_uf1`;
+  - `uf_migrated`: "restored calibration from the previous tree", plus bootinstr and nebsettings. The calibration
+    values are identical to stock's, so the clock-free restore works;
+  - `PRECHECK_OK` in every run.
+  - The owner found that selector confusing, which led to the redesign. The redesigned build `1b761767…` is on the
+    stick, waiting for the install boot.
