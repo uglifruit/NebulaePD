@@ -391,6 +391,17 @@ How it works:
   - Also changed: `run.sh` logs any process still holding `/dev/snd`, checks that jackd is still running (the card
     has no `jack_lsp`), and gives each sclang run a fresh copy of its config, because sclang rewrites the file on
     exit.
+- **Run 2 (2026-11-10, `firmware/device/scprobe2/`): `OK`** (`unpack=1 libs=1 nrt=1 rt=1`). The owner heard the
+  arpeggio. **SuperCollider runs live on this Pi 4.**
+  - jackd opened hw:0 at 48 kHz, 32-bit, period 512 × 3, once `JACK_NO_AUDIO_RESERVATION=1` was set. Nothing else
+    held `/dev/snd` after `systemctl stop nebulae`.
+  - scsynth connected `system:capture_1/2` → `in_1/2` and `out_1/2` → `system:playback_1/2`.
+  - "SuperCollider 3 server ready", **max output latency 32.0 ms**. That comes from Technobear's `-p512 -n3`; uf2
+    should try `-p256 -n2` or lower (~10 ms) for playable instruments.
+  - The app restarted cleanly and the probe reported OK.
+  - The NRT sine is bit-identical to run 1; only the random noise channel differs.
+  - sclang still lists the default `/usr/share/SuperCollider` paths, despite `excludeDefaultPaths`. They don't exist
+    on the card, so this is harmless.
 - Tested offline: `bash -n run.sh`; the instrument compiles and runs in Csound 6.09.1 with `system_i` stubbed (OK
   beeps); `system_i` itself already worked on the module with `fw_backup`. The `.scd` scripts can only be tested on
   the module, because SuperCollider isn't installed on the PC.

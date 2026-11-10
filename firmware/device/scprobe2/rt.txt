@@ -1,0 +1,45 @@
+compiling class library...
+	Found 718 primitives.
+	Compiling directory '/usr/share/SuperCollider/SCClassLibrary'
+	Compiling directory '/usr/share/SuperCollider/Extensions'
+	Compiling directory '/tmp/sc_home/.local/share/SuperCollider/Extensions'
+	Compiling directory '/tmp/sc/share/SCClassLibrary'
+	Compiling directory '/tmp/sc/share/Extensions'
+	numentries = 1086434 / 12117956 = 0.09
+	4133 method selectors, 2932 classes
+	method table size 8069764 bytes, big table size 48471824
+	Number of Symbols 11641
+	Byte Code Size 328987
+	compiled 445 files in 0.55 seconds
+
+Info: 4 methods are currently overwritten by extensions. To see which, execute:
+MethodOverride.printAll
+
+compile done
+localhost : setting clientID to 0.
+internal : setting clientID to 0.
+Class tree inited in 0.03 seconds
+
+
+*** Welcome to SuperCollider 3.10.4. *** For help type ctrl-c ctrl-h (Emacs) or :SChelp (vim) or ctrl-U (sced/gedit).
+Booting server 'localhost' on address 127.0.0.1:57110.
+Found 10 LADSPA plugins
+JackDriver: client name is 'SuperCollider'
+SC_AudioDriver: sample rate = 48000.000000, driver's block size = 512
+JackDriver: connected  system:capture_1 to SuperCollider:in_1
+JackDriver: connected  system:capture_2 to SuperCollider:in_2
+JackDriver: connected  SuperCollider:out_1 to system:playback_1
+JackDriver: connected  SuperCollider:out_2 to system:playback_2
+SuperCollider 3 server ready.
+JackDriver: max output latency 32.0 ms
+Requested notification messages from server 'localhost'
+localhost: server process's maxLogins (1) matches with my options.
+localhost: keeping clientID (0) as confirmed by server process.
+Shared memory server interface initialized
+SCPROBE: server booted
+SCPROBE: RT done
+server 'localhost' disconnected shared memory interface
+'/quit' message sent to server 'localhost'.
+Server 'localhost' exited with exit code 0.
+main: quit request 0
+cleaning up OSC
