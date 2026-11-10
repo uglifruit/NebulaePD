@@ -305,6 +305,33 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
 5. Revert drill: the Stage 0 backup zip goes back to v2_1_2. Then reinstall uf1. (The STOCK card is the faster
    way back, but this proves the USB path from uf1.)
 
+## Stage 2 — SuperCollider (`uf2`), planned
+**Decided (owner, 2026-11-10):**
+- **Binaries:** take SuperCollider and sc3-plugins from Technobear's 2.2.2 firmware zip (patchstorage, 2020). Build
+  our own headless SC 3.13 only if that build can't run on this unit.
+- **Selector:** SC is a 4th Speed position, past Pd:
+  - CCW = user Csound, middle = factory, CW = Pd, CW again = SC;
+  - the Speed lights tell Pd and SC apart (e.g. right light green = Pd, blue = SC);
+  - Pitch = group of five and the buttons load, as for the other banks.
+- **Protocol:** Technobear-compatible. OSC `/neb/<name> <value>` to UDP 3000, so his `sc/*.scd` patches
+  (`external/NebulaePatches/sc/`) run unchanged.
+
+**Phases:**
+1. **Probe, with no firmware change.**
+   - The owner downloads Technobear's zip to `external/technobear_fw/`, **not** onto the Nebulae stick, where it
+     would install his firmware.
+   - I unpack it offline, take SC + sc3-plugins, and check their libraries against the card image
+     (`SDImage/`, read with debugfs), adding what is missing.
+   - A probe `.instr` (`system_i`, like `fw_backup`) unpacks the bundle from the stick into `/tmp`, starts jackd +
+     sclang with a test tone, and logs to the stick.
+2. **uf2 firmware.**
+   - The SC bank and an OSC sender, both Technobear-compatible.
+   - jackd/sclang/scsynth started and stopped cleanly on every switch.
+   - On an SC failure, fall back to a safe instrument, never a boot loop.
+   - The runtime goes outside the firmware tree (installed once from the stick into `/home/alarm/sc_runtime`), so
+     firmware updates stay small and the revert path is unchanged.
+3. **Patches.** A template and our own instruments, tested offline with SuperCollider for Windows (NRT renders).
+
 ## Status
 - 2026-11-09: Stage 0 tools written and offline-tested. **Not yet run on hardware.**
   - `fw_backup.instr` was tested in Csound 6.09.1 with `system_i` stubbed (silent / ok beeps / fail tone). Its shell script ran in a fake module tree: backup and layout correct, no overwrite on a 2nd run, a corrupt backup gives the fail tone.
