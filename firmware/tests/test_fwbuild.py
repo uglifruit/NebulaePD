@@ -53,7 +53,8 @@ class TestPack(unittest.TestCase):
         self.assertEqual(sr, self.base["Code/nebulae/shiftregister.py"])
         self.assertEqual(self.src["Code/nebulae/digitaldata.py"], self.base["Code/nebulae/digitaldata.py"])
         self.assertIn(b"bank='factory', initial_startup=False):", self.src["Code/nebulae/controlhandler.py"])
-        self.assertEqual(self.src["Code/nebulae/nebulae.py"].count(b"initial_startup=initial_startup"), 2)
+        neb = self.src["Code/nebulae/nebulae.py"]
+        self.assertEqual(neb.count(b"initial_startup=initial_startup"), neb.count(b"ch.ControlHandler("))   # every engine
 
     def test_uf1_archive_layout(self):
         data = fwbuild.pack(self.src, self.meta, self.default, version="v2_1_2_uf1")
@@ -155,6 +156,7 @@ class TestImportDevice(unittest.TestCase):
             shutil.copytree(os.path.join(self.saved, part), os.path.join(fw, part))
         fwbuild.FW = fw
         self.base = fwbuild.tree(os.path.join(fw, "base"))
+        self.src0 = fwbuild.tree(os.path.join(fw, "src"))
 
     def tearDown(self):
         import shutil
@@ -187,7 +189,8 @@ class TestImportDevice(unittest.TestCase):
         self.assertIn("Code/nebulae/instrpager.py", src)
         errors, changed, added = fwbuild.guard(base, src)
         self.assertEqual(errors, [])
-        self.assertEqual(len(changed) + len(added), 11)
+        _, c0, a0 = fwbuild.guard(self.base, self.src0)
+        self.assertEqual(len(changed) + len(added), len(c0) + len(a0))     # every uf change carried over
         self.assertEqual(fwbuild.read_source()["provisional"], "no")
 
     def test_device_bytecode_skipped(self):

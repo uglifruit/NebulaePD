@@ -4,6 +4,7 @@ Covers the new uf1 modules directly and the changed stock modules through py2shi
 hardware stubbed). It cannot prove Python 2 compatibility: compile every changed file with python2 as well.
 """
 import inspect
+import io
 import os
 import shutil
 import socket
@@ -22,9 +23,12 @@ import instrpager  # noqa: E402
 import nebopts  # noqa: E402
 import ufmigrate  # noqa: E402
 import pdsender  # noqa: E402
+import scsender  # noqa: E402
+import scengine  # noqa: E402
+import bootguard  # noqa: E402
 
 CHANGED = ["check_calibration", "control", "controlhandler", "filehandler", "fileloader", "nebulae", "pdsender", "ui",
-           "instrpager", "nebopts", "ufmigrate"]
+           "instrpager", "nebopts", "ufmigrate", "scsender", "scengine", "bootguard"]
 
 
 class TestSyntax(unittest.TestCase):
@@ -33,13 +37,22 @@ class TestSyntax(unittest.TestCase):
             py2shim.compile_check(os.path.join(py2shim.SRC, name + ".py"))
 
     def test_no_py3_only_syntax(self):
-        # things Python 2.7 would reject, in the lines uf1 touched
+        # things Python 2.7 would reject, in the files uf1/uf2 touched. f-strings are found by the tokenizer (a regex
+        # can't tell f"x" from b",f" or ">f"); the rest by pattern, outside comments
         import re
-        bad = re.compile(r'(^|[^\w])f"|(^|[^\w])f\'|\bnonlocal\b|print\([^)]*\bend=|\basync\b|\bawait\b|:=')
+        import tokenize
+        bad = re.compile(r'\bnonlocal\b|print\([^)]*\bend=|\basync\b|\bawait\b|:=')
         for name in CHANGED:
-            with open(os.path.join(py2shim.SRC, name + ".py")) as f:
+            path = os.path.join(py2shim.SRC, name + ".py")
+            with open(path) as f:
                 for i, line in enumerate(f, 1):
                     self.assertIsNone(bad.search(line.split("#")[0]), "%s.py:%d %s" % (name, i, line.strip()))
+            with open(path) as f:
+                for tok in tokenize.generate_tokens(f.readline):
+                    kind = tokenize.tok_name[tok.type]
+                    prefix = re.match(r"[A-Za-z]*", tok.string).group(0).lower() if kind == "STRING" else ""
+                    self.assertFalse(kind == "FSTRING_START" or "f" in prefix,
+                                     "%s.py:%d f-string %s" % (name, tok.start[0], tok.string[:20]))
 
 
 class TestPager(unittest.TestCase):
@@ -530,6 +543,16 @@ class TestPdMode(unittest.TestCase):
         self.assertEqual(self.names(ch.pdSock.sent[-1]), alts + primary)
 
 
+class FakeLogger(object):
+    usb_status = False
+
+    def spill_basic_info(self): pass
+
+    def mount_usb(self): pass
+
+    def unmount_usb(self): pass
+
+
 class TestFlatLoop(unittest.TestCase):
     """nebulae.py's main loop over many instrument switches: constant stack depth, Pd waited for."""
 
@@ -541,7 +564,7 @@ class TestFlatLoop(unittest.TestCase):
 
         class Csound(object):
             def setOption(self, o): pass
-            def compileOrc(self, o): pass
+            def compileOrc(self, o): return 0
             def readScore(self, s): pass
             def start(self): pass
             def cleanup(self): pass
@@ -602,9 +625,10 @@ class TestFlatLoop(unittest.TestCase):
             "refreshFileHandler": lambda s: None, "curOrc": "", "curSco": ""})())
         py2shim.stub("ui", UserInterface=UI)
         py2shim.stub("fileloader", FileLoader=lambda: type("F", (), {"reload": lambda s: None})())
-        py2shim.stub("logger", NebLogger=lambda: type("L", (), {"spill_basic_info": lambda s: None})())
+        py2shim.stub("logger", NebLogger=FakeLogger)
         py2shim.stub("neb_globals", remount_fs=False)
         py2shim.stub("ufmigrate", migrate=lambda: ["ok"])
+        py2shim.stub("bootguard", on_app_start=lambda: False, mark_healthy=lambda: True, LIMIT=2, HEALTHY_S=20.0)
         real_popen, real_system, real_sleep = subprocess.Popen, os.system, time.sleep
         subprocess.Popen, os.system, time.sleep = Popen, (lambda c: 0), (lambda s: None)
         try:
@@ -615,12 +639,378 @@ class TestFlatLoop(unittest.TestCase):
         d = state["depths"]
         print("\n  %d switches, stack depth at each start: min %d max %d" % (state["switches"], min(d), max(d)))
         self.assertEqual(state["switches"], state["max_switches"])
-        self.assertEqual(len(d), state["max_switches"] + 1)
+        self.assertEqual(len(d), state["max_switches"] + 2)     # + the safe instrument after Csound stopped
         self.assertEqual(min(d), max(d))
         self.assertEqual(state["pd_alive"], 0)
         pd = [h for h in state["handlers"] if h.pd]
         self.assertEqual(len(pd), state["max_switches"] // 2)
         self.assertTrue(all(h.restores == 1 for h in pd))           # every Pd load starts with alts at defaults
+
+
+class TestScSender(unittest.TestCase):
+    def test_osc_bytes(self):
+        m = scsender.osc_message("/neb/pitch", 0.6)
+        self.assertEqual(m[:12], b"/neb/pitch\0\0")
+        self.assertEqual(m[12:16], b",f\0\0")
+        self.assertEqual(len(m), 20)
+        import struct
+        self.assertAlmostEqual(struct.unpack(">f", m[16:])[0], 0.6, places=6)
+        b = scsender.osc_bundle([m, m])
+        self.assertEqual(b[:8], b"#bundle\0")
+        self.assertEqual(struct.unpack(">Q", b[8:16])[0], 1)
+        self.assertEqual(struct.unpack(">i", b[16:20])[0], 20)
+        self.assertEqual(len(b), 16 + 2 * 24)
+        self.assertEqual(len(scsender.osc_message("/neb/abcdefg", 1)) % 4, 0)    # 12 chars + NUL padding
+
+    def test_change_and_resend(self):
+        s = scsender.ScSend()
+        try:
+            msgs = ["pitch 0.6", "reset 0", "size 0.5"]
+            self.assertEqual([n for n, v in s.select(msgs, 0)], ["pitch", "reset", "size"])   # first pass: all
+            self.assertEqual(s.select(msgs, 100), [])                                     # nothing changed
+            self.assertEqual(s.select(["pitch 0.7", "reset 0", "size 0.5"], 200), [("pitch", 0.7)])
+            self.assertEqual([n for n, v in s.select(["pitch 0.7", "reset 0", "size 0.5"], 1100)],
+                             ["pitch", "size"])                       # once a second all again, but not the trigger
+            self.assertEqual(s.select(["pitch 0.7", "reset 1", "size 0.5"], 1200), [("reset", 1.0)])
+            self.assertEqual(s.select(["garbage", "x y z", "pitch nan?"], 1300), [])
+        finally:
+            s.close()
+
+    def test_udp_delivery(self):
+        rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        rx.bind(("127.0.0.1", 0))
+        rx.settimeout(2)
+        s = scsender.ScSend()
+        s.sport = rx.getsockname()[1]
+        try:
+            s.send(["pitch 0.6", "freeze 1"])
+            data = rx.recv(2048)
+            self.assertTrue(data.startswith(b"#bundle\0"))
+            self.assertIn(b"/neb/pitch\0", data)
+            self.assertIn(b"/neb/freeze\0", data)
+            s.close()
+            s.send(["pitch 0.1"])                   # closed: nothing, no error
+        finally:
+            rx.close()
+
+
+class TestBootGuard(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.p = os.path.join(self.d, "boot_guard.txt")
+
+    def tearDown(self):
+        shutil.rmtree(self.d)
+
+    def test_two_failed_starts_then_safe(self):
+        self.assertFalse(bootguard.on_app_start(self.p))     # 1st start
+        self.assertFalse(bootguard.on_app_start(self.p))     # crash -> 2nd start
+        self.assertTrue(bootguard.on_app_start(self.p))      # crash again -> safe instrument
+        self.assertFalse(bootguard.on_app_start(self.p))     # the safe start counts as 1
+        bootguard.mark_healthy(self.p)
+        self.assertFalse(bootguard.on_app_start(self.p))
+        self.assertFalse(bootguard.on_app_start(self.p))
+
+    def test_healthy_run_resets(self):
+        for _ in range(10):
+            self.assertFalse(bootguard.on_app_start(self.p))
+            bootguard.mark_healthy(self.p)
+
+    def test_garbage_and_unwritable(self):
+        with open(self.p, "w") as f:
+            f.write("nonsense")
+        self.assertFalse(bootguard.on_app_start(self.p))
+        self.assertFalse(bootguard.on_app_start(os.path.join(self.d, "no", "dir", "x.txt")))   # never raises
+
+
+class FakeProc(object):
+    def __init__(self, rc=None):
+        self.rc, self.terminated = rc, False
+
+    def poll(self): return self.rc
+
+    def terminate(self):
+        self.terminated = True
+        self.rc = 0
+
+    def kill(self): self.rc = -9
+
+    def wait(self): return self.rc
+
+
+class TestScEngine(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp().replace("\\", "/") + "/"
+        self.rt = self.d + "rt/"
+        for rel in ("bin/sclang", "bin/scsynth", "lib/libscsynth.so.1"):
+            os.makedirs(os.path.dirname(self.rt + rel), exist_ok=True)
+            open(self.rt + rel, "w").close()
+        os.makedirs(self.rt + "share/SCClassLibrary")
+        self.patch = self.d + "p.scd"
+        open(self.patch, "w").close()
+        self.now = [0.0]
+        self.procs = []
+
+    def tearDown(self):
+        shutil.rmtree(self.d)
+
+    def engine(self, jackd_rc=None, sclang_rc=None):
+        def popen(cmd, **k):
+            p = FakeProc(jackd_rc if cmd[0] == "jackd" else sclang_rc)
+            p.cmd, p.kw = cmd, k
+            self.procs.append(p)
+            return p
+
+        def sleep(t):
+            self.now[0] += t
+        return scengine.ScEngine(self.patch, 256, 2, runtime=self.rt, work=self.d + "w/", popen=popen,
+                                 clock=lambda: self.now[0], sleep=sleep)
+
+    def test_commands_env_files(self):
+        e = self.engine()
+        self.assertEqual(e.start(), "starting")
+        jack, sclang = self.procs
+        self.assertEqual(jack.cmd, ["jackd", "-R", "-P75", "-dalsa", "-dhw:0", "-p256", "-n2", "-s", "-r48000"])
+        self.assertEqual(jack.kw["env"]["JACK_NO_AUDIO_RESERVATION"], "1")
+        self.assertEqual(sclang.cmd, ["sclang", "-D", "-l", self.d + "w/sclang_conf.yaml", self.patch])
+        env = sclang.kw["env"]
+        self.assertEqual(env["LD_LIBRARY_PATH"], self.rt + "lib")
+        self.assertTrue(env["PATH"].startswith(self.rt + "bin:"))
+        self.assertEqual(env["SC_JACK_DEFAULT_OUTPUTS"], "system:playback_1,system:playback_2")
+        with open(self.d + "w/home/.config/SuperCollider/startup.scd") as f:
+            startup = f.read()
+        self.assertIn('ugenPluginsPath = "%splugins"' % self.rt, startup)
+        self.assertIn("openUDPPort(3000)", startup)
+        self.assertIn('File.use("%sw/ready"' % self.d, startup)
+        with open(self.d + "w/sclang_conf.yaml") as f:
+            self.assertIn("- %sshare/SCClassLibrary" % self.rt, f.read())
+
+    def test_ready_then_crash_and_stop(self):
+        e = self.engine()
+        e.start()
+        self.assertEqual(e.poll(), "starting")
+        open(self.d + "w/ready", "w").close()        # the startup file's ServerBoot action
+        self.now[0] += 1
+        self.assertEqual(e.poll(), "ready")
+        self.procs[1].rc = 1                          # sclang dies: the patch stopped
+        self.assertEqual(e.poll(), "failed")
+        self.assertIn("sclang exited", e.reason)
+        real = os.system
+        os.system = lambda c: 0
+        try:
+            e.stop()
+        finally:
+            os.system = real
+        self.assertTrue(self.procs[0].terminated)     # jackd stopped too
+
+    def test_ready_from_log_and_timeout(self):
+        e = self.engine()
+        e.start()
+        with open(self.d + "w/sclang.log", "w") as f:
+            f.write("blah\nSuperCollider 3 server ready.\n")
+        self.now[0] += 1
+        self.assertEqual(e.poll(), "ready")
+        e2 = self.engine()
+        e2.start()
+        os.remove(self.d + "w/sclang.log")
+        self.now[0] += scengine.START_TIMEOUT + 1
+        self.assertEqual(e2.poll(), "failed")
+        self.assertIn("did not start the server", e2.reason)
+
+    def test_start_failures(self):
+        self.assertEqual(self.engine(jackd_rc=1).start(), "failed")            # jackd can't open the device
+        shutil.rmtree(self.rt + "bin")
+        e = self.engine()
+        self.assertEqual(e.start(), "failed")
+        self.assertIn("runtime missing", e.reason)
+
+    def test_install_from_usb(self):
+        import tarfile
+        src = self.d + "bundle/"
+        for rel in ("bin/sclang", "bin/scsynth", "lib/libscsynth.so.1", "share/SCClassLibrary/Object.sc"):
+            os.makedirs(os.path.dirname(src + rel), exist_ok=True)
+            with open(src + rel, "w") as f:
+                f.write(rel)
+        tgz = self.d + "sc_runtime.tgz"
+        with tarfile.open(tgz, "w:gz") as t:
+            for name in ("bin", "lib", "share"):
+                t.add(src + name, arcname=name)
+        dest = self.d + "installed/"
+        self.assertIsNone(scengine.install_from_usb(self.d + "nothing.tgz", dest))
+        self.assertIn("installed", scengine.install_from_usb(tgz, dest))
+        self.assertTrue(scengine.runtime_ok(dest))
+        self.assertIn("up to date", scengine.install_from_usb(tgz, dest))
+        with tarfile.open(self.d + "bad.tgz", "w:gz") as t:
+            t.add(src + "bin", arcname="bin")
+        self.assertIn("incomplete", scengine.install_from_usb(self.d + "bad.tgz", dest))
+        self.assertTrue(scengine.runtime_ok(dest))      # the good install is kept
+
+
+class TestFailover(unittest.TestCase):
+    """nebulae.py's uf2 fallbacks, through the real main loop: every failure lands on factory/a_granularlooper."""
+
+    def run_app(self, script, sc_behaviour=None, guard=False, compile_rc=0):
+        """script: one entry per UI pass: None (idle), ("load", bank, instr), "csound_stop", "pd_die".
+        When the script runs out, everything stops, so the app ends on the safe instrument."""
+        state = {"script": list(script), "loads": [], "csound_stop": False, "pd_die": False, "sc_stops": 0,
+                 "pd": []}
+        sc_behaviour = sc_behaviour or {}
+
+        class HasKeyDict(dict):
+            def has_key(self, k): return k in self
+
+        class Csound(object):
+            def setOption(self, o): pass
+            def compileOrc(self, o): return compile_rc if state.get("orc") == "broken" else 0
+            def readScore(self, s): pass
+            def start(self): pass
+            def cleanup(self): pass
+            def reset(self): pass
+            def csound(self): return None
+
+        class PerfThread(object):
+            def __init__(self, c): self.stopped = False
+            def play(self): pass
+            def stop(self): self.stopped = True
+            def join(self): pass
+            def status(self):
+                if state["csound_stop"]:
+                    state["csound_stop"] = False
+                    return 1
+                return 1 if self.stopped or (not state["script"] and state["loads"][-1] == SAFE) else 0
+
+        class CH(object):
+            def __init__(self, *a, **k):
+                self.bank, self.instr_sel_idx, self.next = k.get("bank"), 0, None
+                state["loads"].append((k.get("bank"), a[3]))
+            def setCsoundPerformanceThread(self, p): pass
+            def enterPureDataMode(self): pass
+            def updateAll(self): pass
+            def restoreAltToDefault(self): pass
+            def printAllControls(self): pass
+            def getInstrSelBank(self): return self.next[0] if self.next else self.bank
+            def setInstrSelBank(self, b): pass
+
+        class UI(object):
+            def __init__(self, ch):
+                self.controlhandler, self.reload_flag = ch, False
+            def update(self):
+                if not state["script"]:
+                    state["pd_die"] = True
+                    return
+                step = state["script"].pop(0)
+                if step == "csound_stop":
+                    state["csound_stop"] = True
+                elif step == "pd_die":
+                    state["pd_die"] = True
+                elif step is not None:
+                    self.controlhandler.next = step[1:]
+                    self.reload_flag = True
+            def getReloadRequest(self): return self.reload_flag
+            def getNewInstr(self): return self.controlhandler.next[1]
+            def clearAllLEDs(self): pass
+            def setCurrentInstr(self, i): pass
+
+        class Popen(object):
+            def __init__(self, cmd, **k):
+                self.rc = None
+                state["pd"].append(self)
+            def poll(self):
+                if state["pd_die"] and self.rc is None:
+                    state["pd_die"] = False
+                    self.rc = 1
+                return self.rc
+            def terminate(self): self.rc = 0
+            def kill(self): pass
+            def wait(self): return self.rc
+
+        class Engine(object):
+            def __init__(self, patch, period, nperiods):
+                self.name = os.path.basename(patch)[:-4]
+                self.mode = sc_behaviour.get(self.name, "ok")
+                self.reason, self.polls = "", 0
+            def start(self):
+                if self.mode == "fail_start":
+                    self.reason = "runtime missing"
+                    return "failed"
+                return "starting"
+            def poll(self):
+                self.polls += 1
+                if self.mode == "fail_start":
+                    return "failed"
+                if self.mode == "die" and self.polls > 2:
+                    self.reason = "sclang exited"
+                    return "failed"
+                if not state["script"]:
+                    self.reason = "end of test"
+                    return "failed"
+                return "ready"
+            def stop(self): state["sc_stops"] += 1
+            def report(self): return "report for " + self.name
+
+        py2shim.stub("ctcsound", Csound=Csound, CsoundPerformanceThread=PerfThread)
+        py2shim.stub("controlhandler", ControlHandler=CH)
+        py2shim.stub("conductor", Conductor=lambda: type("C", (), {
+            "generate_orc": lambda s, i, b: state.__setitem__("orc", i), "getConfigDict": lambda s: HasKeyDict(), "numFiles": lambda s: 0,
+            "refreshFileHandler": lambda s: None, "curOrc": "", "curSco": ""})())
+        py2shim.stub("ui", UserInterface=UI)
+        py2shim.stub("fileloader", FileLoader=lambda: type("F", (), {"reload": lambda s: None})())
+        py2shim.stub("logger", NebLogger=FakeLogger)
+        py2shim.stub("neb_globals", remount_fs=False)
+        py2shim.stub("ufmigrate", migrate=lambda: [])
+        py2shim.stub("bootguard", on_app_start=lambda: guard, mark_healthy=lambda: True, LIMIT=2, HEALTHY_S=20.0)
+        py2shim.stub("scengine", ScEngine=Engine, PATCH_DIR="/home/alarm/sc/")
+        real = subprocess.Popen, os.system, time.sleep
+        subprocess.Popen, os.system, time.sleep = Popen, (lambda c: 0), (lambda s: None)
+        import contextlib
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+                py2shim.load("nebulae", register=False)
+        finally:
+            subprocess.Popen, os.system, time.sleep = real
+        state["notes"] = [l for l in out.getvalue().splitlines() if l.startswith("uf2:")]
+        return state
+
+    def test_pd_crash(self):
+        st = self.run_app([("load", "puredata", "p1"), None, "pd_die", None])
+        self.assertEqual(st["loads"], [SAFE, ("puredata", "p1"), SAFE])
+        self.assertTrue(any("puredata/p1 failed (Pd exited" in n for n in st["notes"]), st["notes"])
+
+    def test_sc_start_failure_and_crash(self):
+        st = self.run_app([("load", "supercollider", "bad"), None, ("load", "supercollider", "dies"), None, None,
+                           None], sc_behaviour={"bad": "fail_start", "dies": "die"})
+        self.assertEqual(st["loads"], [SAFE, ("supercollider", "bad"), SAFE, ("supercollider", "dies"), SAFE])
+        self.assertTrue(any("supercollider/bad failed (runtime missing)" in n for n in st["notes"]), st["notes"])
+        self.assertTrue(any("supercollider/dies failed (sclang exited)" in n for n in st["notes"]), st["notes"])
+        self.assertEqual(st["sc_stops"], 2)
+
+    def test_sc_normal_switch(self):
+        st = self.run_app([("load", "supercollider", "good"), None, None, ("load", "puredata", "p1"), None])
+        self.assertEqual(st["loads"][:3], [SAFE, ("supercollider", "good"), ("puredata", "p1")])
+        self.assertEqual(st["sc_stops"], 1)
+        self.assertFalse(any("supercollider/good failed" in n for n in st["notes"]))
+
+    def test_csound_compile_failure_and_stop(self):
+        st = self.run_app([("load", "user", "broken"), None], compile_rc=-1)
+        self.assertEqual(st["loads"][:2], [SAFE, SAFE])           # the broken one never got a ControlHandler
+        self.assertTrue(any("user/broken failed (the Csound orchestra did not compile)" in n for n in st["notes"]))
+        st = self.run_app([("load", "user", "stops"), "csound_stop", None])
+        self.assertEqual(st["loads"][:3], [SAFE, ("user", "stops"), SAFE])
+        self.assertTrue(any("user/stops failed (Csound stopped)" in n for n in st["notes"]), st["notes"])
+
+    def test_boot_guard(self):
+        st = self.run_app([None], guard=True)
+        self.assertEqual(st["loads"][0], SAFE)
+        self.assertTrue(any(n.startswith("uf2: boot guard") for n in st["notes"]), st["notes"])
+
+    def test_safe_instrument_failing_stops(self):
+        st = self.run_app([])          # the safe instrument stops at once: no endless reloading
+        self.assertEqual(st["loads"], [SAFE])
+        self.assertTrue(any("it is the safe instrument, stopping" in n for n in st["notes"]), st["notes"])
+
+
+SAFE = ("factory", "a_granularlooper")
 
 
 if __name__ == "__main__":

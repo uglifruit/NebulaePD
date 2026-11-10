@@ -58,12 +58,7 @@ class UserInterface(object):
         self.refreshFileHandlers()
         cur_bank = self.controlhandler.getInstrSelBank()
         self.bank_shift_counter = 0
-        if cur_bank == "factory":
-            cnt = self.factoryinstr_fhandle.numFiles()
-        elif cur_bank == "user":
-            cnt = self.userinstr_fhandle.numFiles()
-        elif cur_bank == "puredata":
-            cnt = self.puredata_fhandle.numFiles()
+        cnt = self.handleForBank(cur_bank).numFiles()
         self.controlhandler.setInstrSelNumFiles(cnt)
         self.reload_flag = False # Flag to reload the whole program. 
         self.alt_file_bright = 0.0
@@ -132,12 +127,7 @@ class UserInterface(object):
                 self.animateEditFunction("record")
             elif self.controlhandler.getEditFunctionFlag("source") == True:
                 self.animateEditFunction("source")
-                if self.controlhandler.currentBank == 'factory':
-                    tempidx = self.factoryinstr_fhandle.getIndex(self.controlhandler.currentInstr) 
-                elif self.controlhandler.currentBank == 'user':
-                    tempidx = self.userinstr_fhandle.getIndex(self.controlhandler.currentInstr) 
-                elif self.controlhandler.currentBank == 'puredata':
-                    tempidx = self.puredata_fhandle.getIndex(self.controlhandler.currentInstr) 
+                tempidx = self.handleForBank(self.controlhandler.currentBank).getIndex(self.controlhandler.currentInstr)
                 if tempidx is not None: # uf1: the file may be gone (stock then crashed in getNewInstr)
                     self.controlhandler.setInstrSelIdx(tempidx)
                     self.controlhandler.setInstrSelBank(self.controlhandler.currentBank)
@@ -185,15 +175,20 @@ class UserInterface(object):
         user_dir = "/home/alarm/instr/"
         factory_dir = "/home/alarm/QB_Nebulae_V2/Code/instr/"
         pd_dir = "/home/alarm/pd/"
+        sc_dir = "/home/alarm/sc/"
         self.factoryinstr_fhandle = filehandler.FileHandler(factory_dir, [".instr"])
         self.userinstr_fhandle = filehandler.FileHandler(user_dir, [".instr"])
         self.puredata_fhandle = filehandler.FileHandler(pd_dir, [".pd"], hide_prefix="_")
+        # uf2: SuperCollider patches; "_" files are helpers a patch can load, not listed
+        self.supercollider_fhandle = filehandler.FileHandler(sc_dir, [".scd"], hide_prefix="_")
 
     def handleForBank(self, bank):
         if bank == "user":
             return self.userinstr_fhandle
         elif bank == "puredata":
             return self.puredata_fhandle
+        elif bank == "supercollider":
+            return self.supercollider_fhandle
         return self.factoryinstr_fhandle
 
     def enterInstrSel(self):
@@ -230,8 +225,9 @@ class UserInterface(object):
             self.reload_flag = True
 
     def leaveInstrSel(self):
-        # back to the running instrument without loading anything (Pitch or Speed click)
-        if self.currentInstr in self.puredata_fhandle.getFileNames():
+        # back to the running instrument without loading anything (Pitch or Speed click). uf2: by its bank (Pd and
+        # SuperCollider both use the Pd control mode); stock looked the name up among the Pd files.
+        if self.controlhandler.currentBank in ("puredata", "supercollider"):
             self.controlhandler.enterPureDataMode()
         else:
             self.controlhandler.enterNormalMode()
@@ -515,6 +511,11 @@ class UserInterface(object):
             elif self.controlhandler.getInstrSelBank() == "puredata":
                 self.set_rgb("speed_neg", tempc.red(), tempc.green(), tempc.blue(), 0.0)
                 self.set_rgb("speed_pos", tempc.red(), tempc.green(), tempc.blue(), 1.0)
+            elif self.controlhandler.getInstrSelBank() == "supercollider":
+                # uf2: one step past Pd, the right light in blue
+                blue = libDriver.Color(0, 0, 4095)
+                self.set_rgb("speed_neg", blue.red(), blue.green(), blue.blue(), 0.0)
+                self.set_rgb("speed_pos", blue.red(), blue.green(), blue.blue(), 1.0)
         else:
             pass
     
@@ -555,6 +556,12 @@ class UserInterface(object):
             elif cur_bank == "puredata" and self.bank_shift_counter <= -1 * thresh:
                 self.bank_shift_counter = 0
                 self.selectBank("factory")
+            elif cur_bank == "puredata" and self.bank_shift_counter >= thresh:
+                self.bank_shift_counter = 0
+                self.selectBank("supercollider")
+            elif cur_bank == "supercollider" and self.bank_shift_counter <= -1 * thresh:
+                self.bank_shift_counter = 0
+                self.selectBank("puredata")
             elif cur_bank == "factory":
                 if self.bank_shift_counter >= thresh:
                     self.bank_shift_counter = 0
@@ -809,15 +816,9 @@ class UserInterface(object):
     def getNewInstr(self):
         idx = self.controlhandler.getInstrSelIdx()
         instr = None
-        if self.controlhandler.getInstrSelBank() == "factory":
-            if idx < self.factoryinstr_fhandle.numFiles():
-                instr = self.factoryinstr_fhandle.getFilename(idx)
-        elif self.controlhandler.getInstrSelBank() == "user":
-            if idx < self.userinstr_fhandle.numFiles():
-                instr = self.userinstr_fhandle.getFilename(idx)
-        elif self.controlhandler.getInstrSelBank() == "puredata":
-            if idx < self.puredata_fhandle.numFiles():
-                instr = self.puredata_fhandle.getFilename(idx)
+        f_handle = self.handleForBank(self.controlhandler.getInstrSelBank())
+        if idx < f_handle.numFiles():
+            instr = f_handle.getFilename(idx)
         return instr
 
     def setCurrentInstr(self, instr):
@@ -825,7 +826,7 @@ class UserInterface(object):
         self.controlhandler.setCurrentInstr(instr)
         # uf1: look in the bank it was loaded from first (stock took the first bank with a matching name), and store
         # the absolute index with its page offset (stock stored idx % 5 with offset idx / 5, so files 6+ went wrong).
-        names = ["factory", "user", "puredata"]
+        names = ["factory", "user", "puredata", "supercollider"]
         cur = self.controlhandler.getInstrSelBank()
         if cur in names:
             names.remove(cur)

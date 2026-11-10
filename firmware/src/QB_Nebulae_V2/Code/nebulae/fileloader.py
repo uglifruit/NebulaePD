@@ -3,6 +3,7 @@ import os
 from subprocess import Popen
 import neb_globals
 import nebopts
+import scengine
 #import shutil
 
 class FileLoader(object):
@@ -27,6 +28,7 @@ class FileLoader(object):
         self.dirtypes["pd"] = self.pdtypes
         self.dirtypes["csd"] = self.csdtypes
         self.dirtypes["scd"] = self.scdtypes
+        self.dirtypes["sc"] = self.scdtypes      # uf2: SuperCollider patches -> /home/alarm/sc (scengine.PATCH_DIR)
         self.dirtypes["other"] = self.othertypes
         self.usb_mounted = self.isUSBMounted()
         self.led_process = None
@@ -47,7 +49,11 @@ class FileLoader(object):
             self.copyType("audio")
             self.copyType("instr")
             self.copyType("pd")
+            self.copyType("sc")
             nebopts.copy_from_usb()
+            msg = scengine.install_from_usb()
+            if msg:
+                print "uf2: " + msg
             self.umount()
         else:
             self.launch_bootled(0)

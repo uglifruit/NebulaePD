@@ -32,14 +32,25 @@ For a **new instrument**, see §8.
 | `patches/02_echo.pd` | Stereo tape echo + freeze. Offline-tested, no hardware report |
 | `patches/00_template.pd`, `01_drone.pd` | Template / demo. No hardware report |
 | `instr/` | Csound template + 6 factory demos (V1 ports). `docs/INSTR.md` |
-| Custom firmware | `docs/FIRMWARE.md` (its **To do** list comes first). Plan: Stage 0 → uf1 → uf1b (Pd back-channel) → uf2 (SuperCollider).
-  - **Stage 0:** step 1 done 2026-11-09. The SD card is imaged (`SDImage/`, gitignored) and cloned to a spare card;
-    the clone's boot test is pending. The image was read offline, giving most of the inventory and the unit's own
-    firmware tree. Still to run on hardware: `instr/fw_backup.instr` (backup + inventory + on-module Python 2 precheck of
-    `neb_candidate.tgz`) and `patches/99_pitchlog.pd` + `tools/pitchlog.py`.
-  - **uf1** (`firmware/src`, rebased on the unit's tree incl. Qu-Bit's Pi 4 changes; 27 + 15 desktop tests pass;
-    installable build exists but **held until the on-module Python 2 precheck passes**): paged selector (Speed = bank as stock, Pitch = page of five with the Pitch LED colour, a button loads its patch at once; owner's design 2026-11-10), Pitch coeff 0.95 via `neb_options.txt`, Pd connect retry + batched sends, flat run loop, Pd exit wait, calibration/settings carried over updates, Pd externals + hidden `_` files, stock bug fixes. Every Pd patch load resets the alt layer to defaults (owner's call); `pd_alts_at_load` is built but off.
-  - **Waiting for** the owner's Stage 0 session (`neb_fwbackup/` → `firmware/device/`) |
+| Custom firmware | `docs/FIRMWARE.md` (its **To do** list comes first). Plan: Stage 0 → uf1 → uf2 (SuperCollider + failure fallback) → uf1b (Pd back-channel, later).
+  - **Stage 0 done** (2026-11-09/10).
+    - The SD card is imaged (`SDImage/`) and cloned; the original is kept as STOCK.
+    - The unit's tree, which includes Qu-Bit's Pi 4 changes, is the base.
+    - Poll pass measured at 5.3 ms; Pitch slew ~37 ms on stock.
+  - **uf1 installed on hardware** (2026-11-10).
+    - The calibration restore worked.
+    - The paged selector is the owner's design: Speed = bank, Pitch = page of five, a button loads.
+    - The rest: Pitch coeff 0.95, Pd retry and batching, flat loop, Pd externals, hidden `_` files, stock fixes.
+  - **SC probe passed on hardware** (run 2): SC 3.10.4 + sc3-plugins (Technobear's build) play live via jackd
+    (`JACK_NO_AUDIO_RESERVATION=1`).
+  - **uf2 built** (47 + 15 tests, PC SC tests), **not installed yet**:
+    - an SC bank one Speed step past Pd, with a blue light;
+    - Technobear-compatible OSC;
+    - jackd at 256 × 2;
+    - the runtime installed once from the stick's `sc_runtime.tgz`;
+    - for every engine, a failure falls back to factory/a_granularlooper, plus a boot guard.
+
+    Files are staged in `firmware/dist/stage_uf2/`. |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |
 
 **Roadmap** (not started):
@@ -75,6 +86,7 @@ tools/shimmer.py 07_shimmer builder (ui, reverb (FDN + shifter taps + diffuser),
 tools/resonator.py 08_resonator builder (E/program/watched control-math compiler; ui, exciter, res, bbd, test_source)
 tools/pitchlog.py    99_pitchlog builder + analyzer (poll rate, Pitch jump response) for logs from the module
 tools/fwbuild.py     custom firmware: guards + reproducible neb_update.zip from firmware/src; --import-device
+sc/01_sctest.scd     uf2 hardware-test SC patch (and a minimal Nebulae SC patch example)
 tools/sctest.py      run sclang on the PC: syntax check / NRT renders of .scd files
 tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV

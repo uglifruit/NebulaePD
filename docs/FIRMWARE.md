@@ -10,23 +10,28 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## To do
-**Owner (on hardware): the uf1 install session.** Files are staged in `firmware/dist/stage1_stick/`. Use the
-cloned card; the original stays in the drawer as STOCK.
-1. **Precheck.** Copy `1_precheck/*` to the stick root (no `neb_update.zip` in the root yet). Boot and load
-   `000_fw_backup` from the user bank.
-   - **Three beeps** = backup fine and uf1 passed the module's Python 2 check. Go on.
-   - **Low tone** = stop and bring the stick back.
-2. **Install.** Power off. Copy `2_install/neb_update.zip` and `99_pitchlog.pd` to the stick root. **Unplug every
-   CV/gate cable**, then power on. Expect the update LEDs and a reboot.
-3. **Test** with the list in "Hardware test" (Stage 1 below). End by loading `000_fw_backup` again, which collects
-   the new pitch log and the migration result, and copy the stick's `neb_fwbackup/` folder (the newest
-   `inventory_*.txt` and `neb_pitchlog_*.txt`) to `firmware/device/`.
+**Owner (on hardware): the uf2 install session.** Files are staged in `firmware/dist/stage_uf2/`. Use the
+cloned card; the STOCK card stays in the drawer.
+1. **Precheck (recommended).**
+   - Copy `1_precheck/*` to the stick root. There must be no `neb_update.zip` in the root yet.
+   - Load `000_fw_backup` (user bank).
+   - Three beeps = uf2 passed the module's Python 2 check. Low tone = stop.
+2. **Install.**
+   - Copy everything in `2_install/` to the stick root: `neb_update.zip`, `sc_runtime.tgz`, `01_sctest.scd` and
+     Technobear's `31-simple.scd`.
+   - **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot.
+   - The first instrument load after that installs the SuperCollider runtime from `sc_runtime.tgz`. Leave the file
+     on the stick: a later load skips it once the installed copy matches.
+3. **Test** with the list in "uf2 hardware test" (Stage 2 below).
+4. Bring back:
+   - the stick's `neb_log.txt` (lines starting `uf2:`);
+   - `neb_error.txt`, if there is one;
+   - a `000_fw_backup` run's `neb_fwbackup/`.
 
-**Next session (Claude):**
-1. Newest inventory: `Firmware updated to: v2_1_2_uf1`, the `uf_migrated` content ("restored calibration…"), and
-   `PRECHECK_OK`.
-2. `python tools/pitchlog.py` on the uf1 capture; compare with the stock one (Stage 0 results below).
-3. Go through the owner's hardware test notes.
+**Earlier (done):**
+- uf1 install session, 2026-11-10: the calibration restore worked.
+- The uf1 pitch re-capture with an in-range 0 V ↔ 1 V step is still to do: `99_pitchlog`, with Pitch clicked to
+  centre.
 
 **Decided (owner, 2026-11-09):** every Pd patch load resets the alt layer to its defaults. Because of that,
 `pd_alts_at_load` can only send the defaults, which our patches already start with, so it is harmless. It stays off
@@ -406,6 +411,76 @@ How it works:
   beeps); `system_i` itself already worked on the module with `fw_backup`. The `.scd` scripts can only be tested on
   the module, because SuperCollider isn't installed on the PC.
 
+### Phase 2: uf2 (`v2_1_2_uf2`, 2026-11-10)
+**What changes for the player:**
+- **SuperCollider bank:** `.scd` files in the stick root are copied to `/home/alarm/sc` (like `.pd`). In the selector:
+  - Speed one step clockwise past Pd shows SC, with the right Speed light **blue** (Pd stays green);
+  - Pitch = group of five, and a lit button loads, as for every bank;
+  - `_`-prefixed `.scd` files are hidden (helpers);
+  - loading a patch: jackd and sclang start, and the module is quiet for ~5–10 s until the patch boots its server.
+- **Controls:** every control goes to the patch as OSC `/neb/<name> <float>` on UDP 3000, Technobear-compatible.
+  - Values are sent on change, and all again once a second; reset and reset_alt only on change.
+  - Alt values are sent while Source is held, as for Pd.
+  - The alt layer resets to defaults at each SC load, as for Pd.
+- **Latency:** jackd runs at `-p256 -n2` (~10.7 ms), against the probe's 512 × 3 (32 ms). `neb_options.txt`:
+  `sc_period` (64–1024) and `sc_nperiods` (2–4).
+- **Runtime:** `sc_runtime.tgz` (`tools/scbundle.py`) in the stick root is installed once into
+  `/home/alarm/sc_runtime`, outside the firmware tree, and updated whenever the stick's copy changes (sha256 stamp).
+  A stock revert leaves it unused.
+- **Failures, for every engine.** Every failure lands on **factory/a_granularlooper** (owner's choice) and adds a
+  `uf2: …` line to the stick's `neb_log.txt`.
+  - **Csound:** an orchestra that doesn't compile, or Csound stopping by itself. Stock ran on silently or exited,
+    and the module stayed silent until a power cycle.
+  - **Pd:** the Pd process exiting (a crash, or a patch that won't load).
+  - **SuperCollider:**
+    - no runtime;
+    - jackd or sclang exiting;
+    - no server boot within 30 s.
+
+    The SC log tail goes to the stick as `neb_error.txt`.
+  - **Boot guard (`bootguard.py`):** two app starts in a row without an instrument running 20 s, e.g. a Csound
+    crash with systemd restarting the app (the GENDYN loop), mean the next start loads the safe instrument.
+  - If the safe instrument itself fails, the app stops, as stock did. No endless reloading.
+
+**How it works:**
+- `scsender.ScSend` has the same interface as `pdsender.PdSend`. `controlhandler` picks it for the SC bank, and SC
+  runs in the Pd control mode, so the UI, alt layer and selector behave exactly as for Pd.
+- `scengine.ScEngine`:
+  - writes the startup file: Technobear's server options, the runtime's plugin path, `openUDPPort(3000)` and a
+    `ServerBoot` action that writes `/tmp/neb_sc/ready`;
+  - writes the sclang config;
+  - starts jackd (with `JACK_NO_AUDIO_RESERVATION=1`) and waits until it has stayed up 3 s;
+  - starts `sclang -D -l conf patch`;
+  - `poll()` reports starting / ready / failed;
+  - `stop()` stops sclang, scsynth and jackd, waiting up to 2 s each.
+
+**Tested offline:**
+- 47 logic tests: OSC bytes, UDP delivery, change/resend rules, boot guard, the engine with fake processes
+  (commands, env, files, ready from file or log, crash, timeout, jackd failure, runtime install, update and
+  incomplete bundle), and failover through the real main loop.
+- 15 build tests.
+- On the PC with SC 3.10.4:
+  - the firmware's startup file boots a server, writes the ready file and opens port 3000;
+  - `ScSend` → `sc/01_sctest.scd`: the patch received every control.
+- `tools/sctest.py check` passes for `sc/01_sctest.scd` and Technobear's patches.
+
+### uf2 hardware test (owner)
+1. After the install:
+   - `neb_log.txt` says "Firmware updated to: v2_1_2_uf2";
+   - Csound and Pd instruments work as before;
+   - the selector shows four Speed positions, with blue for SC.
+2. **SC bank:** load `01_sctest`. After ~5–10 s:
+   - Reset (button or gate) plucks a saw note;
+   - Pitch + V/oct play it in tune;
+   - Size = brightness, Density = decay length, Freeze = drone on/off, Blend = level.
+3. Load `31-simple` (Technobear's): a saw drone, with Pitch sweeping 440–880 Hz. **Turn the output down first: it
+   plays at full level.**
+4. Switch SC → Pd → Csound → SC a few times. Every switch should work and leave no silence.
+5. **Fallback:** put a deliberately broken `zz_broken.scd` on the stick, containing just the word `oops`, and load
+   it. After at most ~30 s the module should load the factory granular looper, and `neb_error.txt` + `neb_log.txt`
+   say why.
+6. Latency feel: play 01_sctest from a sequencer. If it crackles, put `sc_period = 512` in `neb_options.txt`.
+
 ## Status
 - 2026-11-09: Stage 0 tools written and offline-tested. **Not yet run on hardware.**
   - `fw_backup.instr` was tested in Csound 6.09.1 with `system_i` stubbed (silent / ok beeps / fail tone). Its shell script ran in a fake module tree: backup and layout correct, no overwrite on a 2nd run, a corrupt backup gives the fail tone.
@@ -437,3 +512,7 @@ How it works:
   - `PRECHECK_OK` in every run.
   - The owner found that selector confusing, which led to the redesign. The redesigned build `1b761767…` is on the
     stick, waiting for the install boot.
+- 2026-11-10: **uf2** (SuperCollider bank, failure fallback for all engines, boot guard).
+  - 47 logic tests and 15 build tests pass; the PC SC tests pass (see Phase 2).
+  - `neb_update.zip` sha256 `b0f6c04ba8c9ffc359c9bef3ca0b68a69d6203078f52d5deb727cf51b48c16ba`.
+  - **Not installed yet.**

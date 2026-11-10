@@ -30,7 +30,7 @@ import tarfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FW = os.path.join(REPO, "firmware")
-VERSION = "v2_1_2_uf1"
+VERSION = "v2_1_2_uf2"
 
 PROTECTED_DIRS = ["Code/scripts/", "Code/localfiles/", "Code/config/", "Code/misc/", "Code/log/"]
 PROTECTED_FILES = ["Code/nebulae/bootleds.py", "Code/nebulae/calibration_collector.py", "Code/config.txt"]
@@ -152,7 +152,7 @@ def pack(files, meta, default, version=None, mtime=1651363200):
 
 # runtime state inside the tree: never part of the base or a build (update.sh replaces the tree; ufmigrate restores)
 RUNTIME = ["Code/config/bootinstr.txt", "Code/config/nebsettings.txt", "Code/config/buffer_cnt.txt",
-           "Code/config/neb_options.txt", "Code/config/uf_migrated", "Code/misc/calibration_data.txt"]
+           "Code/config/neb_options.txt", "Code/config/uf_migrated", "Code/config/boot_guard.txt", "Code/misc/calibration_data.txt"]
 RUNTIME_DIRS = ["Code/log/"]
 MERGE_DIR = "dist/merge"     # under firmware/: conflict files from --import-device, resolved by hand
 

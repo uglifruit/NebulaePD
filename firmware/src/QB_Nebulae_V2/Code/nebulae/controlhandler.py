@@ -6,6 +6,7 @@ import switch as libSwitch
 import shiftregister as libSR
 import control
 import pdsender
+import scsender
 import nebopts
 import os
 import settings
@@ -53,7 +54,11 @@ class ControlHandler(object):
         self.settings.read()
         self.saveFlag = 0
         self.now = int(round(time.time() * 1000))
-        self.pdSock = pdsender.PdSend()
+        # uf2: a SuperCollider patch gets the same control stream as Pd, as OSC (scsender.py, same interface)
+        if bank == "supercollider":
+            self.pdSock = scsender.ScSend()
+        else:
+            self.pdSock = pdsender.PdSend()
         self.currentInstr = instr
         self.currentBank = bank
         self.static_file_idx = 0

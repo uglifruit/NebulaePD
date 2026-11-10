@@ -7,6 +7,8 @@
 #                          twice per poll pass (ui.py re-sets Pitch each pass). 1.0 = no smoothing.
 #   sel_page_steps = 4     Pitch encoder steps per page in the instrument selector (1-16). The encoder gives 4 steps per
 #                          cycle, usually one detent; Speed needs 8 to change bank.
+#   sc_period = 256        SuperCollider: jackd frames per period (64-1024) and periods (sc_nperiods, 2-4). 256 x 2 at
+#   sc_nperiods = 2        48 kHz is ~10.7 ms; Technobear used 512 x 3 (32 ms measured).
 #   pd_alts_at_load = 0    1 = send every *_alt value once when a Pd patch connects (stock: only while Source is
 #                          held). Each Pd load resets them to the defaults first (nebulae.py), so this only tells a
 #                          patch the defaults it already starts with: off by default.
@@ -19,6 +21,8 @@ USB_NAME = "neb_options.txt"
 OPTIONS = {
     "pitch_coeff": (0.95, 0.05, 1.0),
     "sel_page_steps": (4.0, 1.0, 16.0),
+    "sc_period": (256.0, 64.0, 1024.0),
+    "sc_nperiods": (2.0, 2.0, 4.0),
     "pd_alts_at_load": (0.0, 0.0, 1.0),
 }
 
