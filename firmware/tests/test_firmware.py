@@ -26,9 +26,11 @@ import pdsender  # noqa: E402
 import scsender  # noqa: E402
 import scengine  # noqa: E402
 import bootguard  # noqa: E402
+import csplugins  # noqa: E402
 
 CHANGED = ["check_calibration", "control", "controlhandler", "filehandler", "fileloader", "nebulae", "pdsender", "ui",
-           "instrpager", "nebopts", "ufmigrate", "scsender", "scengine", "bootguard"]
+           "instrpager", "nebopts", "ufmigrate", "scsender", "scengine", "bootguard", "csplugins", "csplugins_check",
+           "settings"]
 
 
 class TestSyntax(unittest.TestCase):
@@ -849,17 +851,18 @@ class TestScEngine(unittest.TestCase):
 class TestFailover(unittest.TestCase):
     """nebulae.py's uf2 fallbacks, through the real main loop: every failure lands on factory/a_granularlooper."""
 
-    def run_app(self, script, sc_behaviour=None, guard=False, compile_rc=0):
+    def run_app(self, script, sc_behaviour=None, guard=False, compile_rc=0, plugin_on_load=None):
         """script: one entry per UI pass: None (idle), ("load", bank, instr), "csound_stop", "pd_die".
         When the script runs out, everything stops, so the app ends on the safe instrument."""
         state = {"script": list(script), "loads": [], "csound_stop": False, "pd_die": False, "sc_stops": 0,
-                 "pd": []}
+                 "pd": [], "csounds": 0}
         sc_behaviour = sc_behaviour or {}
 
         class HasKeyDict(dict):
             def has_key(self, k): return k in self
 
         class Csound(object):
+            def __init__(self): state["csounds"] += 1
             def setOption(self, o): pass
             def compileOrc(self, o): return compile_rc if state.get("orc") == "broken" else 0
             def readScore(self, s): pass
@@ -905,6 +908,7 @@ class TestFailover(unittest.TestCase):
                     state["pd_die"] = True
                 elif step is not None:
                     self.controlhandler.next = step[1:]
+                    state["next_instr"] = step[2]
                     self.reload_flag = True
             def getReloadRequest(self): return self.reload_flag
             def getNewInstr(self): return self.controlhandler.next[1]
@@ -954,7 +958,13 @@ class TestFailover(unittest.TestCase):
             "generate_orc": lambda s, i, b: state.__setitem__("orc", i), "getConfigDict": lambda s: HasKeyDict(), "numFiles": lambda s: 0,
             "refreshFileHandler": lambda s: None, "curOrc": "", "curSco": ""})())
         py2shim.stub("ui", UserInterface=UI)
-        py2shim.stub("fileloader", FileLoader=lambda: type("F", (), {"reload": lambda s: None})())
+
+        def reload(_self):
+            # a plugin installed from the stick while loading `plugin_on_load`
+            if plugin_on_load and state.get("next_instr") == plugin_on_load and not state.get("installed"):
+                state["installed"] = True
+                csplugins.generation += 1
+        py2shim.stub("fileloader", FileLoader=lambda: type("F", (), {"reload": reload})())
         py2shim.stub("logger", NebLogger=FakeLogger)
         py2shim.stub("neb_globals", remount_fs=False)
         py2shim.stub("ufmigrate", migrate=lambda: [])
@@ -1004,10 +1014,155 @@ class TestFailover(unittest.TestCase):
         self.assertEqual(st["loads"][0], SAFE)
         self.assertTrue(any(n.startswith("uf2: boot guard") for n in st["notes"]), st["notes"])
 
+    def test_new_plugin_new_csound(self):
+        st = self.run_app([("load", "user", "pearls"), None, "csound_stop", None], plugin_on_load="pearls")
+        self.assertEqual(st["loads"][:2], [SAFE, ("user", "pearls")])
+        self.assertEqual(st["csounds"], 2)          # the boot one, then a fresh one after the install
+
     def test_safe_instrument_failing_stops(self):
         st = self.run_app([])          # the safe instrument stops at once: no endless reloading
         self.assertEqual(st["loads"], [SAFE])
         self.assertTrue(any("it is the safe instrument, stopping" in n for n in st["notes"]), st["notes"])
+
+
+class TestCsPlugins(unittest.TestCase):
+    """The private Csound plugin folder. Links are faked as small files holding their target (no symlinks on the
+    Windows test machine)."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp().replace("\\", "/") + "/"
+        self.stock, self.farm, self.usb = self.d + "stock/", self.d + "farm/", self.d + "usb/"
+        for d in (self.stock, self.usb):
+            os.makedirs(d)
+        for n in ("libstdopcod.so", "librtalsa.so"):
+            open(self.stock + n, "w").close()
+        os.makedirs(self.farm)
+        self.checks = []
+
+    def tearDown(self):
+        shutil.rmtree(self.d)
+
+    def link(self, target, path):
+        with open(path, "w") as f:
+            f.write(target)
+
+    def readlink(self, path):
+        with open(path) as f:
+            return f.read()
+
+    def put_usb(self, name, data):
+        with open(self.usb + name, "w") as f:
+            f.write(data)
+
+    def check_ok(self, path):
+        self.checks.append(os.path.basename(path))
+        return True, "OK: fine"
+
+    def install(self, check=None):
+        return csplugins.install_from_usb(self.usb, self.farm, self.stock, check or self.check_ok, self.link,
+                                          self.readlink)
+
+    def test_nothing_installed_keeps_stock(self):
+        env = {"OPCODE6DIR64": "left over"}
+        self.assertFalse(csplugins.activate(self.stock, self.farm, env, self.readlink))
+        self.assertNotIn("OPCODE6DIR64", env)
+        self.assertEqual(self.install(), [])            # no csound_plugins folder content on the stick
+
+    def test_install_links_and_activate(self):
+        self.put_usb("libpearls.so", "v1")
+        g = csplugins.generation
+        log = self.install()
+        self.assertEqual(self.checks, ["libpearls.so"])
+        self.assertEqual(csplugins.generation, g + 1)
+        self.assertIn("installed", log[0])
+        self.assertEqual(self.readlink(self.farm + "libstdopcod.so"), self.stock + "libstdopcod.so")
+        self.assertEqual(self.readlink(self.farm + "libpearls.so"), self.farm + "extra/libpearls.so")
+        env = {}
+        self.assertTrue(csplugins.activate(self.stock, self.farm, env, self.readlink))
+        self.assertEqual(env["OPCODE6DIR64"], self.farm)
+        self.assertEqual(self.install(), [])            # same file again: not re-checked
+        self.assertEqual(self.checks, ["libpearls.so"])
+
+    def test_failed_check_not_retried_until_changed(self):
+        self.put_usb("libpearls.so", "bad")
+        log = self.install(lambda p: (self.checks.append("x") or False, "FAIL: no output"))
+        self.assertIn("NOT installed", log[0])
+        self.assertFalse(os.path.exists(self.farm + "extra/libpearls.so"))
+        self.assertFalse(csplugins.activate(self.stock, self.farm, {}, self.readlink))
+        self.assertEqual(self.install(lambda p: (self.checks.append("x") or False, "FAIL")), [])
+        self.assertEqual(self.checks, ["x"])            # not retried
+        self.put_usb("libpearls.so", "fixed")
+        self.assertIn("installed", self.install()[0])
+
+    def test_incomplete_farm_is_not_used(self):
+        self.put_usb("libpearls.so", "v1")
+        self.install()
+        open(self.stock + "libnew.so", "w").close()     # a stock plugin the farm doesn't link yet
+        self.assertFalse(csplugins.activate(self.stock, self.farm, {}, self.readlink))
+        csplugins.build_farm(self.stock, self.farm, self.link, self.readlink)
+        self.assertTrue(csplugins.activate(self.stock, self.farm, {}, self.readlink))
+        os.remove(self.stock + "librtalsa.so")          # a stale link is removed
+        csplugins.build_farm(self.stock, self.farm, self.link, self.readlink)
+        self.assertFalse(os.path.exists(self.farm + "librtalsa.so"))
+
+
+class FakeComm(object):
+    def __init__(self, state=0.0):
+        self.state = state
+
+    def update(self): pass
+
+    def getState(self): return self.state
+
+
+class TestPearlsHooks(unittest.TestCase):
+    """Pearls' controlhandler config keys and LED feedback, in the real controlhandler.py / ui.py."""
+
+    class Cfg(dict):
+        def has_key(self, k): return k in self
+
+    def make(self, cfg):
+        py2shim.load("filehandler")
+        ch_mod = py2shim.load("controlhandler")
+        ui_mod = py2shim.load("ui")
+        pdsender.PdSend.sport = 1
+        py2shim.FakeControlChannel.script = {}
+        try:
+            ch = ch_mod.ControlHandler(object(), 0, cfg, instr="pearls", bank="user")
+        finally:
+            pdsender.PdSend.sport = 3000
+        return ch, ui_mod.UserInterface(ch)
+
+    def test_config_keys(self):
+        ch, _ = self.make(self.Cfg({"ignoregate": ["freeze", "reset"], "ignorealtgate": ["reset", "file"],
+                                    "eol": ["engine"], "ui": ["pearls"]}))
+        self.assertTrue(ch.channeldict["freeze"].ignore_gate)
+        self.assertTrue(ch.channeldict["reset"].ignore_gate)
+        self.assertFalse(getattr(ch.channeldict["record"], "ignore_gate", False))
+        self.assertTrue(ch.altchanneldict["reset_alt"].ignore_gate)
+        self.assertTrue(ch.altchanneldict["file_alt"].ignore_gate)
+        self.assertTrue(ch.eol_from_engine)
+        self.assertIsNotNone(ch.pearls_quality_comm)
+        ch.eol_comm = None                       # would raise if handleEndOfLoop touched it
+        ch.handleEndOfLoop()
+
+    def test_inactive_for_other_instruments(self):
+        ch, ui = self.make(self.Cfg({}))
+        self.assertFalse(ch.eol_from_engine)
+        self.assertIsNone(ch.pearls_quality_comm)
+        ui.update_pearls_leds()                  # no-op
+
+    def test_leds(self):
+        ch, ui = self.make(self.Cfg({"ui": ["pearls"]}))
+        for name, state in (("quality", 2), ("seedled", 0.5), ("frozen", 1), ("clock", 1), ("io", 3), ("scale", 0)):
+            setattr(ch, "pearls_%s_comm" % name, FakeComm(state))
+        ui.now = 100000
+        ui.update_pearls_leds()
+        led = py2shim.FakeLedDriver.last
+        self.assertEqual(led.buttons["reset"], 0.15)           # seed LED dim: locked and idle
+        self.assertEqual(led.buttons["freeze"], 1.0)
+        self.assertEqual(led.buttons["record"], 1.0)
+        self.assertEqual(led.rgb["pitch_pos"][:3], (0, 0, 4095))   # io 3 = saved: blue
 
 
 SAFE = ("factory", "a_granularlooper")

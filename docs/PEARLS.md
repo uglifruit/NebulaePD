@@ -31,7 +31,7 @@ plus an instrument (`pearls.instr`). Clone for reading: `external/xponent_QB_Neb
   - it reads the gates through `/dev/gpiomem` GPLEV0 only, at the same offset on the BCM2711 (Pi 4).
 - WSL build trees: `~/pearls_build` (Pearls at 635ce93), `~/mi_upstream` (MI's repositories).
 
-## Plan
+## In uf2 (implemented 2026-11-10, not yet on hardware)
 1. **Firmware hooks** from Pearls' fork, ported into uf2. Inactive for other instruments; about 120 lines:
    - `controlhandler.py`: `ignoregate`, `eol,engine`, `ignorealtgate`;
    - `ui.py`: Pearls LED feedback (`ui,pearls`);
@@ -46,6 +46,30 @@ plus an instrument (`pearls.instr`). Clone for reading: `external/xponent_QB_Neb
      module's Csound from a temporary folder;
    - only then is it linked in, and `pearls.instr` added to the user bank.
 4. **Tests:**
-   - the plugin in Csound on the PC, through Pearls' harnesses;
-   - our firmware tests;
+   - 55 logic tests, including the plugin folder (links, stale links, incomplete folder not used, install checked
+     once, failures not retried) and the hooks through the real controlhandler/ui;
+   - **`csplugins_check.py` run for real** in WSL, with Csound 6.18 and an x86 build of Pearls from the same
+     source: Pearls loads and plays (rms 0.303); a folder without it fails;
    - then the owner's hardware test.
+
+**Files:**
+- `firmware/src/.../nebulae/`:
+  - `csplugins.py`: the folder, the install and `OPCODE6DIR64`;
+  - `csplugins_check.py`: the check, run as `timeout 90 python2 …`;
+  - hooks in `controlhandler.py`, `ui.py` and `settings.py`;
+  - wiring in `fileloader.py` and `nebulae.py`.
+- **Stick:** `pearls.instr` in the root (the user bank) and `csound_plugins/libpearls.so`. Both are exact copies from
+  Pearls' commit 635ce93, staged in `firmware/dist/stage_uf2/2_install/`.
+- **On the module:**
+  - `/home/alarm/csound_plugins/` (links + `extra/libpearls.so` + sha stamps);
+  - Pearls' own state in `/home/alarm/pearls` (quality, frozen buffer) and saved WAVs on the stick.
+- A plugin in a stick's `csound_plugins/` is installed once per file content. If its check fails it's not retried
+  until the file changes. Without that folder on the stick, the installed one stays.
+
+## Playing it
+The panel and the secondary layer are in Pearls' README (`external/xponent_QB_Nebulae_V2/Code/beads_port/README.md`,
+"Panel"). In short:
+- Start = TIME, Size = SIZE (fully clockwise = delay mode), Window = SHAPE, Density = DENSITY;
+- Pitch = PITCH, Overlap = FEEDBACK, Blend = DRY/WET, Speed = REVERB;
+- Freeze = FREEZE, Reset = SEED, Next = QUALITY, Source = wavetable synth, Record = tap tempo;
+- EOL = grain gates.

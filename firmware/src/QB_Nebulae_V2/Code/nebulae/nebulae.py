@@ -14,6 +14,7 @@ import ufmigrate
 import bootguard
 import nebopts
 import scengine
+import csplugins
 
 cfg_path = "/home/alarm/QB_Nebulae_V2/Code/config/"
 
@@ -39,7 +40,12 @@ class Nebulae(object):
             print "uf1 migrate: " + line
         # uf2: boot-loop guard, see bootguard.py
         guard_fallback = bootguard.on_app_start()
+        # uf2: extra Csound plugins (Pearls) from the private folder, see csplugins.py; untouched if none installed
+        if os.path.isdir(csplugins.extra_dir()):
+            csplugins.build_farm()
+        print "uf2: extra Csound plugins " + ("on" if csplugins.activate() else "off")
         self.ro()
+        self.cs_generation = csplugins.generation
         self.instr_cfg = cfg_path + "bootinstr.txt"
         self.orc_handle = conductor.Conductor() # Initialize Audio File Tables and Csound Score/Orchestra
         #self.currentInstr = "a_granularlooper"
@@ -158,6 +164,11 @@ class Nebulae(object):
         self.log.spill_basic_info()
         floader = fileloader.FileLoader()
         floader.reload()
+        if csplugins.generation != self.cs_generation:
+            # uf2: a plugin was just installed from the stick: a new Csound instance loads it now
+            self.cs_generation = csplugins.generation
+            csplugins.activate()
+            self.c = ctcsound.Csound()
         self.orc_handle.generate_orc(instr, instr_bank)
         configData = self.orc_handle.getConfigDict()
         self.c.setOption("-iadc:hw:0,0")

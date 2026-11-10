@@ -4,6 +4,7 @@ from subprocess import Popen
 import neb_globals
 import nebopts
 import scengine
+import csplugins
 #import shutil
 
 class FileLoader(object):
@@ -54,6 +55,8 @@ class FileLoader(object):
             msg = scengine.install_from_usb()
             if msg:
                 print "uf2: " + msg
+            for line in csplugins.install_from_usb():
+                print "uf2: " + line
             self.umount()
         else:
             self.launch_bootled(0)

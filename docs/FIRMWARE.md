@@ -17,8 +17,9 @@ cloned card; the STOCK card stays in the drawer.
    - Load `000_fw_backup` (user bank).
    - Three beeps = uf2 passed the module's Python 2 check. Low tone = stop.
 2. **Install.**
-   - Copy everything in `2_install/` to the stick root: `neb_update.zip`, `sc_runtime.tgz`, `01_sctest.scd` and
-     Technobear's `31-simple.scd`.
+   - Copy everything in `2_install/` to the stick root: `neb_update.zip`, `sc_runtime.tgz`, `01_sctest.scd`,
+     Technobear's `31-simple.scd`, `pearls.instr` and the `csound_plugins` folder (Pearls' plugin,
+     `docs/PEARLS.md`).
    - **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot.
    - The first instrument load after that installs the SuperCollider runtime from `sc_runtime.tgz`. Leave the file
      on the stick: a later load skips it once the installed copy matches.
@@ -480,6 +481,13 @@ How it works:
    it. After at most ~30 s the module should load the factory granular looper, and `neb_error.txt` + `neb_log.txt`
    say why.
 6. Latency feel: play 01_sctest from a sequencer. If it crackles, put `sc_period = 512` in `neb_options.txt`.
+7. **Pearls (Beads).** The first instrument load after the install checks and installs the plugin; that load takes a
+   few seconds longer, once. `neb_log.txt` should say "uf2: Csound plugin libpearls.so installed".
+   - Load `pearls` from the user (Csound) bank. It's a granular processor: patch audio in.
+   - Freeze/Reset gates, Next cycles the quality (the encoder LEDs show the colour), the EOL output gives grain
+     gates.
+   - Source + Next loads a sample from the stick, Source + Reset saves the buffer.
+   - Other Csound instruments behave as before.
 
 ## Status
 - 2026-11-09: Stage 0 tools written and offline-tested. **Not yet run on hardware.**
@@ -515,4 +523,9 @@ How it works:
 - 2026-11-10: **uf2** (SuperCollider bank, failure fallback for all engines, boot guard).
   - 47 logic tests and 15 build tests pass; the PC SC tests pass (see Phase 2).
   - `neb_update.zip` sha256 `b0f6c04ba8c9ffc359c9bef3ca0b68a69d6203078f52d5deb727cf51b48c16ba`.
+  - **Not installed yet.**
+- 2026-11-10: **Pearls (Beads) added to uf2** (`docs/PEARLS.md`): the verified plugin, a private plugin folder via
+  `OPCODE6DIR64` (Csound's own folder is never written), Pearls' firmware hooks.
+  - 55 logic tests and 15 build tests; the plugin check was run with real Csound.
+  - `neb_update.zip` sha256 `52d1b3a1280538c9475dc51abe4bbeefbeb762b27b5ddc022eb9642aed42e044`.
   - **Not installed yet.**

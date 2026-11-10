@@ -48,7 +48,9 @@ For a **new instrument**, see §8.
     - Technobear-compatible OSC;
     - jackd at 256 × 2;
     - the runtime installed once from the stick's `sc_runtime.tgz`;
-    - for every engine, a failure falls back to factory/a_granularlooper, plus a boot guard.
+    - for every engine, a failure falls back to factory/a_granularlooper, plus a boot guard;
+    - **Pearls (Beads port, `docs/PEARLS.md`)**: a verified, reproducibly rebuilt plugin in a private Csound plugin
+      folder, plus Pearls' firmware hooks.
 
     Files are staged in `firmware/dist/stage_uf2/`. |
 | GENDYN (`gendyn.instr`) | Boot-loops the module, and so does our rewrite `instr/demos/gendyn_fixed.instr`. New try `instr/gendyn_orc.instr` (2026-10-22) drops `gendy`/`butterlp` (algorithm ported to a `setksmps 1` UDO) and fixes the negative-Pitch runaway: offline-tested, **awaiting hardware**. If it loops too, `instr/diag_log.instr` captures the journal to the USB stick without SSH. See `docs/INSTR.md` |

@@ -183,7 +183,7 @@ class FakeControlChannel(object):
 
     def setIgnoreHID(self, s): pass
 
-    def setIgnoreGate(self, s): pass
+    def setIgnoreGate(self, s): self.ignore_gate = s
 
     def setIgnoreNextButton(self): pass
 
