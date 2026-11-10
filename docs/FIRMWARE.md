@@ -213,16 +213,15 @@ change set. The base is the unit's own tree (from the SD image), so `fwbuild` wr
 
   | Control | Action |
   |---|---|
-  | Speed turn | Bank (user ← factory → Pd), as stock |
-  | **Next** | Next page: 1–5 → 6–10 → 11–15 → 16–20 → 21–25 → 1–5. Only as many pages as there are files |
-  | **Pitch LED** | Page colour: white, orange, yellow, blue, green (the octave colours) |
-  | **Pitch turn** | Cursor within the page |
-  | **Reset** | Load the instrument under the cursor (Speed click also loads, as stock) |
-  | Pitch click | Cancel, as stock |
-  | Record / Source / Freeze | Nothing in the selector |
+  | Speed turn | Bank, as stock: CCW = your Csound instruments, middle = factory, CW = Pd patches (each sorted alphabetically) |
+  | **Pitch turn** | Page of five: 1–5, 6–10, 11–15, 16–20, 21–25. One detent per page (`sel_page_steps`), stops at the first and last page |
+  | **Pitch LEDs** | Page colour: white, orange, yellow, blue, green (the octave colours) |
+  | **The five buttons** | Left to right = the five patches on the page. A press **loads that patch at once** |
+  | Pitch or Speed click | Leave without loading |
 
-  - Button LEDs: cursor = full, other files on the page = dim, empty slots = off.
+  - Button LEDs: lit = a patch is there, bright = the one running now, off = empty slot (a press does nothing).
   - The selector opens on the running instrument's page.
+  - Decided by the owner (2026-11-10), replacing the first uf1 design (Next = page, Pitch = cursor, Reset = load).
   - Up to 25 files per bank are reachable.
   - File lists are re-read each time the selector opens, so new files on the stick show up without a reboot.
 - **Alt layer reset on every Pd patch load** (including a reload and the patch at boot). Every `*_alt` goes back to
@@ -236,6 +235,7 @@ change set. The base is the unit's own tree (from the SD image), so `fwbuild` wr
 - **`neb_options.txt`** in the stick root (optional, copied at each instrument load, kept when the stick has none):
   ```
   pitch_coeff = 0.95     # 0.05-1.0 per filter step (2 per poll pass); 0.33 = stock glide
+  sel_page_steps = 4     # 1-16 Pitch encoder steps per selector page (4 = one detent, usually)
   pd_alts_at_load = 0    # 1 = also send the (default) alt values once when a Pd patch connects
   ```
 - **Pd externals:** `.pd_linux`, `.l_arm` and `.l_arm64` files in the stick root are copied next to the patches, so
@@ -293,9 +293,12 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
 2. The last instrument and calibration should be back (the restore). V/oct should track as before. Play a Pd patch
    and a Csound instrument.
 3. Selector (your Pd bank has 11 files = 3 pages):
-   - Next pages through, and the Pitch LED colour shows the page;
-   - Pitch turn moves the cursor (bright button), dim buttons are other files, dark = empty;
-   - Reset loads;
+   - Speed CCW/middle/CW gives user Csound / factory / Pd;
+   - Pitch turn steps through the pages, one detent each, and the Pitch LED colour shows the page. If it feels too
+     fast or slow, put `sel_page_steps = 8` (or 2) in `neb_options.txt`;
+   - lit buttons = patches on that page, bright = the running one; pressing a lit button loads it at once, a dark
+     one does nothing;
+   - Pitch or Speed click leaves without loading;
    - power off and on while on a file of page 2 or 3: the selector should open on that page.
 4. `99_pitchlog` again: Pitch clicked to centre, a 0 V ↔ 1 V square into Pitch CV, press Reset, wait for the end
    beeps. Then 08_resonator by ear on big V/oct jumps.
@@ -321,5 +324,7 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
 - 2026-11-10: Stage 0 run on the module (results above). Clock-free `ufmigrate`, past file dates in `fwbuild`,
   `fw_backup` beeps include the precheck (shell logic tested in WSL in 4 scenarios).
   - 28 logic tests and 15 build tests pass.
-  - uf1 `neb_update.zip` sha256 `d8f58966495e806d82a310405ca8b971c2e18d45615b5fc1dc452ab506a852c5`.
+  - uf1 `neb_update.zip` sha256 `1b761767d1a4dfedfbf978c5c3b4d42d7b14d6820ff0d4d4043db2abe0c3b81d`.
   - **Not installed yet.**
+- 2026-11-10: selector redesigned to the owner's spec (Pitch = page, a button loads its patch at once, Pitch or Speed
+  click leaves). 30 logic tests and 15 build tests pass.

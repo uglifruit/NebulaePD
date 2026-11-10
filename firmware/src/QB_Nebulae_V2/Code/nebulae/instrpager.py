@@ -1,14 +1,14 @@
 # Paged instrument selector logic (uf1). Pure logic, no hardware: ui.py drives it and draws the LEDs.
 # Python 2 and 3 compatible so it can be unit-tested off the module.
 #
-# A bank holds up to MAX_FILES instruments, shown PAGE_SIZE at a time on the five button LEDs:
-#   Next press  -> next page (wraps)          Pitch turn -> cursor within the page (clamped)
-#   Reset press -> load the instrument under the cursor (ui.py)
+# A bank holds up to MAX_FILES instruments in pages of PAGE_SIZE. The five buttons are the five slots of the page:
+#   Pitch turn   -> page (clamped at both ends; ui.py sets the detents per page)
+#   button press -> load the instrument in that slot, if there is one (ui.py)
 PAGE_SIZE = 5
 MAX_FILES = 25
 
-LED_CURSOR = 1.0
-LED_FILE = 0.3
+LED_CURRENT = 1.0   # the instrument that is running
+LED_FILE = 0.3      # another instrument on this page
 LED_EMPTY = 0.0
 
 
@@ -16,7 +16,6 @@ class InstrPager(object):
     def __init__(self, count=0):
         self.count = 0
         self.page = 0
-        self.cursor = 0
         self.setCount(count)
 
     def setCount(self, count):
@@ -36,48 +35,41 @@ class InstrPager(object):
             self.page = self.numPages() - 1
         if self.page < 0:
             self.page = 0
-        n = self.filesOnPage()
-        if self.cursor > n - 1:
-            self.cursor = n - 1
-        if self.cursor < 0:
-            self.cursor = 0
 
-    def nextPage(self):
-        self.page = (self.page + 1) % self.numPages()
+    def turn(self, pages):
+        self.page += int(pages)
         self.clamp()
 
-    def move(self, steps):
-        self.cursor += int(steps)
-        self.clamp()
-
-    def goto(self, index):
-        """Show `index` (absolute, 0-based). Out-of-range or None goes to the first slot."""
+    def showIndex(self, index):
+        """Show the page holding `index` (absolute, 0-based). Out of range or None shows page 1."""
         if index is None or index < 0 or index >= self.count:
             self.page = 0
-            self.cursor = 0
         else:
             self.page = index // PAGE_SIZE
-            self.cursor = index % PAGE_SIZE
         self.clamp()
 
-    def index(self):
-        """Absolute index under the cursor, or None if the bank is empty."""
-        if self.count == 0:
+    def slotIndex(self, slot):
+        """Absolute index of button `slot` (0-4) on this page, or None if that slot is empty."""
+        if slot < 0 or slot >= PAGE_SIZE:
             return None
-        return self.page * PAGE_SIZE + self.cursor
+        idx = self.page * PAGE_SIZE + slot
+        if idx >= self.count:
+            return None
+        return idx
 
     def offset(self):
         return self.page * PAGE_SIZE
 
-    def leds(self):
-        """Brightness for the five slot LEDs (Record, Next, Source, Reset, Freeze order)."""
-        n = self.filesOnPage()
+    def leds(self, current=None):
+        """Brightness for the five slot LEDs (Record, Next, Source, Reset, Freeze order). `current` is the running
+        instrument's absolute index in this bank, or None."""
         values = []
-        for i in range(PAGE_SIZE):
-            if i >= n:
+        for slot in range(PAGE_SIZE):
+            idx = self.slotIndex(slot)
+            if idx is None:
                 values.append(LED_EMPTY)
-            elif i == self.cursor:
-                values.append(LED_CURSOR)
+            elif idx == current:
+                values.append(LED_CURRENT)
             else:
                 values.append(LED_FILE)
         return values

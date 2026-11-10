@@ -5,6 +5,7 @@ import leddriver as libDriver
 import switch as libSwitch
 import filehandler
 import instrpager
+import nebopts
 import threading
 import time
 import random
@@ -51,6 +52,8 @@ class UserInterface(object):
         self.mode = "normal"
 
         self.pager = instrpager.InstrPager() # uf1 paged selector
+        self.page_steps = int(nebopts.get("sel_page_steps")) # Pitch encoder steps per page
+        self.page_counter = 0
         self.prev_mode = None
         self.refreshFileHandlers()
         cur_bank = self.controlhandler.getInstrSelBank()
@@ -195,42 +198,46 @@ class UserInterface(object):
 
     def enterInstrSel(self):
         self.refreshFileHandlers()
+        self.controlhandler.popInstrSelSlot() # drop a press left over from before the selector opened
         self.selectBank(self.controlhandler.getInstrSelBank())
 
     def selectBank(self, bank):
-        # Show `bank`, starting at the running instrument if it lives there, else at slot 1 of page 1.
+        # Show `bank` on the page of the running instrument if it lives there, else on page 1.
         f_handle = self.handleForBank(bank)
         self.controlhandler.setInstrSelBank(bank)
         self.controlhandler.setInstrSelNumFiles(f_handle.numFiles())
         self.pager.setCount(f_handle.numFiles())
-        idx = None
-        if bank == self.controlhandler.currentBank:
-            idx = f_handle.getIndex(self.currentInstr)
-        self.pager.goto(idx)
-        self.syncInstrSel()
+        self.pager.showIndex(self.currentIndexInBank(bank))
+        self.page_counter = 0
 
-    def syncInstrSel(self):
-        idx = self.pager.index()
-        self.controlhandler.setInstrSelIdx(idx if idx is not None else 0)
-        self.controlhandler.setInstrSelOffset(self.pager.offset())
-
-    def requestInstrLoad(self):
-        if self.pager.index() is None:
-            return
-        self.syncInstrSel()
-        if self.getNewInstr() is not None:
-            self.reload_flag = True
+    def currentIndexInBank(self, bank):
+        if bank != self.controlhandler.currentBank:
+            return None
+        return self.handleForBank(bank).getIndex(self.currentInstr)
 
     def handleInstrSelButtons(self):
-        if self.controlhandler.popInstrSelPress("next"):
-            self.pager.nextPage()
-            self.syncInstrSel()
-        if self.controlhandler.popInstrSelPress("load"):
-            print "Reset pressed in Instr Sel: loading"
-            self.requestInstrLoad()
+        # uf1: a button loads the instrument in its slot of the page at once; an empty slot does nothing
+        slot = self.controlhandler.popInstrSelSlot()
+        if slot is None:
+            return
+        idx = self.pager.slotIndex(slot)
+        if idx is None:
+            return
+        self.controlhandler.setInstrSelIdx(idx)
+        self.controlhandler.setInstrSelOffset(self.pager.offset())
+        if self.getNewInstr() is not None:
+            print "Button " + str(slot + 1) + " pressed in Instr Sel: loading"
+            self.reload_flag = True
+
+    def leaveInstrSel(self):
+        # back to the running instrument without loading anything (Pitch or Speed click)
+        if self.currentInstr in self.puredata_fhandle.getFileNames():
+            self.controlhandler.enterPureDataMode()
+        else:
+            self.controlhandler.enterNormalMode()
 
     def displayInstrSel(self):
-        values = self.pager.leds()
+        values = self.pager.leds(self.currentIndexInBank(self.controlhandler.getInstrSelBank()))
         self.set_button_led("record", values[0])
         self.set_button_led("next", values[1])
         self.set_button_led("source", values[2])
@@ -557,8 +564,8 @@ class UserInterface(object):
                     self.selectBank("user")
 
             if self.clicked_speed() == 1:
-                print "Clicked Speed from Instr Sel"
-                self.requestInstrLoad()
+                print "Clicked Speed from Instr Sel: leaving without loading"
+                self.leaveInstrSel()
         else:
             pass
         self.set_speed_leds(mode)
@@ -751,25 +758,20 @@ class UserInterface(object):
                 self.restoreDefaultsFlag = True
                 self.controlhandler.restoreAltToDefault()
         elif mode == "instr selector":
-            # uf1: Pitch turns move the cursor within the page (Next changes page)
-            inc = self.get_delta("pitch")
-            if inc:
-                self.pager.move(inc)
-                self.syncInstrSel()
+            # uf1: Pitch turns choose the page, page_steps encoder steps per page (neb_options.txt sel_page_steps)
+            self.page_counter += self.get_delta("pitch")
+            while self.page_counter >= self.page_steps:
+                self.page_counter -= self.page_steps
+                self.pager.turn(1)
+            while self.page_counter <= -self.page_steps:
+                self.page_counter += self.page_steps
+                self.pager.turn(-1)
         else:
             pass
                 
         if mode == "instr selector":
             if self.clicked_pitch():
-                #print "current Instr: " + str(self.currentInstr)
-                #print "all files in puredata_fhandle:"
-                #l = self.puredata_fhandle.getFileNames()
-                #for name in l:
-                #    print name
-                if self.currentInstr in self.puredata_fhandle.getFileNames():
-                    self.controlhandler.enterPureDataMode()
-                else:
-                    self.controlhandler.enterNormalMode()
+                self.leaveInstrSel()
         self.set_pitch_leds(mode)
 
     def set_rgb(self, name, r, g, b, bright=1.0):

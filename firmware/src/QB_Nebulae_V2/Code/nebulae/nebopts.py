@@ -5,6 +5,8 @@
 # Format: one `key=value` per line, `#` starts a comment. Known keys:
 #   pitch_coeff = 0.95     Pitch CV one-pole coefficient per filter step (stock firmware: 0.33). The filter steps
 #                          twice per poll pass (ui.py re-sets Pitch each pass). 1.0 = no smoothing.
+#   sel_page_steps = 4     Pitch encoder steps per page in the instrument selector (1-16). The encoder gives 4 steps per
+#                          cycle, usually one detent; Speed needs 8 to change bank.
 #   pd_alts_at_load = 0    1 = send every *_alt value once when a Pd patch connects (stock: only while Source is
 #                          held). Each Pd load resets them to the defaults first (nebulae.py), so this only tells a
 #                          patch the defaults it already starts with: off by default.
@@ -16,6 +18,7 @@ USB_NAME = "neb_options.txt"
 # key: (default, minimum, maximum)
 OPTIONS = {
     "pitch_coeff": (0.95, 0.05, 1.0),
+    "sel_page_steps": (4.0, 1.0, 16.0),
     "pd_alts_at_load": (0.0, 0.0, 1.0),
 }
 

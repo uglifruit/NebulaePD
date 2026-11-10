@@ -43,44 +43,42 @@ class TestSyntax(unittest.TestCase):
 
 
 class TestPager(unittest.TestCase):
-    def test_pages_and_wrap(self):
+    def test_pages_clamp(self):
         for n, pages in [(0, 1), (3, 1), (5, 1), (7, 2), (25, 5), (30, 5)]:
             p = instrpager.InstrPager(n)
             self.assertEqual(p.numPages(), pages, n)
-            seen = []
-            for _ in range(pages + 1):
-                seen.append(p.page)
-                p.nextPage()
-            self.assertEqual(seen, list(range(pages)) + [0], n)
+            p.turn(10)
+            self.assertEqual(p.page, pages - 1, n)              # clamped at the last page, no wrap
+            p.turn(-10)
+            self.assertEqual(p.page, 0, n)
 
     def test_cap_25(self):
         p = instrpager.InstrPager(30)
-        p.goto(27)
-        self.assertEqual(p.index(), 0)        # beyond the cap: back to the first slot
-        p.goto(24)
-        self.assertEqual((p.page, p.cursor, p.index()), (4, 4, 24))
+        p.showIndex(27)
+        self.assertEqual(p.page, 0)                             # beyond the cap: page 1
+        p.showIndex(24)
+        self.assertEqual((p.page, p.slotIndex(4)), (4, 24))
 
-    def test_cursor_clamp_and_short_page(self):
+    def test_slots_on_a_short_page(self):
         p = instrpager.InstrPager(7)
-        p.move(10)
-        self.assertEqual(p.cursor, 4)
-        p.nextPage()                          # page 2 has 2 files: cursor clamps to the last one
-        self.assertEqual((p.page, p.cursor, p.index()), (1, 1, 6))
-        self.assertEqual(p.leds(), [0.3, 1.0, 0.0, 0.0, 0.0])
-        p.move(-9)
-        self.assertEqual(p.index(), 5)
+        p.turn(1)                                               # page 2 holds files 6 and 7
+        self.assertEqual([p.slotIndex(i) for i in range(5)], [5, 6, None, None, None])
+        self.assertIsNone(p.slotIndex(5))
+        self.assertIsNone(p.slotIndex(-1))
+        self.assertEqual(p.leds(), [0.3, 0.3, 0.0, 0.0, 0.0])   # lit = available
+        self.assertEqual(p.leds(6), [0.3, 1.0, 0.0, 0.0, 0.0])  # the running one is bright
 
-    def test_goto_index_ge_5(self):
+    def test_show_index_ge_5(self):
         p = instrpager.InstrPager(12)
-        p.goto(7)
-        self.assertEqual((p.page, p.cursor, p.offset()), (1, 2, 5))
-        self.assertEqual(p.leds(), [0.3, 0.3, 1.0, 0.3, 0.3])
+        p.showIndex(7)
+        self.assertEqual((p.page, p.offset()), (1, 5))
+        self.assertEqual(p.leds(7), [0.3, 0.3, 1.0, 0.3, 0.3])
+        self.assertEqual(p.leds(2), [0.3] * 5)                  # running one on another page
 
     def test_empty(self):
         p = instrpager.InstrPager(0)
-        p.nextPage()
-        p.move(3)
-        self.assertIsNone(p.index())
+        p.turn(3)
+        self.assertIsNone(p.slotIndex(0))
         self.assertEqual(p.leds(), [0.0] * 5)
 
 
@@ -331,7 +329,7 @@ class TestPitchFilter(unittest.TestCase):
 
 
 class TestSelector(unittest.TestCase):
-    """Real controlhandler.py + ui.py (stubbed hardware): Next pages, Pitch moves the cursor, Reset loads."""
+    """Real controlhandler.py + ui.py (stubbed hardware): Speed = bank, Pitch = page, a button loads its slot."""
 
     def setUp(self):
         self.root = tempfile.mkdtemp().replace("\\", "/")
@@ -381,43 +379,81 @@ class TestSelector(unittest.TestCase):
     def test_boot_index_ge_5(self):
         self.assertEqual((self.ch.getInstrSelIdx(), self.ch.getInstrSelOffset()), (6, 5))
 
-    def test_paging_cursor_load(self):
+    def pitch_steps(self, n):
+        py2shim.FakeEncoderWorker.steps[(17, 27)] = n
+        self.tick(2)                                                 # LEDs are drawn before the encoders are read
+
+    def test_pitch_pages_button_loads(self):
         self.ch.enterInstrSelMode()
         self.tick()
-        self.assertEqual(self.leds(), [0.3, 1.0, 0.3, 0.3, 0.3])     # page 2 (6-10), cursor on 07
+        self.assertEqual(self.leds(), [0.3, 1.0, 0.3, 0.3, 0.3])     # page 2 (6-10); 07 is running = bright
         self.assertEqual(self.pitch_colour(), (4095, 1100, 0))       # orange = page 2
-        self.press("file_instr")                                     # one press held 3 polls = one page
+        self.pitch_steps(4)                                          # one detent = one page
         self.assertEqual(self.ui.pager.page, 2)
-        self.assertEqual(self.leds(), [0.3, 1.0, 0.0, 0.0, 0.0])     # 11, 12; cursor stays on slot 2
+        self.assertEqual(self.leds(), [0.3, 0.3, 0.0, 0.0, 0.0])     # 11, 12 available, 3 slots empty
         self.assertEqual(self.pitch_colour(), (4095, 3395, 0))       # yellow = page 3
-        self.press("file_instr")
+        self.press("source_instr")                                   # empty slot: nothing happens
+        self.assertFalse(self.ui.getReloadRequest())
+        self.pitch_steps(8)
+        self.assertEqual(self.ui.pager.page, 2)                      # clamped at the last page
+        self.pitch_steps(-3)
+        self.assertEqual(self.ui.pager.page, 2)                      # less than a detent: no change
+        self.pitch_steps(-1)
+        self.assertEqual(self.ui.pager.page, 1)
+        self.pitch_steps(-8)
         self.assertEqual(self.ui.pager.page, 0)
         self.assertEqual(self.pitch_colour(), (4095, 4095, 4095))    # white = page 1
-        py2shim.FakeEncoderWorker.steps[(17, 27)] = 9                # Pitch encoder: cursor clamps at slot 5
-        self.tick(2)                                                 # LEDs are drawn before the encoders are read
-        self.assertEqual(self.leds(), [0.3, 0.3, 0.3, 0.3, 1.0])
-        for name in ["record_instr", "source_instr", "freeze_instr"]:
-            self.press(name)                                         # unused in the selector
         self.assertFalse(self.ui.getReloadRequest())
-        self.press("reset_instr")
+        self.press("freeze_instr")                                   # 5th button on page 1 = 05
         self.assertTrue(self.ui.getReloadRequest())
         self.assertEqual(self.ui.getNewInstr(), "05_p")
         self.assertEqual(self.ch.getInstrSelBank(), "puredata")
+
+    def test_each_button_is_its_slot(self):
+        for slot, name in enumerate(["record_instr", "file_instr", "source_instr", "reset_instr", "freeze_instr"]):
+            self.setUp()
+            self.ch.enterInstrSelMode()
+            self.tick()
+            self.press(name)
+            self.assertTrue(self.ui.getReloadRequest(), name)
+            self.assertEqual(self.ui.getNewInstr(), self.pd[5 + slot], name)   # page 2 = files 6-10
+            self.tearDown()
+        self.setUp()
+
+    def test_clicks_leave_without_loading(self):
+        for pin in (26, 22):                                         # Speed click, then Pitch click
+            self.ch.enterInstrSelMode()
+            self.tick()
+            self.assertEqual(self.ch.mode(), "instr selector")
+            py2shim.FakeSwitch.held[pin] = True
+            self.tick()
+            py2shim.FakeSwitch.held[pin] = False
+            self.tick()                                              # the release closes the selector (no more
+                                                                     # ticks: stock normal mode uses py2's has_key)
+            self.assertEqual(self.ch.mode(), "puredata", pin)
+            self.assertFalse(self.ui.getReloadRequest(), pin)
 
     def test_bank_switch_and_hidden(self):
         self.ch.enterInstrSelMode()
         self.tick()
         self.assertEqual(self.ui.puredata_fhandle.getFileNames(), self.pd)   # _helper hidden, externals not listed
-        py2shim.FakeEncoderWorker.steps[(6, 13)] = -8                # Speed: puredata -> factory
+        py2shim.FakeEncoderWorker.steps[(6, 13)] = -8                # Speed CCW: puredata -> factory
         self.tick(2)
         self.assertEqual(self.ch.getInstrSelBank(), "factory")
-        self.assertEqual(self.leds(), [1.0, 0.3, 0.3, 0.3, 0.3])
+        self.assertEqual(self.leds(), [0.3] * 5)                     # 5 factory instruments, none running
+        self.assertEqual(self.pitch_colour(), (4095, 4095, 4095))    # page 1
         py2shim.FakeEncoderWorker.steps[(6, 13)] = -8                # factory -> user (empty)
         self.tick(2)
         self.assertEqual(self.ch.getInstrSelBank(), "user")
         self.assertEqual(self.leds(), [0.0] * 5)
-        self.press("reset_instr")
+        self.press("record_instr")
         self.assertFalse(self.ui.getReloadRequest())                 # nothing to load in an empty bank
+        py2shim.FakeEncoderWorker.steps[(6, 13)] = 16                # back CW past factory to puredata
+        self.tick(2)
+        py2shim.FakeEncoderWorker.steps[(6, 13)] = 8
+        self.tick(2)
+        self.assertEqual(self.ch.getInstrSelBank(), "puredata")
+        self.assertEqual(self.ui.pager.page, 1)                      # back on the running patch's page
 
     def test_new_files_appear_on_open(self):
         open(self.dirs["/home/alarm/pd/"] + "13_new.pd", "w").close()

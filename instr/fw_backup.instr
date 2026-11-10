@@ -119,10 +119,10 @@ grep "^[MA] .*[.]py" /mnt/memory/neb_candidate_manifest.txt | cut -d " " -f 2 | 
 cd /tmp/ufcheck/QB_Nebulae_V2/Code/nebulae && python2 -c "
 import instrpager, nebopts, ufmigrate, pdsender, filehandler
 p = instrpager.InstrPager(12)
-p.goto(7)
-p.nextPage()
-assert (p.page, p.cursor, p.index()) == (2, 1, 11), (p.page, p.cursor)
-assert p.leds() == [0.3, 1.0, 0.0, 0.0, 0.0]
+p.showIndex(7)
+p.turn(5)
+assert (p.page, p.slotIndex(1), p.slotIndex(2)) == (2, 11, None), p.page
+assert p.leds(11) == [0.3, 1.0, 0.0, 0.0, 0.0]
 assert nebopts.get('pitch_coeff', '/nonexistent') == 0.95
 assert pdsender.PdSend.batch.im_func(None, ['a 1', 'b 2']) == 'a 1' + chr(59) + 'b 2' + chr(59)
 print('PY2_SELFTEST_OK')

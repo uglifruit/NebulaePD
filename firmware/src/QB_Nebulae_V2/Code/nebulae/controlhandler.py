@@ -142,7 +142,7 @@ class ControlHandler(object):
         self.instr_sel_bank = "factory"
         self.instr_sel_offset = 0
         self.instr_sel_numfiles = 5
-        self.instr_sel_presses = {"next": 0, "load": 0} # uf1: paged selector, consumed by ui.py
+        self.instr_sel_slot_press = None # uf1: paged selector, the last button pressed (0-4), consumed by ui.py
         # uf1: optionally send every *_alt value once after each Pd (re)connect (neb_options.txt pd_alts_at_load=1)
         self.pd_alts_at_load = nebopts.get("pd_alts_at_load") >= 0.5
         self.pd_send_alts = self.pd_alts_at_load
@@ -215,12 +215,11 @@ class ControlHandler(object):
     def setInstrSelNumFiles(self, numfiles):
         self.instr_sel_numfiles = numfiles
 
-    def popInstrSelPress(self, name):
-        # uf1: True once per Next ("next") or Reset ("load") press in the instrument selector
-        if self.instr_sel_presses[name] > 0:
-            self.instr_sel_presses[name] -= 1
-            return True
-        return False
+    def popInstrSelSlot(self):
+        # uf1: the button (0-4: Record, Next, Source, Reset, Freeze) pressed in the instrument selector, once, or None
+        slot = self.instr_sel_slot_press
+        self.instr_sel_slot_press = None
+        return slot
 
     def updateChannel(self, name):
         self.channeldict[name].update()
@@ -478,15 +477,12 @@ class ControlHandler(object):
             #        self.restoreAltToDefault()
         elif self.control_mode == "instr selector":
             #self.exit_instrmode_chn.update()
-            # uf1 paged selector: Next = next page, Reset = load; Record/Source/Freeze unused. These channels are
-            # button-only (no gate jack), and a press holds 1 for a pulse period, so count rising edges only.
-            for chn in self.instr_sel_controls:
+            # uf1 paged selector: each button loads the instrument in its slot of the page (ui.py). These channels
+            # are button-only (no gate jack), and a press holds 1 for a pulse period, so take rising edges only.
+            for slot, chn in enumerate(self.instr_sel_controls):
                 chn.update()
                 if chn.getValue() == 1 and chn.getPrevValue() != 1:
-                    if chn.name == "file_instr":
-                        self.instr_sel_presses["next"] += 1
-                    elif chn.name == "reset_instr":
-                        self.instr_sel_presses["load"] += 1
+                    self.instr_sel_slot_press = slot
 
         elif self.control_mode == "puredata":
             time.sleep(0.001)
