@@ -30,7 +30,7 @@ import tarfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FW = os.path.join(REPO, "firmware")
-VERSION = "v2_1_2_uf2"
+VERSION = "v2_1_2_uf2_1"
 
 PROTECTED_DIRS = ["Code/scripts/", "Code/localfiles/", "Code/config/", "Code/misc/", "Code/log/"]
 PROTECTED_FILES = ["Code/nebulae/bootleds.py", "Code/nebulae/calibration_collector.py", "Code/config.txt"]

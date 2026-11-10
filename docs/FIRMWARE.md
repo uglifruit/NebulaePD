@@ -17,9 +17,9 @@ cloned card; the STOCK card stays in the drawer.
    - Load `000_fw_backup` (user bank).
    - Three beeps = uf2 passed the module's Python 2 check. Low tone = stop.
 2. **Install.**
-   - Copy everything in `2_install/` to the stick root: `neb_update.zip`, `sc_runtime.tgz`, `01_sctest.scd`,
-     Technobear's `31-simple.scd`, `pearls.instr` and the `csound_plugins` folder (Pearls' plugin,
-     `docs/PEARLS.md`).
+   - Copy everything in `2_install/` to the stick root: `neb_update.zip` (**uf2_1**), `sc_runtime.tgz`, the SC
+     instruments `01_sctest` … `04_sc_cloud` (`sc/README.md`) and Technobear's `31-simple.scd`, `pearls.instr` and
+     the `csound_plugins` folder (Pearls' plugin, `docs/PEARLS.md`).
    - **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot.
    - The first instrument load after that installs the SuperCollider runtime from `sc_runtime.tgz`. Leave the file
      on the stick: a later load skips it once the installed copy matches.
@@ -480,9 +480,11 @@ How it works:
 5. **Fallback:** put a deliberately broken `zz_broken.scd` on the stick, containing just the word `oops`, and load
    it. After at most ~30 s the module should load the factory granular looper, and `neb_error.txt` + `neb_log.txt`
    say why.
-6. Latency feel: play 01_sctest from a sequencer. If it crackles, put `sc_period = 512` in `neb_options.txt`.
+6. SC instruments `02_sc_drift`, `03_sc_strike`, `04_sc_cloud`: see `sc/README.md` for their controls.
+   Latency feel: play 01_sctest or 03_sc_strike from a sequencer. If it crackles, put `sc_period = 512` in `neb_options.txt`.
 7. **Pearls (Beads).** The first instrument load after the install checks and installs the plugin; that load takes a
-   few seconds longer, once. `neb_log.txt` should say "uf2: Csound plugin libpearls.so installed".
+   few seconds longer, once. `neb_log.txt` should say "uf2: Csound plugin libpearls.so installed" (uf2_1 writes it
+   there; uf2 printed it only to the journal). The full test list is `docs/PEARLS_GUIDE.md`.
    - Load `pearls` from the user (Csound) bank. It's a granular processor: patch audio in.
    - Freeze/Reset gates, Next cycles the quality (the encoder LEDs show the colour), the EOL output gives grain
      gates.
@@ -529,3 +531,13 @@ How it works:
   - 55 logic tests and 15 build tests; the plugin check was run with real Csound.
   - `neb_update.zip` sha256 `52d1b3a1280538c9475dc51abe4bbeefbeb762b27b5ddc022eb9642aed42e044`.
   - **Not installed yet.**
+- 2026-11-10: uf2 was installed on hardware (`Firmware updated to: v2_1_2_uf2`).
+  - The owner's "Pd → stock → Pd loaded a different patch": most likely the selector, where uf2 puts the SC bank one
+    Speed step past Pd, so an extra turn lands on SC (blue light) and a press loads an SC patch. Owner to confirm.
+- 2026-11-10: **uf2_1**:
+  - `fileloader` also writes the SC-runtime and plugin install results to the stick's `neb_log.txt`;
+  - three SC instruments (`sc/02_sc_drift`, `03_sc_strike`, `04_sc_cloud`), tested offline in SC 3.10.4 by
+    `tools/sc_nrt_tests.py` (pitch within 3 cents, the controls, freeze, no clicks between events);
+  - the Pearls guide is `docs/PEARLS_GUIDE.md`;
+  - 55 logic tests and 15 build tests pass;
+  - `neb_update.zip` sha256 `261db5258e0d88b54091800f0cfc407745e22c530577ebf4191e06035d5032d0`.

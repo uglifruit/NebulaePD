@@ -89,6 +89,9 @@ tools/resonator.py 08_resonator builder (E/program/watched control-math compiler
 tools/pitchlog.py    99_pitchlog builder + analyzer (poll rate, Pitch jump response) for logs from the module
 tools/fwbuild.py     custom firmware: guards + reproducible neb_update.zip from firmware/src; --import-device
 sc/01_sctest.scd     uf2 hardware-test SC patch (and a minimal Nebulae SC patch example)
+sc/02..04_*.scd      SC instruments: drift (pad), strike (plucked string), cloud (granular input); guide sc/README.md
+tools/sc_nrt_tests.py  offline renders + audio checks of the SC instruments in SC 3.10.4
+docs/PEARLS_GUIDE.md   Pearls (Beads) panel + hardware test checklist
 tools/sctest.py      run sclang on the PC: syntax check / NRT renders of .scd files
 tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV

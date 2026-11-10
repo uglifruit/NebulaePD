@@ -52,11 +52,22 @@ class FileLoader(object):
             self.copyType("pd")
             self.copyType("sc")
             nebopts.copy_from_usb()
+            # uf2: install results go to the stick's neb_log.txt too (the journal isn't reachable without SSH)
+            lines = []
             msg = scengine.install_from_usb()
             if msg:
-                print "uf2: " + msg
-            for line in csplugins.install_from_usb():
+                lines.append(msg)
+            lines.extend(csplugins.install_from_usb())
+            for line in lines:
                 print "uf2: " + line
+            news = [line for line in lines if "up to date" not in line]     # not on every load
+            if news:
+                try:
+                    with open("/mnt/memory/neb_log.txt", "a") as f:
+                        for line in news:
+                            f.write("uf2: " + line + "\n")
+                except Exception:
+                    pass
             self.umount()
         else:
             self.launch_bootled(0)
