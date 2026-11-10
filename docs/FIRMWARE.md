@@ -378,6 +378,9 @@ How it works:
 - Its EXIT trap always starts the app again.
 - Nothing is installed: SuperCollider runs from `/tmp/sc`.
 - It runs once. `neb_scprobe/started` blocks a rerun; delete it and `RESULT.txt` to run again.
+- **PC test bench:** SC 3.10.4 + sc3-plugins 3.10.0 for Windows are installed. `tools/sctest.py check|run`.
+  - `probe_nrt.scd` renders on the PC exactly as on the module: same frames, the sine within 1 LSB.
+  - All our and Technobear's `.scd` files pass the syntax check.
 - **Run 1 (2026-11-10, `firmware/device/scprobe1/`):** `unpack=1 libs=1 nrt=1 rt=no`.
   - `ldd` found every library.
   - sclang 3.10.4 compiled 445 class files, including sc3-plugins.

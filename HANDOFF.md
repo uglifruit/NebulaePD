@@ -75,6 +75,7 @@ tools/shimmer.py 07_shimmer builder (ui, reverb (FDN + shifter taps + diffuser),
 tools/resonator.py 08_resonator builder (E/program/watched control-math compiler; ui, exciter, res, bbd, test_source)
 tools/pitchlog.py    99_pitchlog builder + analyzer (poll rate, Pitch jump response) for logs from the module
 tools/fwbuild.py     custom firmware: guards + reproducible neb_update.zip from firmware/src; --import-device
+tools/sctest.py      run sclang on the PC: syntax check / NRT renders of .scd files
 tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
 tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
@@ -177,6 +178,14 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - `wrap~` only on **positive** input (old Pd's `wrap~` was wrong for negatives); `floor(z) = z − wrap~(z)`.
 
 ## 5. How to test (do this before handing anything over)
+SuperCollider (`.scd`): the PC has **SC 3.10.4 + sc3-plugins 3.10.0**, the module's versions, at
+`C:\Program Files\SuperCollider-3.10.4` (plugins in `%LOCALAPPDATA%\SuperCollider\Extensions`). PC and module NRT
+renders are identical (SC probe, 2026-11-10).
+```bash
+python tools/sctest.py check sc/x.scd                 # syntax check (sclang compiles, nothing runs)
+python tools/sctest.py run   sc/x_nrt.scd             # run e.g. an NRT render, then check it with wavcheck/wavpeaks
+```
+Pd:
 ```bash
 python tools/gen.py                                   # regenerate everything
 PD="/c/Program Files/Pd/bin/pd.com"                   # Pd 0.57 is installed
