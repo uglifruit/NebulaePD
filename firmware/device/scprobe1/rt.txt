@@ -1,0 +1,37 @@
+compiling class library...
+	Found 718 primitives.
+	Compiling directory '/usr/share/SuperCollider/SCClassLibrary'
+	Compiling directory '/usr/share/SuperCollider/Extensions'
+	Compiling directory '/tmp/sc_home/.local/share/SuperCollider/Extensions'
+	Compiling directory '/tmp/sc/share/SCClassLibrary'
+	Compiling directory '/tmp/sc/share/Extensions'
+	numentries = 1086434 / 12117956 = 0.09
+	4133 method selectors, 2932 classes
+	method table size 8069764 bytes, big table size 48471824
+	Number of Symbols 11641
+	Byte Code Size 328987
+	compiled 445 files in 0.55 seconds
+
+Info: 4 methods are currently overwritten by extensions. To see which, execute:
+MethodOverride.printAll
+
+compile done
+localhost : setting clientID to 0.
+internal : setting clientID to 0.
+Class tree inited in 0.03 seconds
+
+
+*** Welcome to SuperCollider 3.10.4. *** For help type ctrl-c ctrl-h (Emacs) or :SChelp (vim) or ctrl-U (sced/gedit).
+Booting server 'localhost' on address 127.0.0.1:57110.
+Found 10 LADSPA plugins
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+Automatic start of JACK server is disabled at configure time
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+could not initialize audio.
+Server 'localhost' exited with exit code 1.
+SCPROBE: RT timeout
+main: quit request 1
+cleaning up OSC

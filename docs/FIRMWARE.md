@@ -378,6 +378,16 @@ How it works:
 - Its EXIT trap always starts the app again.
 - Nothing is installed: SuperCollider runs from `/tmp/sc`.
 - It runs once. `neb_scprobe/started` blocks a rerun; delete it and `RESULT.txt` to run again.
+- **Run 1 (2026-11-10, `firmware/device/scprobe1/`):** `unpack=1 libs=1 nrt=1 rt=no`.
+  - `ldd` found every library.
+  - sclang 3.10.4 compiled 445 class files, including sc3-plugins.
+  - The NRT render is correct: left a clean 440 Hz sine at 0.30, right DFM1-filtered noise (so sc3-plugins load).
+  - Realtime failed. jackd 1.9.21 tries to reserve the card through the D-Bus *session* bus, which the module
+    doesn't have, and stops with "Audio device hw:0 cannot be acquired". scsynth then found no JACK server.
+  - Fix: `JACK_NO_AUDIO_RESERVATION=1`.
+  - Also changed: `run.sh` logs any process still holding `/dev/snd`, checks that jackd is still running (the card
+    has no `jack_lsp`), and gives each sclang run a fresh copy of its config, because sclang rewrites the file on
+    exit.
 - Tested offline: `bash -n run.sh`; the instrument compiles and runs in Csound 6.09.1 with `system_i` stubbed (OK
   beeps); `system_i` itself already worked on the module with `fw_backup`. The `.scd` scripts can only be tested on
   the module, because SuperCollider isn't installed on the PC.

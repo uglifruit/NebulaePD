@@ -1,0 +1,173 @@
+=== start
+Sat Jun 11 12:30:51 UTC 2022
+ 12:30:51 up 0 min,  0 users,  load average: 1.14, 0.30, 0.10
+=== unpack
+17M	/tmp/sc
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           1.9G   17M  1.9G   1% /tmp
+=== ldd
+/tmp/sc/bin/sclang:
+	linux-vdso.so.1 (0xbed6d000)
+	libpthread.so.0 => /usr/lib/libpthread.so.0 (0xb6d10000)
+	libudev.so.1 => /usr/lib/libudev.so.1 (0xb6cc0000)
+	libscsynth.so.1 => /tmp/sc/lib/libscsynth.so.1 (0xb6bf0000)
+	libreadline.so.7 => /tmp/sc/lib/libreadline.so.7 (0xb6b90000)
+	libasound.so.2 => /usr/lib/libasound.so.2 (0xb6ac0000)
+	libsndfile.so.1 => /usr/lib/libsndfile.so.1 (0xb6a30000)
+	librt.so.1 => /usr/lib/librt.so.1 (0xb6a10000)
+	libstdc++.so.6 => /usr/lib/libstdc++.so.6 (0xb6810000)
+	libm.so.6 => /usr/lib/libm.so.6 (0xb67b0000)
+	libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0xb6780000)
+	libc.so.6 => /usr/lib/libc.so.6 (0xb65e0000)
+	/lib/ld-linux-armhf.so.3 => /usr/lib/ld-linux-armhf.so.3 (0xb6f61000)
+	libdl.so.2 => /usr/lib/libdl.so.2 (0xb65c0000)
+	libavahi-common.so.3 => /tmp/sc/lib/libavahi-common.so.3 (0xb65a0000)
+	libavahi-client.so.3 => /tmp/sc/lib/libavahi-client.so.3 (0xb6580000)
+	libjack.so.0 => /usr/lib/libjack.so.0 (0xb6520000)
+	libfftw3f.so.3 => /usr/lib/libfftw3f.so.3 (0xb6440000)
+	libncursesw.so.6 => /usr/lib/libncursesw.so.6 (0xb63d0000)
+	libvorbisenc.so.2 => /usr/lib/libvorbisenc.so.2 (0xb6330000)
+	libFLAC.so.8 => /usr/lib/libFLAC.so.8 (0xb62f0000)
+	libopus.so.0 => /usr/lib/libopus.so.0 (0xb6280000)
+	libvorbis.so.0 => /usr/lib/libvorbis.so.0 (0xb6240000)
+	libogg.so.0 => /usr/lib/libogg.so.0 (0xb6220000)
+	libdbus-1.so.3 => /usr/lib/libdbus-1.so.3 (0xb61c0000)
+	libdb-5.3.so => /usr/lib/libdb-5.3.so (0xb6030000)
+	libsystemd.so.0 => /usr/lib/libsystemd.so.0 (0xb5f40000)
+	libcap.so.2 => /usr/lib/libcap.so.2 (0xb5f20000)
+	libgcrypt.so.20 => /usr/lib/libgcrypt.so.20 (0xb5e20000)
+	liblzma.so.5 => /usr/lib/liblzma.so.5 (0xb5de0000)
+	libzstd.so.1 => /usr/lib/libzstd.so.1 (0xb5d30000)
+	liblz4.so.1 => /usr/lib/liblz4.so.1 (0xb5d00000)
+	libgpg-error.so.0 => /usr/lib/libgpg-error.so.0 (0xb5cc0000)
+/tmp/sc/bin/scsynth:
+	linux-vdso.so.1 (0xbefdb000)
+	libscsynth.so.1 => /tmp/sc/lib/libscsynth.so.1 (0xb6e90000)
+	libpthread.so.0 => /usr/lib/libpthread.so.0 (0xb6e70000)
+	libstdc++.so.6 => /usr/lib/libstdc++.so.6 (0xb6c70000)
+	libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0xb6c40000)
+	libc.so.6 => /usr/lib/libc.so.6 (0xb6aa0000)
+	/lib/ld-linux-armhf.so.3 => /usr/lib/ld-linux-armhf.so.3 (0xb6f82000)
+	libdl.so.2 => /usr/lib/libdl.so.2 (0xb6a80000)
+	libsndfile.so.1 => /usr/lib/libsndfile.so.1 (0xb69f0000)
+	libavahi-common.so.3 => /tmp/sc/lib/libavahi-common.so.3 (0xb69d0000)
+	libavahi-client.so.3 => /tmp/sc/lib/libavahi-client.so.3 (0xb69b0000)
+	libjack.so.0 => /usr/lib/libjack.so.0 (0xb6950000)
+	libfftw3f.so.3 => /usr/lib/libfftw3f.so.3 (0xb6870000)
+	librt.so.1 => /usr/lib/librt.so.1 (0xb6850000)
+	libm.so.6 => /usr/lib/libm.so.6 (0xb67f0000)
+	libvorbisenc.so.2 => /usr/lib/libvorbisenc.so.2 (0xb6750000)
+	libFLAC.so.8 => /usr/lib/libFLAC.so.8 (0xb6710000)
+	libopus.so.0 => /usr/lib/libopus.so.0 (0xb66a0000)
+	libvorbis.so.0 => /usr/lib/libvorbis.so.0 (0xb6660000)
+	libogg.so.0 => /usr/lib/libogg.so.0 (0xb6640000)
+	libdbus-1.so.3 => /usr/lib/libdbus-1.so.3 (0xb65e0000)
+	libdb-5.3.so => /usr/lib/libdb-5.3.so (0xb6450000)
+	libsystemd.so.0 => /usr/lib/libsystemd.so.0 (0xb6360000)
+	libcap.so.2 => /usr/lib/libcap.so.2 (0xb6340000)
+	libgcrypt.so.20 => /usr/lib/libgcrypt.so.20 (0xb6240000)
+	liblzma.so.5 => /usr/lib/liblzma.so.5 (0xb6200000)
+	libzstd.so.1 => /usr/lib/libzstd.so.1 (0xb6150000)
+	liblz4.so.1 => /usr/lib/liblz4.so.1 (0xb6120000)
+	libgpg-error.so.0 => /usr/lib/libgpg-error.so.0 (0xb60e0000)
+=== versions
+scsynth 3.10.4 (Built from branch 'not_a_git_checkout' [na])
+sclang 3.10.4 (Built from branch 'not_a_git_checkout' [na])
+=== stage 1: NRT render
+compiling class library...
+	Found 718 primitives.
+	Compiling directory '/tmp/sc/share/SCClassLibrary'
+	Compiling directory '/tmp/sc/share/Extensions'
+	numentries = 1086434 / 12117956 = 0.09
+	4133 method selectors, 2932 classes
+	method table size 8069764 bytes, big table size 48471824
+	Number of Symbols 11641
+	Byte Code Size 328987
+	compiled 445 files in 0.67 seconds
+
+Info: 4 methods are currently overwritten by extensions. To see which, execute:
+MethodOverride.printAll
+
+compile done
+localhost : setting clientID to 0.
+internal : setting clientID to 0.
+Class tree inited in 0.04 seconds
+
+
+*** Welcome to SuperCollider 3.10.4. *** For help type ctrl-c ctrl-h (Emacs) or :SChelp (vim) or ctrl-U (sced/gedit).
+SCPROBE: sclang 3.10.4, sc3-plugins classes: true
+Found 10 LADSPA plugins
+start time 0
+nextOSCPacket 0
+nextOSCPacket 0
+nextOSCPacket 0
+nextOSCPacket 2
+nextOSCPacket 2
+SCPROBE: NRT done, file true
+main: quit request 0
+cleaning up OSC
+total 376
+-rw-r--r-- 1 root root 384300 Jun 11 12:30 probe_nrt.wav
+=== stage 2: realtime (the Nebulae app is stopped meanwhile)
+compiling class library...
+	Found 718 primitives.
+	Compiling directory '/usr/share/SuperCollider/SCClassLibrary'
+	Compiling directory '/usr/share/SuperCollider/Extensions'
+	Compiling directory '/tmp/sc_home/.local/share/SuperCollider/Extensions'
+	Compiling directory '/tmp/sc/share/SCClassLibrary'
+	Compiling directory '/tmp/sc/share/Extensions'
+	numentries = 1086434 / 12117956 = 0.09
+	4133 method selectors, 2932 classes
+	method table size 8069764 bytes, big table size 48471824
+	Number of Symbols 11641
+	Byte Code Size 328987
+	compiled 445 files in 0.55 seconds
+
+Info: 4 methods are currently overwritten by extensions. To see which, execute:
+MethodOverride.printAll
+
+compile done
+localhost : setting clientID to 0.
+internal : setting clientID to 0.
+Class tree inited in 0.03 seconds
+
+
+*** Welcome to SuperCollider 3.10.4. *** For help type ctrl-c ctrl-h (Emacs) or :SChelp (vim) or ctrl-U (sced/gedit).
+Booting server 'localhost' on address 127.0.0.1:57110.
+Found 10 LADSPA plugins
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+Automatic start of JACK server is disabled at configure time
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+could not initialize audio.
+Server 'localhost' exited with exit code 1.
+SCPROBE: RT timeout
+main: quit request 1
+cleaning up OSC
+=== jackd
+Could not open component .so '/usr/lib/jack/jack_firewire.so': libffado.so.2: cannot open shared object file: No such file or directory
+Could not open component .so '/usr/lib/jack/jack_firewire.so': libffado.so.2: cannot open shared object file: No such file or directory
+jack_get_descriptor : dll 
+jack_get_descriptor returns null for 'jack_firewire.so'
+Could not open component .so '/usr/lib/jack/jack_firewire.so': libffado.so.2: cannot open shared object file: No such file or directory
+jackdmp 1.9.21
+Copyright 2001-2005 Paul Davis and others.
+Copyright 2004-2016 Grame.
+Copyright 2016-2022 Filipe Coelho.
+jackdmp comes with ABSOLUTELY NO WARRANTY
+This is free software, and you are welcome to redistribute it
+under certain conditions; see the file COPYING for details
+JACK server starting in realtime mode with priority 75
+self-connect-mode is "Don't restrict self connect requests"
+Failed to connect to session bus for device reservation: Using X11 for dbus-daemon autolaunch was disabled at compile time, set your DBUS_SESSION_BUS_ADDRESS instead
+
+To bypass device reservation via session bus, set JACK_NO_AUDIO_RESERVATION=1 prior to starting jackd.
+
+Audio device hw:0 cannot be acquired...
+Cannot initialize driver
+JackServer::Open failed with -1
+Failed to open server
+=== finish
+FAIL

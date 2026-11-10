@@ -1,0 +1,22 @@
+Could not open component .so '/usr/lib/jack/jack_firewire.so': libffado.so.2: cannot open shared object file: No such file or directory
+Could not open component .so '/usr/lib/jack/jack_firewire.so': libffado.so.2: cannot open shared object file: No such file or directory
+jack_get_descriptor : dll 
+jack_get_descriptor returns null for 'jack_firewire.so'
+Could not open component .so '/usr/lib/jack/jack_firewire.so': libffado.so.2: cannot open shared object file: No such file or directory
+jackdmp 1.9.21
+Copyright 2001-2005 Paul Davis and others.
+Copyright 2004-2016 Grame.
+Copyright 2016-2022 Filipe Coelho.
+jackdmp comes with ABSOLUTELY NO WARRANTY
+This is free software, and you are welcome to redistribute it
+under certain conditions; see the file COPYING for details
+JACK server starting in realtime mode with priority 75
+self-connect-mode is "Don't restrict self connect requests"
+Failed to connect to session bus for device reservation: Using X11 for dbus-daemon autolaunch was disabled at compile time, set your DBUS_SESSION_BUS_ADDRESS instead
+
+To bypass device reservation via session bus, set JACK_NO_AUDIO_RESERVATION=1 prior to starting jackd.
+
+Audio device hw:0 cannot be acquired...
+Cannot initialize driver
+JackServer::Open failed with -1
+Failed to open server
