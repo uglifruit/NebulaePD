@@ -10,23 +10,23 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## To do
-**Owner (on hardware), in one session:**
-0. Boot the cloned card (written from the image) in the module and play a few instruments. If it works, keep the
-   original card in a drawer as **STOCK** and use the clone from now on. If not, put the original back and tell me.
-1. Stage 0 steps 2–5 below (step 1 is done). For step 3, also copy `firmware/dist/v2_1_2_uf1/neb_candidate.tgz` and
-   `neb_candidate_manifest.txt` to the stick root, so the backup run checks uf1 with the module's own Python 2.
-   Nothing is installed by this.
-2. Copy the stick's `neb_fwbackup/` folder to `firmware/device/`.
+**Owner (on hardware): the uf1 install session.** Files are staged in `firmware/dist/stage1_stick/`. Use the
+cloned card; the original stays in the drawer as STOCK.
+1. **Precheck.** Copy `1_precheck/*` to the stick root (no `neb_update.zip` in the root yet). Boot and load
+   `000_fw_backup` from the user bank.
+   - **Three beeps** = backup fine and uf1 passed the module's Python 2 check. Go on.
+   - **Low tone** = stop and bring the stick back.
+2. **Install.** Power off. Copy `2_install/neb_update.zip` and `99_pitchlog.pd` to the stick root. **Unplug every
+   CV/gate cable**, then power on. Expect the update LEDs and a reboot.
+3. **Test** with the list in "Hardware test" (Stage 1 below). End by loading `000_fw_backup` again, which collects
+   the new pitch log and the migration result, and copy the stick's `neb_fwbackup/` folder (the newest
+   `inventory_*.txt` and `neb_pitchlog_*.txt`) to `firmware/device/`.
 
-**Next session (Claude), once `firmware/device/` exists:**
-1. Read `inventory_*.txt`. The "uf1 precheck" section must show `PY2_COMPILE_OK` and `PY2_SELFTEST_OK`; only then
-   is the uf1 `neb_update.zip` handed over for install. Also note the live CPU clock.
-2. `python tools/pitchlog.py firmware/device/neb_pitchlog_*.txt` gives the real poll rate and stock Pitch slew. Put
-   them in HANDOFF §4.
-3. Check that `neb_fwbackup/neb_update.zip` matches `firmware/device_image/neb_update.zip` apart from runtime files
-   (calibration, last instrument, settings, `.pyc`). The base was already imported from the SD image; re-import only
-   if the code differs.
-4. Hand over the uf1 install with the hardware test list (Stage 1 below).
+**Next session (Claude):**
+1. Newest inventory: `Firmware updated to: v2_1_2_uf1`, the `uf_migrated` content ("restored calibration…"), and
+   `PRECHECK_OK`.
+2. `python tools/pitchlog.py` on the uf1 capture; compare with the stock one (Stage 0 results below).
+3. Go through the owner's hardware test notes.
 
 **Decided (owner, 2026-11-09):** every Pd patch load resets the alt layer to its defaults. Because of that,
 `pd_alts_at_load` can only send the defaults, which our patches already start with, so it is harmless. It stays off
@@ -100,6 +100,33 @@ Read offline from `SDImage/nebulae_stock_pi4.img` with WSL `debugfs` (read-only)
   - so the owner's own image is the one to restore. Qu-Bit's is an independent fallback (recalibrate after it).
 - `/home/alarm/backup/new/neb_update.zip` is the update Qu-Bit installed on 2022-06-02. It differs from GitHub only in
   `digitaldata.py` and `nebulae.service`; the other three Pi 4 changes were made in place afterwards.
+
+## Stage 0 results (module run, 2026-11-10)
+- `fw_backup.instr` worked: `system_i` runs shell commands on this Csound. `firmware/device/` holds its output.
+  Its `neb_update.zip` has the same code as `firmware/device_image/neb_update.zip`; only `bootinstr.txt` differs.
+- **Inventory:**
+  - hardware and system: Raspberry Pi 4 Model B Rev 1.5 (BCM2711, 4 GB), 32-bit armv7l, governor `performance`;
+  - **CPU clock: 1200 MHz** (`arm_freq=1200`);
+  - software: Pd 0.52.2, Csound 6.11 (double), Python 2.7.18, jackd present, no SuperCollider;
+  - space: root 951 MB free (82 % used), `/dev/shm` 128 MB, stick 960 MB.
+- **No real clock.** The Pi has no RTC and no network, so every boot starts at about 2022-06-11 12:13 UTC.
+  Nothing may rely on file times:
+  - `ufmigrate` no longer uses them;
+  - `fwbuild` stamps files 2022-05-01, because 2026 dates were "in the future" for tar on the unit.
+- **uf1 precheck:**
+  - `PY2_COMPILE_OK` for every uf1 file (build `802db7e1…`).
+  - The self-test then stopped on a bug in the test line itself: Python 2 refuses an unbound method called with
+    `None`. Fixed with `im_func`.
+  - Since then, `ufmigrate.py` changed, so the next run checks again.
+  - The result sounds now include the precheck, so three beeps mean it passed.
+- **Pitch log** (`tools/pitchlog.py firmware/device/neb_pitchlog_220611_121645.txt`):
+  - **Poll pass: 5.3 ms mean** (median 5.5, 4–8 ms), one `pitch` message per pass.
+  - **The Pitch filter steps twice per pass.** `ui.set_pitch_amount()` calls `setValue("pitch", …)` every pass,
+    and that reads the ADC and filters again. So stock is effectively 1 − 0.67² = 0.55 per pass.
+  - The capture hit the 1.30 clip (1.00 ↔ 1.30), so rising edges look instant. Falling edges are clean:
+    **90 % in ~4 passes (~21 ms), settled in ~7 (~37 ms)**. That is the glide 08_resonator shows.
+  - With 0.95 (twice per pass) a jump should settle in about 1 pass (~5 ms).
+  - For the uf1 comparison, use an in-range step: Pitch clicked to centre, CV 0 V ↔ 1 V.
 
 ## Stage 0 — back up, measure, prove the revert path
 Do these in order. Nothing on the module changes until step 5, and step 5 reinstalls exactly what is already
@@ -203,12 +230,12 @@ change set. The base is the unit's own tree (from the SD image), so `fwbuild` wr
   take over again, as after Source + Pitch click.
   - Stock did this only for Csound instrument changes.
   - Pd patches got whatever the last Csound instrument had saved, because Pd mode never saves alt values.
-- **Pitch CV:** the firmware's one-pole goes from 0.33 to **0.95** per poll. A 3-octave jump settles in 2 polls
-  instead of 12. Steady CV is still held by the hysteresis and stability gate (±1 LSB noise gives 0 output changes in
-  both).
+- **Pitch CV:** the firmware's one-pole goes from 0.33 to **0.95** per filter step. The filter steps twice per
+  5.3 ms poll pass, so a jump should settle in about 1 pass (~5 ms) instead of ~7 (~37 ms, measured on stock).
+  Steady CV is still held by the hysteresis and stability gate (±1 LSB noise gives 0 output changes in both).
 - **`neb_options.txt`** in the stick root (optional, copied at each instrument load, kept when the stick has none):
   ```
-  pitch_coeff = 0.95     # 0.05-1.0; 0.33 = stock glide
+  pitch_coeff = 0.95     # 0.05-1.0 per filter step (2 per poll pass); 0.33 = stock glide
   pd_alts_at_load = 0    # 1 = also send the (default) alt values once when a Pd patch connects
   ```
 - **Pd externals:** `.pd_linux`, `.l_arm` and `.l_arm64` files in the stick root are copied next to the patches, so
@@ -217,8 +244,8 @@ change set. The base is the unit's own tree (from the SD image), so `fwbuild` wr
 - **After a firmware update:** the first start restores calibration, last instrument, alt settings and
   `neb_options.txt` from the replaced tree (`/home/alarm/backup/old`).
   - The calibration is restored only if the old file is valid.
-  - Nothing is restored if Pitch was held at power-on (deliberate recalibration and reset) or the boot time is
-    unknown.
+  - It runs on the first start of a new tree only, whatever the time says (the clock is not real). Holding Pitch
+    at power-on on that one boot is overridden by the restore. Recalibrate on any later boot.
   - The first uf1 install still runs stock's forced calibration: unplug all CV/gate cables for it.
 
 ### Fixes (no behaviour change otherwise)
@@ -240,7 +267,7 @@ change set. The base is the unit's own tree (from the SD image), so `fwbuild` wr
 
 ### Developer workflow
 ```bash
-python firmware/tests/test_firmware.py   # 27 logic tests: stock modules via firmware/tests/py2shim.py, hardware stubbed
+python firmware/tests/test_firmware.py   # 28 logic tests: stock modules via firmware/tests/py2shim.py, hardware stubbed
 python firmware/tests/test_fwbuild.py    # 15: base repack == unit tree, Pi 4 changes kept, guards, --import-device
 python tools/fwbuild.py --check          # guards only
 python tools/fwbuild.py                  # -> firmware/dist/v2_1_2_uf1/ (+ neb_candidate.* for the on-module check)
@@ -263,10 +290,15 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
 ### Hardware test (owner, after the installable build)
 1. Unplug all CV/gate cables. Put `neb_update.zip` in the stick root and boot. Expect the update animation and
    reboots, and "Firmware updated to: v2_1_2_uf1" in `neb_log.txt`.
-2. The last instrument and calibration should be back (the restore). Play a Pd patch and a Csound instrument.
-3. Selector: 7+ Pd files on the stick. Check the paging and LEDs, Reset to load, booting into file 7 opens page 2,
-   and `_helper.pd` is hidden.
-4. `99_pitchlog` capture again (compare with Stage 0), and 08_resonator by ear on big V/oct jumps.
+2. The last instrument and calibration should be back (the restore). V/oct should track as before. Play a Pd patch
+   and a Csound instrument.
+3. Selector (your Pd bank has 11 files = 3 pages):
+   - Next pages through, and the Pitch LED colour shows the page;
+   - Pitch turn moves the cursor (bright button), dim buttons are other files, dark = empty;
+   - Reset loads;
+   - power off and on while on a file of page 2 or 3: the selector should open on that page.
+4. `99_pitchlog` again: Pitch clicked to centre, a 0 V ↔ 1 V square into Pitch CV, press Reset, wait for the end
+   beeps. Then 08_resonator by ear on big V/oct jumps.
 5. Revert drill: the Stage 0 backup zip goes back to v2_1_2. Then reinstall uf1. (The STOCK card is the faster
    way back, but this proves the USB path from uf1.)
 
@@ -286,3 +318,8 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
     which made the retry test fail.
   - Installable `neb_update.zip` sha256 `802db7e19d695a891b75b45b210bc0e6e38fcbde547c3451fcb9928da7c4682d`.
   - **Still not compiled with Python 2. Not installed.**
+- 2026-11-10: Stage 0 run on the module (results above). Clock-free `ufmigrate`, past file dates in `fwbuild`,
+  `fw_backup` beeps include the precheck (shell logic tested in WSL in 4 scenarios).
+  - 28 logic tests and 15 build tests pass.
+  - uf1 `neb_update.zip` sha256 `d8f58966495e806d82a310405ca8b971c2e18d45615b5fc1dc452ab506a852c5`.
+  - **Not installed yet.**

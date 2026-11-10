@@ -16,7 +16,9 @@ The base must come from the unit itself (firmware/base/SOURCE.txt: provisional=n
 base the build only writes neb_update_PROVISIONAL_DO_NOT_INSTALL.tgz, a name update.sh ignores.
 
 File modes and owners are copied from the base archive (SOURCE.txt `archive=`); new files get 0644. The archive is
-reproducible (sorted entries, fixed mtimes, gzip mtime 0): the same tree gives the same sha256.
+reproducible (sorted entries, fixed mtimes, gzip mtime 0): the same tree gives the same sha256. The fixed mtime is
+2022-05-01: the unit has no RTC and its clock restarts around 2022-06-11 every boot, so later dates are "in the
+future" there.
 """
 import argparse
 import gzip
@@ -117,7 +119,7 @@ def archive_meta(path):
     return meta, default
 
 
-def pack(files, meta, default, version=None, mtime=1767225600):
+def pack(files, meta, default, version=None, mtime=1651363200):
     """tar.gz bytes of QB_Nebulae_V2/<files>; version rewrites Code/config.txt's VERSION line."""
     files = dict(files)
     if version:

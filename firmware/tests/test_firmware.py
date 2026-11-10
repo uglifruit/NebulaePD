@@ -150,51 +150,60 @@ class TestMigrate(unittest.TestCase):
             return f.read()
 
     def test_restores_after_update(self):
-        boot = time.time()
         self.put(self.old, ufmigrate.CAL, CAL_GOOD)
         self.put(self.old, "config/bootinstr.txt", "bank,puredata\ninstr,07_shimmer\n")
         self.put(self.old, "config/nebsettings.txt", "x")
-        self.put(self.code, ufmigrate.CAL, CAL_GOOD.replace("0.027", "0.3"), mtime=boot - 60)  # forced, last boot
-        log = ufmigrate.migrate(self.code, self.old, booted_at=boot)
+        self.put(self.code, ufmigrate.CAL, CAL_GOOD.replace("0.027", "0.3"))           # update.sh's forced one
+        log = ufmigrate.migrate(self.code, self.old)
         self.assertEqual(self.read(self.code, ufmigrate.CAL), CAL_GOOD)
         self.assertIn("07_shimmer", self.read(self.code, "config/bootinstr.txt"))
         self.assertTrue(os.path.exists(self.code + ufmigrate.MARKER), log)
         # second start: marker present -> untouched
         self.put(self.code, ufmigrate.CAL, "changed")
-        self.assertEqual(ufmigrate.migrate(self.code, self.old, booted_at=boot), [])
+        self.assertEqual(ufmigrate.migrate(self.code, self.old), [])
         self.assertEqual(self.read(self.code, ufmigrate.CAL), "changed")
 
-    def test_calibrated_this_boot_wins(self):
-        boot = time.time() - 30
+    def test_frozen_clock(self):
+        """The unit's clock restarts at the same moment every boot, so the forced calibration from the install boot
+        can carry a time later than this boot's start. It must still be replaced."""
+        now = time.time()
+        self.put(self.old, ufmigrate.CAL, CAL_GOOD, mtime=now - 3600)
+        self.put(self.code, ufmigrate.CAL, "forced at install", mtime=now + 30)
+        ufmigrate.migrate(self.code, self.old)
+        self.assertEqual(self.read(self.code, ufmigrate.CAL), CAL_GOOD)
+
+    def test_settings_kept_if_present(self):
         self.put(self.old, ufmigrate.CAL, CAL_GOOD)
-        self.put(self.old, "config/bootinstr.txt", "bank,factory\n")
-        self.put(self.code, ufmigrate.CAL, "pitch held at boot", mtime=boot + 5)
-        ufmigrate.migrate(self.code, self.old, booted_at=boot)
-        self.assertEqual(self.read(self.code, ufmigrate.CAL), "pitch held at boot")
-        self.assertFalse(os.path.exists(self.code + "config/bootinstr.txt"))
+        self.put(self.old, "config/nebsettings.txt", "old")
+        self.put(self.code, "config/nebsettings.txt", "new")
+        ufmigrate.migrate(self.code, self.old)
+        self.assertEqual(self.read(self.code, "config/nebsettings.txt"), "new")
+
+    def test_unit_calibration_is_valid(self):
+        """The calibration file from the unit's own backup (firmware/device) passes the restore check."""
+        import tarfile
+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "device", "neb_update.zip")
+        if not os.path.isfile(p):
+            self.skipTest("no firmware/device backup")
+        with tarfile.open(p) as t:
+            data = t.extractfile("QB_Nebulae_V2/Code/" + ufmigrate.CAL).read().decode("ascii")
+        self.put(self.code, "unit_cal.txt", data)
+        self.assertTrue(ufmigrate.valid_calibration(self.code + "unit_cal.txt"))
 
     def test_invalid_or_missing_old(self):
-        boot = time.time()
         self.put(self.old, ufmigrate.CAL, "start,abc,\n")
-        self.put(self.code, ufmigrate.CAL, "new", mtime=boot - 60)
-        ufmigrate.migrate(self.code, self.old, booted_at=boot)
+        self.put(self.code, ufmigrate.CAL, "new")
+        ufmigrate.migrate(self.code, self.old)
         self.assertEqual(self.read(self.code, ufmigrate.CAL), "new")
         shutil.rmtree(self.old)
         os.remove(self.code + ufmigrate.MARKER)
-        self.assertIn("no previous tree", ufmigrate.migrate(self.code, self.old, booted_at=boot)[0])
+        self.assertIn("no previous tree", ufmigrate.migrate(self.code, self.old)[0])
         self.assertFalse(ufmigrate.valid_calibration(self.d + "/nope.txt"))
         self.put(self.code, "x.txt", CAL_GOOD.replace("pitch,0.027", "pitch,9"))
         self.assertFalse(ufmigrate.valid_calibration(self.code + "x.txt"))
 
-    def test_unknown_boot_time_keeps_stock(self):
-        self.put(self.old, ufmigrate.CAL, CAL_GOOD)
-        self.put(self.code, ufmigrate.CAL, "forced")
-        ufmigrate.migrate(self.code, self.old, booted_at=None)
-        self.assertEqual(self.read(self.code, ufmigrate.CAL), "forced")
-
     def test_never_raises(self):
-        self.assertTrue(ufmigrate.migrate(self.d + "/missing/", self.old, booted_at=0)[-1].startswith(
-            "migration error"))
+        self.assertTrue(ufmigrate.migrate(self.d + "/missing/", self.old)[-1].startswith("migration error"))
 
 
 def free_port():

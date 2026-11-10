@@ -99,12 +99,13 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - TCP to `[netreceive 3000]`, FUDI `name value;`.
   - **Every primary value is resent once per poll loop, changed or not.** Use `[change]` for button edges, and ignore
     edges for about 1 s after load (stored latch states arrive straight away). `gloop.press(..., primed=...)` does both.
-  - **The poll rate is NOT measured.** The loop is `sleep(0.001)`, ~26 SPI reads in Python 2, then one TCP send per
-    value (`controlhandler.py` puredata branch, `pdsender.py`). It is probably several ms per pass, not 1 ms. Don't build
-    timing logic on a 1 ms assumption (08_resonator's settle-wait attempt did, and was reverted).
-  - **The firmware slews Pitch CV.** `control.py` HybridData applies a one-pole (`filtCoeff` 0.33 per poll), hysteresis
-    0.001, octave snapping and a stability gate. The CV input also has a smoothing cap. A big V/oct jump arrives as a
-    ramp of about 13 polls. Technobear's fork changes Pitch's coefficient to 0.95 ("we dont want it gliding").
+  - **Poll pass: 5.3 ms mean** (median 5.5, range 4–8 ms; stock firmware, measured on the module 2026-11-10 with
+    `99_pitchlog`). Every value arrives once per pass. Don't build timing logic on a 1 ms assumption (08_resonator's
+    settle-wait attempt did, and was reverted).
+  - **The firmware slews Pitch CV.** `control.py` HybridData applies a one-pole (`filtCoeff` 0.33), hysteresis
+    0.001, octave snapping and a stability gate. The filter steps **twice per pass**, because `ui.py` re-sets Pitch
+    every pass. Measured: a big V/oct jump reaches 90 % in ~4 passes (~21 ms) and settles in ~7 (~37 ms). Pitch is
+    clipped to −0.30…1.30. Technobear's fork and uf1 use 0.95 ("we dont want it gliding").
   - **Alt values (`*_alt`) are sent only while Source is held.** They are stored once for all Pd patches (stock
     resets them only on a Csound instrument change), so a Pd patch sees the previous patch's alt values.
     Pd mode never saves them either. **uf1 resets the alt layer to defaults on every Pd patch load.**

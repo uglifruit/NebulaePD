@@ -5,11 +5,12 @@
 # is wrong if cables were patched. On the first start of the new tree (no MARKER yet) this restores:
 #   misc/calibration_data.txt   if the old one is valid
 #   config/bootinstr.txt, config/nebsettings.txt, config/neb_options.txt   if the new tree has none
-# Nothing is restored if the calibration was written during this boot (Pitch held at power-on = recalibrate +
-# reset settings on purpose). MARKER is written in every case, so this runs once per installed tree.
+# MARKER is written in every case, so this runs once per installed tree.
+# No timestamps are used: the module has no RTC and its clock restarts at about the same moment every boot, so file
+# times can't tell this boot from the last. A Pitch-held recalibration on that one first boot is therefore
+# overridden by the restore; recalibrate on any later boot.
 import os
 import shutil
-import time
 
 CODE = "/home/alarm/QB_Nebulae_V2/Code/"
 OLD = "/home/alarm/backup/old/QB_Nebulae_V2/Code/"
@@ -35,41 +36,24 @@ def valid_calibration(path):
         return False
 
 
-def boot_time(now=None):
-    try:
-        with open("/proc/uptime", "r") as f:
-            up = float(f.read().split()[0])
-    except Exception:
-        return None
-    return (time.time() if now is None else now) - up
-
-
-def migrate(code=CODE, old=OLD, booted_at="auto"):
-    """Returns a list of log lines. booted_at: wall-clock boot time (None = unknown, "auto" = from /proc/uptime)."""
+def migrate(code=CODE, old=OLD):
+    """Returns a list of log lines."""
     log = []
     try:
         if os.path.exists(code + MARKER):
             return log
-        if booted_at == "auto":
-            booted_at = boot_time()
         if not os.path.isdir(old):
             log.append("no previous tree - nothing to carry over")
         else:
-            new_cal = code + CAL
-            fresh = (os.path.isfile(new_cal) and booted_at is not None
-                     and os.path.getmtime(new_cal) >= booted_at - 1.0)
-            if fresh or booted_at is None:
-                log.append("calibration written this boot (or boot time unknown) - nothing restored")
+            if valid_calibration(old + CAL):
+                shutil.copyfile(old + CAL, code + CAL)
+                log.append("restored calibration from the previous tree")
             else:
-                if valid_calibration(old + CAL):
-                    shutil.copyfile(old + CAL, new_cal)
-                    log.append("restored calibration from the previous tree")
-                else:
-                    log.append("previous calibration missing or invalid - kept the new one")
-                for rel in CARRY:
-                    if os.path.isfile(old + rel) and not os.path.isfile(code + rel):
-                        shutil.copyfile(old + rel, code + rel)
-                        log.append("restored " + rel)
+                log.append("previous calibration missing or invalid - kept the new one")
+            for rel in CARRY:
+                if os.path.isfile(old + rel) and not os.path.isfile(code + rel):
+                    shutil.copyfile(old + rel, code + rel)
+                    log.append("restored " + rel)
         with open(code + MARKER, "w") as f:
             f.write("\n".join(log) + "\n")
     except Exception as e:

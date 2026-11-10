@@ -3,7 +3,8 @@
 #
 # neb_options.txt goes in the USB stick's root; fileloader.py copies it to OPTIONS_PATH at each instrument load.
 # Format: one `key=value` per line, `#` starts a comment. Known keys:
-#   pitch_coeff = 0.95     Pitch CV one-pole coefficient per poll (stock firmware: 0.33). 1.0 = no smoothing.
+#   pitch_coeff = 0.95     Pitch CV one-pole coefficient per filter step (stock firmware: 0.33). The filter steps
+#                          twice per poll pass (ui.py re-sets Pitch each pass). 1.0 = no smoothing.
 #   pd_alts_at_load = 0    1 = send every *_alt value once when a Pd patch connects (stock: only while Source is
 #                          held). Each Pd load resets them to the defaults first (nebulae.py), so this only tells a
 #                          patch the defaults it already starts with: off by default.
