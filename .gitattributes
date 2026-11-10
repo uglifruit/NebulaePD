@@ -3,3 +3,4 @@
 *.csd text eol=lf
 # firmware trees go onto the Pi byte-for-byte: no line-ending conversion
 firmware/** -text
+sc/** text eol=lf

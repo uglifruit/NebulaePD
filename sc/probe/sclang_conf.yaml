@@ -1,0 +1,7 @@
+includePaths:
+    - /tmp/sc/share/SCClassLibrary
+    - /tmp/sc/share/Extensions
+excludePaths:
+    []
+postInlineWarnings: false
+excludeDefaultPaths: true

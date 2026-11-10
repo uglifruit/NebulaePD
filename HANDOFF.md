@@ -62,6 +62,7 @@ For a **new instrument**, see §8.
 
 ## 3. Repo layout
 ```
+sc/probe/       SuperCollider probe: run.sh + test .scd scripts (Stage 2, docs/FIRMWARE.md)
 patches/        deliverable .pd files (one self-contained file each, copied to USB root) + *_README.md user guides
 lib/            nebulae_controls.pd (netreceive 3000 -> route -> [s name]) - also embedded in every patch
 sim/            sim_controls.pd (GUI sliders), send_fudi.py (TCP sender), test_*.pd (offline batch tests)
@@ -74,6 +75,7 @@ tools/shimmer.py 07_shimmer builder (ui, reverb (FDN + shifter taps + diffuser),
 tools/resonator.py 08_resonator builder (E/program/watched control-math compiler; ui, exciter, res, bbd, test_source)
 tools/pitchlog.py    99_pitchlog builder + analyzer (poll rate, Pitch jump response) for logs from the module
 tools/fwbuild.py     custom firmware: guards + reproducible neb_update.zip from firmware/src; --import-device
+tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
 tools/wavcheck.py    beats / clicks / freq / holds / spec: sample-level checks of test renders (see its docstring)
 tools/instr2csd.py   wrap .instr into the .csd the module builds;  tools/run_csound609.js  run it in Csound 6.09.1

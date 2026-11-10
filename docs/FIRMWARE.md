@@ -332,6 +332,56 @@ python tools/fwbuild.py --import-device firmware/device_image/neb_update.zip --s
      firmware updates stay small and the revert path is unchanged.
 3. **Patches.** A template and our own instruments, tested offline with SuperCollider for Windows (NRT renders).
 
+### Phase 1 findings (offline, 2026-11-10)
+- **Source.** Technobear's zip (`external/technobear_fw/`, sha256 `b7e37e11…`) contains `Code/packages/`:
+  - `supercollider-3.10.4-2-armv7h.pkg.tar.xz` (built 2020-03-22);
+  - `sc3-plugins-3.10.0-3-armv7h.pkg.tar.xz`;
+  - its `update.sh` installs them with `pacman -U`, which we don't do.
+- **Headless.** `sclang` doesn't link Qt.
+- **Versions.** It needs at most GLIBC 2.9 and GLIBCXX 3.4.22; the card has glibc 2.35 and gcc-libs 12.
+- **Libraries the card lacks:**
+  - `libreadline.so.7`: the card has readline 8.1. `sclang` uses 12 readline functions, all present in 8. The bundle
+    links `.so.7` to the card's `/usr/lib/libreadline.so.8`.
+  - `libavahi-client.so.3` and `libavahi-common.so.3`: needed by `libscsynth`, which binds all symbols at load
+    (`FLAGS_1 NOW`), so it can't start without them. They come from Debian 11 armhf
+    (`libavahi-{client,common}3 0.8-5+deb11u2`, `external/avahi_deb/`):
+    - the `.deb` sha256s were checked against the archive's `Packages.xz`, and `Packages.xz` against `InRelease`,
+      over HTTPS;
+    - the PGP signature was **not** checked, because WSL has no Debian keyring;
+    - they need only `libdbus-1.so.3`, which the card has;
+    - with no avahi daemon on the module, scsynth should only log a warning.
+  - `libstk-4.5.1.so`: the card has stk 4.6.2. The two Stk plugins (`StkInst`, `StkUGens`) are left out.
+- **Offline link check.** Every undefined symbol of `sclang`, `scsynth`, `libscsynth`, the avahi libraries and 193
+  plugins resolves against the bundle plus the card's own libraries, copied read-only from the SD image: 0
+  unresolved. The card libraries' own dependencies (FLAC, ogg, vorbis, opus, libdb, libsystemd) are all on the card.
+- **Technobear's settings, reused:**
+  - `jackd -R -P75 -dalsa -dhw:0 -p512 -n3 -s -r48000`;
+  - server options: memSize 16 × 8192, blockSize 64, 2 in / 2 out.
+
+### Phase 1 probe (owner, on hardware)
+Built by `python tools/scbundle.py` → `firmware/dist/sc_probe/`:
+- `000_sc_probe.instr` (from `instr/sc_probe.instr`);
+- `neb_scprobe/`: `sc_runtime.tgz` (6.3 MB), plus `run.sh`, `probe_nrt.scd` and `probe_rt.scd` (from `sc/probe/`).
+
+Steps:
+1. Copy both to the stick root.
+2. Load `000_sc_probe` from the user bank (page 1, second button).
+3. Audio passes through. After about a minute the module goes quiet for ~20 s, you hear a short SuperCollider
+   arpeggio, and the module restarts into the probe.
+4. Every 4 s after that: **three beeps** = SuperCollider works (offline render and live audio); **low tone** = it
+   failed.
+5. Bring back `neb_scprobe/` (`RESULT.txt`, `log.txt`, `rt.txt`, `jackd.txt`, `probe_nrt.wav`).
+
+How it works:
+- The instrument starts `run.sh` with `systemd-run`, outside `nebulae.service`, so the script survives stage 2,
+  where it stops the app to free the audio device.
+- Its EXIT trap always starts the app again.
+- Nothing is installed: SuperCollider runs from `/tmp/sc`.
+- It runs once. `neb_scprobe/started` blocks a rerun; delete it and `RESULT.txt` to run again.
+- Tested offline: `bash -n run.sh`; the instrument compiles and runs in Csound 6.09.1 with `system_i` stubbed (OK
+  beeps); `system_i` itself already worked on the module with `fw_backup`. The `.scd` scripts can only be tested on
+  the module, because SuperCollider isn't installed on the PC.
+
 ## Status
 - 2026-11-09: Stage 0 tools written and offline-tested. **Not yet run on hardware.**
   - `fw_backup.instr` was tested in Csound 6.09.1 with `system_i` stubbed (silent / ok beeps / fail tone). Its shell script ran in a fake module tree: backup and layout correct, no overwrite on a 2nd run, a corrupt backup gives the fail tone.

@@ -1,0 +1,60 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+nebconfigend
+
+; sc_probe.instr - checks that SuperCollider (Technobear's 3.10.4 build + sc3-plugins) runs on this module.
+; Nothing on the card is installed or changed: sc/probe/run.sh runs SuperCollider from /tmp. See docs/FIRMWARE.md
+; (Stage 2) and sc/probe/run.sh.
+;
+; Needs on the stick: neb_scprobe/ with sc_runtime.tgz, run.sh, probe_nrt.scd, probe_rt.scd (tools/scbundle.py).
+; Runs once: neb_scprobe/started marks the first run. Delete it (and RESULT.txt) on the stick to run again.
+;
+; What you hear: audio passes through. After about a minute the module goes quiet for ~20 s (the app is stopped),
+; you hear a short SuperCollider arpeggio, then the module restarts and loads this instrument again. Then, every
+; 4 s:  three short high beeps = SuperCollider works (offline render and live audio).
+;       one long low tone      = something failed (see neb_scprobe/log.txt).
+; The shell commands avoid dollar signs and semicolons (Csound macro and comment characters).
+
+gkscstate init 0
+
+instr 1
+ires system_i 1, {{mkdir -p /mnt/memory
+grep -q " /mnt/memory " /proc/mounts || mount /dev/sda1 /mnt/memory
+if [ -f /mnt/memory/neb_scprobe/RESULT.txt ] || [ -f /mnt/memory/neb_scprobe/started ]
+then
+echo already-run
+else
+date > /mnt/memory/neb_scprobe/started
+sync
+mkdir -p /tmp/sc_probe
+cp /mnt/memory/neb_scprobe/run.sh /tmp/sc_probe/run.sh
+systemd-run --unit=neb-scprobe --collect sh /tmp/sc_probe/run.sh
+fi}}
+kpoll metro 1
+schedkwhen kpoll, 0, 1, 2, 0, 0.01
+; result sounds, repeating every 4 s once a result is on the stick
+kph phasor 0.25
+kt = kph * 4
+kok = (gkscstate == 1 && (kt < 0.12 || (kt > 0.3 && kt < 0.42) || (kt > 0.6 && kt < 0.72)) ? 0.2 : 0)
+kfail = (gkscstate == 2 && kt < 1.5 ? 0.2 : 0)
+kok portk kok, 0.004
+kfail portk kfail, 0.01
+aok oscili kok, 1320
+afail oscili kfail, 220
+ainl, ainr inch 1, 2
+outs ainl + aok + afail, ainr + aok + afail
+endin
+
+; reads the result on the stick once a second
+instr 2
+iok system_i 1, {{grep -q "^OK" /mnt/memory/neb_scprobe/RESULT.txt}}
+ifail system_i 1, {{grep -q "^FAIL" /mnt/memory/neb_scprobe/RESULT.txt}}
+if iok == 0 then
+gkscstate init 1
+elseif ifail == 0 then
+gkscstate init 2
+endif
+endin
