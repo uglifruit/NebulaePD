@@ -86,6 +86,18 @@ Read offline from `SDImage/nebulae_stock_pi4.img` with WSL `debugfs` (read-only)
   - that factory tree is **v1.0.0 (2018)**, older than the Pi 4 port, so it may not run properly on this unit. Use
     it only if nothing else works, then install v2.1.2 again from USB;
   - `fwbuild` refuses any build that lacks one of the mandatory files.
+- **Qu-Bit's official "Nebulae v2 Pi 4 Disk Image"** (free download, qubitelectronix.com/alternate-firmware) is
+  `SDImage/nebulae_6gb_11_15.img`, dated 2022-11-15, 6,211,764,224 bytes, SHA256
+  `A64E1F20DBEC814CA9888B1C52C543F06AE122159D4B635C8DB30E0BD056046F`. Compared read-only with the owner's card:
+  - same master: identical partition table, same ext4 filesystem (same creation time), same 280 packages, same
+    `checkfirmware.sh`, mandatory list, service file and factory v1.0.0 package. The "errors seen" ext4 flag is in
+    Qu-Bit's image too;
+  - **the firmware code is identical**, so `firmware/base` is Qu-Bit's official Pi 4 build. Only the runtime files
+    differ;
+  - Qu-Bit's image carries another unit's calibration, which is why their page says to recalibrate V/oct after
+    flashing. It also holds Qu-Bit's bench leftovers (a test patch, a test instrument and a few large test
+    recordings) instead of the owner's files;
+  - so the owner's own image is the one to restore. Qu-Bit's is an independent fallback (recalibrate after it).
 - `/home/alarm/backup/new/neb_update.zip` is the update Qu-Bit installed on 2022-06-02. It differs from GitHub only in
   `digitaldata.py` and `nebulae.service`; the other three Pi 4 changes were made in place afterwards.
 
@@ -159,7 +171,8 @@ In order of preference:
 2. **USB:** put `neb_fwbackup/neb_update.zip` or `firmware/device_image/neb_update.zip` in the stick root, unplug all
    CV/gate cables, and power on.
 3. **SD image:** write `SDImage/nebulae_stock_pi4.img` to a card (Win32 Disk Imager **Write**, or Raspberry Pi
-   Imager "Use custom" with OS customisation off).
+   Imager "Use custom" with OS customisation off). If that is lost, Qu-Bit's `nebulae_6gb_11_15.img` gives the same
+   firmware, but V/oct must then be recalibrated (hold Pitch at power-on, nothing patched).
 4. Emergency only: a file named `revert_to_factory_firmware` in the stick root makes `checkfirmware.sh` install the
    factory v1.0.0 tree (see above). Then do 2.
 
