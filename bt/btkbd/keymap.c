@@ -2,7 +2,7 @@
 //
 // The host (a Windows PC with a UK layout) turns usages back into characters with its own layout, so only
 // characters on keys that are identical on UK and US layouts are typed: letters, digits, space, Enter and
-// . , ! ? ( ) - : % '   (UK and US differ on " @ # ~ \ | and a few others; those are dropped).
+// . , ! ? ( ) - : % ' / ; = + [ ] < > *   (UK and US differ on " @ # ~ \ | ` ^ & _ { } $; those are dropped).
 #include "keymap.h"
 
 int neb_keymap(unsigned char c, uint8_t * keycode, uint8_t * modifier){
@@ -24,6 +24,15 @@ int neb_keymap(unsigned char c, uint8_t * keycode, uint8_t * modifier){
         case ')':  *keycode = 0x27; *modifier = NEB_MOD_SHIFT; return 1;   // Shift 0
         case ':':  *keycode = 0x33; *modifier = NEB_MOD_SHIFT; return 1;   // Shift ;
         case '?':  *keycode = 0x38; *modifier = NEB_MOD_SHIFT; return 1;   // Shift /
+        case '/':  *keycode = 0x38; return 1;
+        case ';':  *keycode = 0x33; return 1;
+        case '=':  *keycode = 0x2e; return 1;
+        case '+':  *keycode = 0x2e; *modifier = NEB_MOD_SHIFT; return 1;   // Shift =
+        case '[':  *keycode = 0x2f; return 1;
+        case ']':  *keycode = 0x30; return 1;
+        case '<':  *keycode = 0x36; *modifier = NEB_MOD_SHIFT; return 1;   // Shift ,
+        case '>':  *keycode = 0x37; *modifier = NEB_MOD_SHIFT; return 1;   // Shift .
+        case '*':  *keycode = 0x25; *modifier = NEB_MOD_SHIFT; return 1;   // Shift 8
         default:   return 0;
     }
 }

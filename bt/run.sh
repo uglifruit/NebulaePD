@@ -5,7 +5,8 @@
 # holds the programs, the pairing (pairing.tlv) and the logs (probe.txt, log.txt).
 #   test   diagnose the chip's power and UART (diag.txt), probe BTstack's start (probe.txt), then be a keyboard
 #          that types a hello line every 10 s
-#   story  narrator.py (the instrument's events -> chatty English) piped into the keyboard
+#   story  narrator.py + phrases.py (the instrument's events -> data + poetry) piped into the keyboard;
+#          a file named hide_data in bt_keyboard/ leaves out the [data] lines
 #   save   (btkbd's hook) copy the new pairing to the stick
 # It stops when the module loads another instrument (btkbd --watch on the firmware's bootinstr.txt), or when
 # systemd stops the unit (the next launch). btkbd then powers the Bluetooth chip off.
@@ -35,7 +36,7 @@ echo "=== run.sh $1, uptime $(cut -d ' ' -f 1 /proc/uptime) s"
 
 # the programs and the pairing, from the stick into RAM
 if ! mounted; then mkdir -p $M; mount /dev/sda1 $M; fi
-for f in btkbd narrator.py; do [ -f $S/$f ] && cp $S/$f $W/$f; done
+for f in btkbd narrator.py phrases.py; do [ -f $S/$f ] && cp $S/$f $W/$f; done
 chmod +x $W/btkbd
 rm -f $W/pairing.tlv $W/state
 [ -f $S/pairing.tlv ] && cp $S/pairing.tlv $W/pairing.tlv && echo "pairing loaded from the stick"
@@ -52,6 +53,7 @@ finish() {
     # so wait before mounting it (when the next bt instrument stops us, it holds the stick mounted already)
     [ -z "$TERMED" ] && sleep 6
     to_stick $W/log.txt log.txt
+    [ -f $W/narrator.log ] && to_stick $W/narrator.log narrator.log
 }
 trap finish EXIT
 trap 'TERMED=1; exit 0' TERM INT
@@ -74,11 +76,15 @@ test)
     eval "$KBD --hello"
     ;;
 story)
-    if ! python2 -m py_compile $W/narrator.py; then
-        echo "failed: narrator.py does not compile" > $W/state
+    # bt_storyteller.instr writes the events; narrator.py turns them into lines; btkbd types them
+    if ! python2 -m py_compile $W/narrator.py $W/phrases.py; then
+        echo "failed: narrator.py or phrases.py does not compile" > $W/state
+        echo 4 > $W/state.code
         exit 0
     fi
-    python2 -u $W/narrator.py --state $W/state --events $W/events | eval "$KBD --type"
+    DATA=""
+    [ -f $S/hide_data ] && DATA="--no-data" && echo "data lines hidden (hide_data on the stick)"
+    python2 -u $W/narrator.py --state $W/state --events $W/events --log $W/narrator.log $DATA | eval "$KBD --type"
     ;;
 *)
     echo "unknown mode: $1"

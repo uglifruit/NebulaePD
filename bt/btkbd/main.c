@@ -91,6 +91,18 @@ static void write_state(const char * fmt, const char * arg){
     fprintf(f, "\n");
     fclose(f);
     rename(tmp, state_path);
+    // the same as a number for Csound (bt_storyteller reads it with GEN23): 1 waiting, 2 reconnecting,
+    // 3 connected, 4 failed, 0 starting / off
+    int code = !strncmp(fmt, "waiting", 7) ? 1 : !strncmp(fmt, "reconnecting", 12) ? 2 :
+               !strncmp(fmt, "connected", 9) ? 3 : !strncmp(fmt, "failed", 6) ? 4 : 0;
+    char cpath[300];
+    snprintf(cpath, sizeof(cpath), "%s.code", state_path);
+    snprintf(tmp, sizeof(tmp), "%s.code.tmp", state_path);
+    f = fopen(tmp, "w");
+    if (!f) return;
+    fprintf(f, "%d\n", code);
+    fclose(f);
+    rename(tmp, cpath);
 }
 
 // --------------------------------------------------------------------------------------------- Pi 4 checks

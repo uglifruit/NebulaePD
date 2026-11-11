@@ -28,13 +28,16 @@ int main(void){
     expect('.', 1, 0x37, 0);  expect(',', 1, 0x36, 0);  expect('-', 1, 0x2d, 0);  expect('\'', 1, 0x34, 0);
     expect('!', 1, 0x1e, 2);  expect('%', 1, 0x22, 2);  expect('(', 1, 0x26, 2);  expect(')', 1, 0x27, 2);
     expect(':', 1, 0x33, 2);  expect('?', 1, 0x38, 2);
+    expect('/', 1, 0x38, 0);  expect(';', 1, 0x33, 0);  expect('=', 1, 0x2e, 0);  expect('+', 1, 0x2e, 2);
+    expect('[', 1, 0x2f, 0);  expect(']', 1, 0x30, 0);  expect('<', 1, 0x36, 2);  expect('>', 1, 0x37, 2);
+    expect('*', 1, 0x25, 2);
     // every NEB_SAFE_PUNCT character is typed
     for (const char * p = NEB_SAFE_PUNCT; *p; p++){
         uint8_t k, m;
         if (!neb_keymap((unsigned char) *p, &k, &m)){ printf("FAIL safe '%c' not typed\n", *p); fails++; }
     }
     // everything else is dropped: UK/US differences, control characters, 8-bit
-    const char * dropped = "\"@#~\\|`^&*_+={}[]<>/;$\t\r";
+    const char * dropped = "\"@#~\\|`^&_{}$\t\r";
     for (const char * p = dropped; *p; p++) expect((unsigned char) *p, 0, 0, 0);
     for (c = 0; c < 32; c++) if (c != '\n') expect((unsigned char) c, 0, 0, 0);
     for (c = 127; c < 256; c++) expect((unsigned char) c, 0, 0, 0);

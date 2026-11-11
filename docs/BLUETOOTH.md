@@ -79,6 +79,67 @@ Stages 1 and 2 are one instrument, `bt_test.instr`.
 **To pair with a different PC:** delete `bt_keyboard/pairing.tlv` on the stick and remove "Nebulae" from the
 old PC.
 
+## Stage 3: the storyteller, `bt_storyteller.instr`
+The factory granular looper (copied verbatim by `tools/storyteller.py`) plus the storyteller's ears. Load it from
+the Csound user bank; once the PC connects, open Notepad. Each observation is typed as two lines:
+
+```
+[1:39 heard 94 seconds ago: in -32 > -26 dB, 231 > 152 Hz, lows 78% > 93% / in -26 dB, out -33 dB, 153 Hz, lows 93%, calm]
+I know this. I heard it 94 seconds ago. There is more weight underneath. The edges have softened.
+```
+
+- **The [data] line** is the underlying input:
+  - the time since load;
+  - what was noticed;
+  - after the `/`, the input level, the output level, the input's brightness (spectral centroid, Hz), the share of
+    low end (below 160 Hz), and the mood (calm or busy).
+
+  An empty file named `hide_data` in `bt_keyboard/` leaves these lines out.
+- **The poem line** comes from `bt/phrases.py`: 343 lines in 94 pools, picked like a shuffled deck so nothing
+  repeats until a pool is used up. Edit or add lines freely, using only the characters listed at its top.
+  `bt/tests/test_narrator.py` checks every line.
+
+What it notices (`bt/narrator.py`):
+| | |
+|---|---|
+| Knobs | each move as from > to, how long, reversals. Kinds: indecision (back and forth), small, big, to the top or bottom, back to an earlier setting, the first touch of each control, several at once. Pitch moves as intervals (octave, fifth, ...); speed through backwards, stopped and normal |
+| CV | a control moving by itself: a wave (with its period), steps (a sequence: a jump after a plateau), or wandering |
+| Buttons and gates | Freeze, Record, Source, Next file, the hidden layer (Source held), Reset as a single press or a burst |
+| Pulses | on the Reset gate and in the input's onsets: regular, loose or irregular, the tempo, faster or slower, stopped |
+| Sound | a transient after calm or silence, silence (20 s, 60 s, then every 3 minutes), sound arriving, gradual brightening or darkening, more or less low end, louder or softer, the output louder than the input, frozen and alone |
+| Memory | a sound heard more than 45 s before, back after something else: "I recognise this sound", and how it differs (lows, brightness, level, tempo) |
+| Time | idle musings when nobody touches it; minutes together (5, 15, 30, ...) |
+
+**Pacing.** One observation at a time, at least 3.5 s apart (1 s for urgent ones: transients, the greeting), and
+never while the previous one is still being typed (about 28 characters a second). The most important pending
+observation goes first; stale ones are dropped after 12 s.
+
+**CPU.** The instrument's part (`instr 98`): three level followers, one low-pass filter, a 1024-point centroid FFT
+four times a second, and change checks on 23 controls, written to a RAM file. `tools/story_sim.py` renders a scripted
+150 s performance through the real instrument in Csound: **+7% CPU** over the plain looper (28.6 s against 26.7 s
+of CPU for 150 s of audio on the PC), about 1% of one PC core. The state cues read the Bluetooth state from a
+small file once a second through a GEN23 table, so no process is started (`bt_test` uses `system_i`).
+`narrator.py` runs as its own process at a 10 Hz tick.
+
+**Tests.**
+- `python bt/tests/test_narrator.py` (24 tests): phrases, the pacing, the live file loop, Python 2 syntax, and every
+  detector with scripted events.
+- `wsl -u andy -- python3 tools/story_sim.py`: the whole chain in Csound 6.18, with the story it tells in
+  `firmware/dist/story_sim/story.txt`.
+- On the module, `run.sh` compiles `narrator.py` and `phrases.py` with the module's Python 2.7 before starting;
+  a failure gives the low tone. A crash is written to `bt_keyboard/narrator.log`.
+
+**Stage 3 test (owner).** Copy `bt_storyteller.instr` and the updated `bt_keyboard/` folder (now with
+`narrator.py` and `phrases.py`) to the stick. Load `bt_storyteller`, wait for the chime, open Notepad. Then:
+- [ ] turn knobs, slowly and quickly, back and forth;
+- [ ] patch an LFO and a sequencer into CV inputs;
+- [ ] send a clock to Reset;
+- [ ] play something with a pulse into the input, then stop it for a minute;
+- [ ] bring the first sound back.
+
+Bring back `narrator.log` and `log.txt` from `bt_keyboard/`, and the Notepad text (or what felt wrong, slow or
+dull).
+
 ## Licence
 BTstack (bluekitchen) is free "solely for personal benefit", not for any commercial purpose (its LICENSE,
 condition 4). That fits this private project; a product would need BlueKitchen's commercial licence. The
@@ -111,3 +172,14 @@ Bluetooth firmware is the card's own file and isn't redistributed.
   - Found: a SIGTERM (systemctl stop, when bt_test is loaded again) killed btkbd with the chip still on. The
     cause is BTstack's btstack_signal.c, which waits for SIGINT only and replaces the mask per call. btkbd now
     uses its own signal pipe, so stopping is always a clean shutdown.
+- 2026-11-11: **stage 3 built** (owner: poetic and responsive, showing the underlying data, a large pool of
+  phrases; awareness of knobs, CVs, regular and irregular pulses; enough CPU left for the processing).
+  - `bt_storyteller.instr` (generated by `tools/storyteller.py`), `bt/narrator.py`, `bt/phrases.py`.
+  - `btkbd` now types `/ ; = + [ ] < > *` too (identical on UK and US layouts) and writes `state.code`.
+  - Tested offline: `test_narrator.py` 24 OK; `story_sim.py` in Csound 6.18 tells a coherent 25-observation story
+    of the scripted performance; +7% CPU.
+  - Csound 6.11 checked in its source:
+    - `fprintks` is line-buffered but has no `%s`, hence one format string per control;
+    - `readfi` can't re-read a file from a reused instance, hence GEN23;
+    - centroid, monitor, event_i, ftgentmp and strindex all exist.
+  - Staged in `firmware/dist/stage_bt/` and copied to the stick (`pairing.tlv` kept). Awaiting hardware.
