@@ -183,3 +183,5 @@ Bluetooth firmware is the card's own file and isn't redistributed.
     - `readfi` can't re-read a file from a reused instance, hence GEN23;
     - centroid, monitor, event_i, ftgentmp and strindex all exist.
   - Staged in `firmware/dist/stage_bt/` and copied to the stick (`pairing.tlv` kept). Awaiting hardware.
+- 2026-11-11: **stage 3 works on hardware**: the owner loaded bt_storyteller and it narrated to the PC. No tuning
+  notes or logs yet.
