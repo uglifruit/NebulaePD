@@ -101,3 +101,13 @@ Bluetooth firmware is the card's own file and isn't redistributed.
     - three power cycles with longer delays;
     - a raw HCI Reset at 115200 with and without flow, and at 921600 and 3000000, reporting CTS and the reply bytes.
   - Also: the chip gets 300 ms to boot after power-on before BTstack starts.
+- 2026-11-11, second hardware run: **it works.** The owner's PC paired and Notepad shows "Hello from the Nebulae".
+  - `diag.txt`: as found at boot, BT_ON is already high (output) and CTS is up, but the chip doesn't answer.
+  - After a power cycle (200 ms off), it answers HCI Reset at 115200 within 100 ms, with and without flow. So
+    the first build's 100 ms off with no wait before talking was the problem; it now gets 300 ms off and 300 ms
+    to boot.
+  - BTstack then reads BCM4345C0 (LMP subversion 0x6119), loads the firmware, and runs at 921600 with flow
+    control. Address B8:27:EB:EA:85:1D. `pairing.tlv` was saved to the stick.
+  - Found: a SIGTERM (systemctl stop, when bt_test is loaded again) killed btkbd with the chip still on. The
+    cause is BTstack's btstack_signal.c, which waits for SIGINT only and replaces the mask per call. btkbd now
+    uses its own signal pipe, so stopping is always a clean shutdown.

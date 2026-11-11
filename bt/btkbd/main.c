@@ -47,7 +47,6 @@
 #include "btstack_chipset_bcm.h"
 #include "btstack_control.h"
 #include "btstack_run_loop_posix.h"
-#include "btstack_signal.h"
 #include "btstack_tlv_posix.h"
 #include "btstack_uart.h"
 #include "classic/btstack_link_key_db_tlv.h"
@@ -459,7 +458,45 @@ static void shutdown_with(int code, const char * why){
     hci_power_control(HCI_POWER_OFF);
 }
 
-static void on_signal(void){ shutdown_with(0, "signal"); }
+// SIGTERM (systemctl stop), SIGINT, SIGHUP -> a byte on a pipe -> the run loop shuts down cleanly (chip off).
+// (BTstack's btstack_signal.c waits for SIGINT only and replaces the signal mask per call, so a SIGTERM killed
+// the process with the chip still on: first hardware run, 2026-11-11.)
+static int signal_pipe[2] = { -1, -1 };
+static btstack_data_source_t signal_source;
+
+static void on_signal_raw(int sig){
+    uint8_t b = (uint8_t) sig;
+    ssize_t r = write(signal_pipe[1], &b, 1);
+    (void) r;
+}
+
+static void on_signal(btstack_data_source_t * ds, btstack_data_source_callback_type_t type){
+    UNUSED(type);
+    uint8_t b = 0;
+    ssize_t r = read(ds->source.fd, &b, 1);
+    (void) r;
+    char why[40];
+    snprintf(why, sizeof(why), "signal %d", b);
+    shutdown_with(0, why);
+}
+
+static void signals_setup(void){
+    if (pipe(signal_pipe) != 0) return;
+    fcntl(signal_pipe[0], F_SETFL, O_NONBLOCK);
+    fcntl(signal_pipe[1], F_SETFL, O_NONBLOCK);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = on_signal_raw;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
+    signal(SIGPIPE, SIG_IGN);
+    btstack_run_loop_set_data_source_fd(&signal_source, signal_pipe[0]);
+    btstack_run_loop_set_data_source_handler(&signal_source, &on_signal);
+    btstack_run_loop_enable_data_source_callbacks(&signal_source, DATA_SOURCE_CALLBACK_READ);
+    btstack_run_loop_add_data_source(&signal_source);
+}
 
 static void start_timeout(btstack_timer_source_t * ts){
     UNUSED(ts);
@@ -849,8 +886,7 @@ int main(int argc, const char * argv[]){
     hci_set_control(&control);
     hci_event_callback_registration.callback = &hci_packet_handler;
     hci_add_event_handler(&hci_event_callback_registration);
-    btstack_signal_register_callback(SIGINT, &on_signal);
-    btstack_signal_register_callback(SIGTERM, &on_signal);
+    signals_setup();
 
     if (mode != MODE_PROBE) keyboard_setup();
     if (mode == MODE_HELLO){

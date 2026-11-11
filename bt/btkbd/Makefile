@@ -25,7 +25,7 @@ BTSTACK_SRC = \
 	btstack_ring_buffer.c btstack_hid.c btstack_hid_parser.c \
 	sdp_util.c sdp_server.c device_id_server.c hid_device.c btstack_link_key_db_tlv.c \
 	hci_transport_h4.c btstack_run_loop_posix.c btstack_tlv_posix.c btstack_uart_posix.c hci_dump_posix_fs.c \
-	btstack_signal.c btstack_chipset_bcm.c
+	btstack_chipset_bcm.c
 OUR_SRC = main.c keymap.c
 
 OBJ = $(BTSTACK_SRC:.c=.o) $(OUR_SRC:.c=.o)
