@@ -4,3 +4,6 @@
 # firmware trees go onto the Pi byte-for-byte: no line-ending conversion
 firmware/** -text
 sc/** text eol=lf
+
+# Pearls stick files: stored byte-exact, so their sha256 matches the build (pearls/README.md)
+pearls/** -text

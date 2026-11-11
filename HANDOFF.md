@@ -96,6 +96,7 @@ sc/02..04_*.scd      SC instruments: drift (pad), strike (plucked string), cloud
 tools/sc_nrt_tests.py  offline renders + audio checks of the SC instruments in SC 3.10.4
 tools/sc_osc_tests.py  live control test of the SC patches: scsender.py -> sclang -> synth values read back
 docs/PEARLS_GUIDE.md   Pearls (Beads) panel + hardware test checklist
+pearls/              Pearls stick files (pearls.instr + csound_plugins/libpearls.so), byte-exact, MIT
 tools/sctest.py      run sclang on the PC: syntax check / NRT renders of .scd files
 tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder
 tools/wavpeaks.py    per-50 ms peaks of a (float) WAV
