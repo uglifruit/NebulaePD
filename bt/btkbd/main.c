@@ -3,6 +3,7 @@
 //   btkbd --probe                  check the Pi 4's Bluetooth, start the controller once, report, power it off
 //   btkbd --hello                  keyboard; types a hello line every 10 s while connected (hardware test)
 //   btkbd --type                   keyboard; types the lines it reads on stdin (from narrator.py); stops at EOF
+//   btkbd --diag                   the chip's power line and raw UART (HCI Reset at several speeds), no BTstack
 // options:
 //   --state FILE    write starting / waiting / reconnecting / connected / off / failed: <why>   (atomic)
 //   --tlv FILE      pairing store (BTstack TLV); a stored host means "owned": not discoverable, reconnects to it
@@ -37,6 +38,7 @@
 #include <strings.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <termios.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -62,7 +64,7 @@
 #define REPORT_ID 0x01
 #define TLV_TAG_HIDR ((((uint32_t) 'H') << 24) | (((uint32_t) 'I') << 16) | (((uint32_t) 'D') << 8) | 'R')
 
-static enum { MODE_PROBE, MODE_HELLO, MODE_TYPE } mode = MODE_TYPE;
+static enum { MODE_PROBE, MODE_HELLO, MODE_TYPE, MODE_DIAG } mode = MODE_TYPE;
 static const char * state_path, * tlv_path, * hook_cmd, * watch_path, * watch_name, * pklg_path;
 static const char * extra_hcd_dir;
 static const char * bt_name = "Nebulae";
@@ -286,33 +288,136 @@ static const char * pi4_checks(void){
 }
 
 // ------------------------------------------------------------------------- BT_REG_ON via the firmware mailbox
+// As the kernel's gpio-raspberrypi-exp driver: the reply puts a status in the gpio word (0 = done).
 #define IOCTL_RPI_FIRMWARE_PROPERTY _IOWR(100, 0, char *)
-#define RPI_FIRMWARE_GET_GPIO_STATE 0x00030041
-#define RPI_FIRMWARE_SET_GPIO_STATE 0x00038041
+#define RPI_FIRMWARE_GET_GPIO_STATE  0x00030041
+#define RPI_FIRMWARE_SET_GPIO_STATE  0x00038041
+#define RPI_FIRMWARE_GET_GPIO_CONFIG 0x00030043
 static int vcio_fd = -1;
+static int chip_boot_ms = 300;   // after BT_ON goes high, before BTstack talks to the chip
 
-static int mailbox_gpio(uint32_t tag, int gpio, int value){
+// one property tag with n value words (in/out); 0 when the firmware answered, -1 otherwise
+static int mailbox(uint32_t tag, uint32_t * words, int n){
     if (vcio_fd < 0) vcio_fd = open("/dev/vcio", O_NONBLOCK);
     if (vcio_fd < 0) return -1;
-    uint32_t m[8];
-    m[0] = sizeof(m);
-    m[1] = 0;            // request
+    uint32_t m[16];
+    m[0] = (uint32_t) ((6 + n) * 4);
+    m[1] = 0;                      // request
     m[2] = tag;
-    m[3] = 8;            // value buffer size
+    m[3] = (uint32_t) (n * 4);     // value buffer size
     m[4] = 0;
-    m[5] = (uint32_t) gpio;
-    m[6] = (uint32_t) value;
-    m[7] = 0;            // end tag
+    for (int i = 0; i < n; i++) m[5 + i] = words[i];
+    m[5 + n] = 0;                  // end tag
     if (ioctl(vcio_fd, IOCTL_RPI_FIRMWARE_PROPERTY, m) == -1) return -1;
     if (m[1] != 0x80000000u) return -1;
-    return (int) m[6];
+    for (int i = 0; i < n; i++) words[i] = m[5 + i];
+    return 0;
 }
 
 static int bt_gpio(void){ return 128 + bt_on_line; }
+
+// the line's state (0/1), or -1
+static int bt_on_get(void){
+    uint32_t w[2] = { (uint32_t) bt_gpio(), 0 };
+    if (mailbox(RPI_FIRMWARE_GET_GPIO_STATE, w, 2) || w[0] != 0) return -1;
+    return (int) w[1];
+}
+
+// 0 when the firmware set it, else -1 (printed)
+static int bt_on_set(int value){
+    uint32_t w[2] = { (uint32_t) bt_gpio(), (uint32_t) value };
+    int r = mailbox(RPI_FIRMWARE_SET_GPIO_STATE, w, 2);
+    if (r || w[0] != 0){
+        printf("  BT_ON set %d: FAILED (mailbox %d, status 0x%x)\n", value, r, w[0]);
+        return -1;
+    }
+    return 0;
+}
+
+static void bt_on_print_config(void){
+    uint32_t w[5] = { (uint32_t) bt_gpio(), 0, 0, 0, 0 };
+    int r = mailbox(RPI_FIRMWARE_GET_GPIO_CONFIG, w, 5);
+    if (r || w[0] != 0) printf("  BT_ON config: unavailable (mailbox %d, status 0x%x)\n", r, w[0]);
+    else printf("  BT_ON config: direction %u (1 = output), polarity %u, term_en %u, pull_up %u\n", w[1], w[2], w[3],
+                w[4]);
+}
+
 static void control_init(const void * config){ UNUSED(config); }
-static int control_on(void){ log_info("BT_ON high"); mailbox_gpio(RPI_FIRMWARE_SET_GPIO_STATE, bt_gpio(), 1); return 0; }
-static int control_off(void){ log_info("BT_ON low"); mailbox_gpio(RPI_FIRMWARE_SET_GPIO_STATE, bt_gpio(), 0); return 0; }
+static int control_on(void){
+    bt_on_set(1);
+    printf("  BT_ON high (reads %d), waiting %d ms for the chip\n", bt_on_get(), chip_boot_ms);
+    usleep((useconds_t) chip_boot_ms * 1000);
+    return 0;
+}
+static int control_off(void){ bt_on_set(0); return 0; }
 static btstack_control_t control = { control_init, control_on, control_off, NULL, NULL, NULL };
+
+// ------------------------------------------------------------- --diag: the chip's power and UART, without BTstack
+static void diag_uart(speed_t speed, int baud, int flow){
+    int fd = open(UART_DEVICE, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0){ printf("    %7d %-7s open failed: %s\n", baud, flow ? "flow" : "noflow", strerror(errno)); return; }
+    struct termios t;
+    tcgetattr(fd, &t);
+    cfmakeraw(&t);
+    cfsetispeed(&t, speed);
+    cfsetospeed(&t, speed);
+    t.c_cflag |= CLOCAL | CREAD;
+    if (flow) t.c_cflag |= CRTSCTS; else t.c_cflag &= ~CRTSCTS;
+    tcsetattr(fd, TCSANOW, &t);
+    tcflush(fd, TCIOFLUSH);
+    int bits = 0;
+    ioctl(fd, TIOCMGET, &bits);
+    int cts_before = (bits & TIOCM_CTS) != 0;
+    static const uint8_t reset[] = { 0x01, 0x03, 0x0c, 0x00 };   // HCI Reset
+    ssize_t w = write(fd, reset, sizeof(reset));
+    uint8_t buf[64];
+    int got = 0;
+    for (int ms = 0; ms < 400 && got < (int) sizeof(buf); ms += 10){
+        ssize_t n = read(fd, buf + got, sizeof(buf) - (size_t) got);
+        if (n > 0) got += (int) n;
+        usleep(10000);
+    }
+    ioctl(fd, TIOCMGET, &bits);
+    int cts_after = (bits & TIOCM_CTS) != 0;
+    int outq = 0;
+    ioctl(fd, TIOCOUTQ, &outq);
+    char hex[200] = "";
+    for (int i = 0; i < got && i < 40; i++) snprintf(hex + strlen(hex), sizeof(hex) - strlen(hex), "%02x ", buf[i]);
+    static const uint8_t answer[] = { 0x04, 0x0e, 0x04, 0x01, 0x03, 0x0c, 0x00 };
+    int ok = 0;
+    for (int i = 0; i + 7 <= got; i++) if (memcmp(buf + i, answer, 7) == 0) ok = 1;
+    printf("    %7d %-7s CTS %d->%d, wrote %d, unsent %d, got %d bytes%s%s %s\n", baud, flow ? "flow" : "noflow",
+           cts_before, cts_after, (int) w, outq, got, got ? ": " : "", hex, ok ? "<- RESET ANSWERED" : "");
+    tcflush(fd, TCIOFLUSH);
+    close(fd);
+}
+
+static void diag(void){
+    printf("=== diag (raw UART, no BTstack)\n");
+    bt_on_print_config();
+    printf("  BT_ON before: %d\n", bt_on_get());
+    printf("  as found (no power change):\n");
+    diag_uart(B115200, 115200, flow);
+    static const int off_ms[] = { 200, 500, 1000 };
+    static const int on_ms[] = { 100, 500, 1500 };
+    for (int v = 0; v < 3; v++){
+        bt_on_set(0);
+        int low = bt_on_get();
+        usleep((useconds_t) off_ms[v] * 1000);
+        bt_on_set(1);
+        int high = bt_on_get();
+        usleep((useconds_t) on_ms[v] * 1000);
+        printf("  power cycle %d: off %d ms (read %d), on (read %d), waited %d ms:\n", v + 1, off_ms[v], low, high,
+               on_ms[v]);
+        diag_uart(B115200, 115200, 1);
+        diag_uart(B115200, 115200, 0);
+        diag_uart(B3000000, 3000000, 1);
+        diag_uart(B921600, 921600, 1);
+    }
+    bt_on_set(0);
+    printf("  BT_ON after: %d\n", bt_on_get());
+    printf("DIAG DONE\n");
+}
 
 // ----------------------------------------------------------------------------------------------- stack setup
 static hci_transport_config_uart_t transport_config = { HCI_TRANSPORT_CONFIG_UART, 115200, 0, 1, NULL, 0 };
@@ -667,7 +772,7 @@ static void hci_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * 
 
 // --------------------------------------------------------------------------------------------------- main
 static void usage(void){
-    printf("usage: btkbd --probe|--hello|--type [--state F] [--tlv F] [--hook CMD] [--watch F NAME] "
+    printf("usage: btkbd --probe|--hello|--type|--diag [--boot-ms N] [--state F] [--tlv F] [--hook CMD] [--watch F NAME] "
            "[--hcd-dir D] [--baud N] [--name S] [--pklg F] [--check-only] [--root DIR (tests)]\n");
     exit(1);
 }
@@ -678,6 +783,8 @@ int main(int argc, const char * argv[]){
         const char * a = argv[i];
         int more = i + 1 < argc;
         if (!strcmp(a, "--probe")) mode = MODE_PROBE;
+        else if (!strcmp(a, "--diag")) mode = MODE_DIAG;
+        else if (!strcmp(a, "--boot-ms") && more) chip_boot_ms = atoi(argv[++i]);
         else if (!strcmp(a, "--hello")) mode = MODE_HELLO;
         else if (!strcmp(a, "--type")) mode = MODE_TYPE;
         else if (!strcmp(a, "--state") && more) state_path = argv[++i];
@@ -692,7 +799,8 @@ int main(int argc, const char * argv[]){
         else if (!strcmp(a, "--check-only")) check_only = 1;
         else usage();
     }
-    printf("btkbd (%s mode)\n", mode == MODE_PROBE ? "probe" : (mode == MODE_HELLO ? "hello" : "type"));
+    printf("btkbd (%s mode)\n", mode == MODE_PROBE ? "probe" : mode == MODE_HELLO ? "hello" :
+           mode == MODE_DIAG ? "diag" : "type");
     write_state("starting", NULL);
 
     const char * why = pi4_checks();
@@ -707,7 +815,11 @@ int main(int argc, const char * argv[]){
                flow ? "flow control" : "no flow control", baud_main, hcd_path);
         return 0;
     }
-    printf("  BT_ON now: %d\n", mailbox_gpio(RPI_FIRMWARE_GET_GPIO_STATE, bt_gpio(), 0));
+    printf("  BT_ON now: %d\n", bt_on_get());
+    if (mode == MODE_DIAG){
+        diag();
+        return 0;
+    }
 
     btstack_memory_init();
     if (pklg_path){
@@ -761,7 +873,7 @@ int main(int argc, const char * argv[]){
 
     // a clean power cycle of the controller, then let BTstack bring it up (firmware download, reset, baud rate)
     control_off();
-    usleep(100000);
+    usleep(300000);
     printf("=== starting the controller: %s, H4, %u then %u baud, %s, firmware %s\n", UART_DEVICE,
            transport_config.baudrate_init, baud_main, flow ? "flow control" : "no flow control", hcd_path);
     btstack_run_loop_set_timer_handler(&start_timer, start_timeout);

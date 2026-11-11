@@ -91,3 +91,13 @@ Bluetooth firmware is the card's own file and isn't redistributed.
   - device-tree checks OK (15 cases, including this module's real `bcm2711-rpi-4-b.dtb` layout);
   - `bt_test.instr` compiles in Csound 6.18, and its four state sounds were measured in a render.
   Awaiting the first hardware run.
+- 2026-11-11, first hardware run: long low tone.
+  - `probe.txt`: every check passed on the module;
+    - the Pi firmware does set GPIO 30/31 to CTS/RTS, so it used flow control;
+    - BT_ON was line 0 = GPIO 128 and was already on before btkbd ran.
+  - Then the chip never answered BTstack's HCI Reset (resent every 200 ms) over 25 s.
+  - Next: `btkbd --diag` (run by `bt_test` before the probe, written to `diag.txt`):
+    - mailbox status checked, line config and state read back on every switch;
+    - three power cycles with longer delays;
+    - a raw HCI Reset at 115200 with and without flow, and at 921600 and 3000000, reporting CTS and the reply bytes.
+  - Also: the chip gets 300 ms to boot after power-on before BTstack starts.

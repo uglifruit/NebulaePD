@@ -3,7 +3,8 @@
 #   systemd-run --unit=neb-bt --collect sh /dev/shm/neb_bt/run.sh <test|story>
 # Everything runs from RAM (/dev/shm/neb_bt); nothing on the SD card is written. The stick's bt_keyboard/ folder
 # holds the programs, the pairing (pairing.tlv) and the logs (probe.txt, log.txt).
-#   test   probe the Pi 4's Bluetooth (probe.txt), then be a keyboard that types a hello line every 10 s
+#   test   diagnose the chip's power and UART (diag.txt), probe BTstack's start (probe.txt), then be a keyboard
+#          that types a hello line every 10 s
 #   story  narrator.py (the instrument's events -> chatty English) piped into the keyboard
 #   save   (btkbd's hook) copy the new pairing to the stick
 # It stops when the module loads another instrument (btkbd --watch on the firmware's bootinstr.txt), or when
@@ -57,6 +58,10 @@ trap 'TERMED=1; exit 0' TERM INT
 
 case "$1" in
 test)
+    # the chip's power line and raw UART first (diag.txt), then BTstack's start (probe.txt)
+    $W/btkbd --diag > $W/diag.txt 2>&1
+    cat $W/diag.txt
+    to_stick $W/diag.txt diag.txt
     $W/btkbd --probe --state $W/state > $W/probe.txt 2>&1
     PROBE=$?
     cat $W/probe.txt
