@@ -94,6 +94,7 @@ tools/fwbuild.py     custom firmware: guards + reproducible neb_update.zip from 
 sc/01_sctest.scd     uf2 hardware-test SC patch (and a minimal Nebulae SC patch example)
 sc/02..04_*.scd      SC instruments: drift (pad), strike (plucked string), cloud (granular input); guide sc/README.md
 tools/sc_nrt_tests.py  offline renders + audio checks of the SC instruments in SC 3.10.4
+tools/sc_osc_tests.py  live control test of the SC patches: scsender.py -> sclang -> synth values read back
 docs/PEARLS_GUIDE.md   Pearls (Beads) panel + hardware test checklist
 tools/sctest.py      run sclang on the PC: syntax check / NRT renders of .scd files
 tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder

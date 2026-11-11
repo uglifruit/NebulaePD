@@ -80,6 +80,10 @@ scripted knob moves, and checks the audio:
 - strike: each pluck in tune within 3 cents (C4, F#4, C3); the decay; auto-pluck rate; sustain;
 - cloud: grains follow the input pitch; one octave up; no output once the input stops; Freeze holds the buffer.
 
+`python tools/sc_osc_tests.py` runs each patch live in SC 3.10.4 on the PC. The firmware's own `scsender.py` drives
+it, and the test reads every control back from the running synth. (This test found a bug in the first versions of
+02–04: they stored the synth as `~neb.synth`, and every control was lost. Fixed 2026-11-11.)
+
 PC and module renders matched exactly in the SC probe, so these results carry over. What only the module can tell:
 CPU load, the 5 ms control timing, and how it feels.
 
@@ -93,4 +97,7 @@ The patch sends each one to the synth argument of the same name, so you only wri
 - `reset` is a trigger, which the patch sends as `t_reset`.
 
 `_`-prefixed `.scd` files are hidden from the selector (helpers). Check a new file with
-`python tools/sctest.py check sc/x.scd`.
+`python tools/sctest.py check sc/x.scd`, then `python tools/sc_osc_tests.py sc/x.scd`.
+
+Watch out with Events (`~neb = ()`): a key with the same name as an Event method calls the method instead. `synth`,
+`set`, `play`, `stop`, `free`, `group` and `release` are all methods. Keep the Synth in a plain `~nebSynth`.

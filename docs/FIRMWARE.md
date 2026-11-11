@@ -541,3 +541,8 @@ How it works:
   - the Pearls guide is `docs/PEARLS_GUIDE.md`;
   - 55 logic tests and 15 build tests pass;
   - `neb_update.zip` sha256 `261db5258e0d88b54091800f0cfc407745e22c530577ebf4191e06035d5032d0`.
+- 2026-11-11: hardware: SC patches load, 02_sc_drift drones, but the knobs and buttons did nothing.
+  - Cause: 02-04 stored the synth as `~neb.synth`, which runs Event's built-in `synth` method, so `.set` failed
+    ("Non Boolean in test") on every control. The firmware's OSC was fine (proved on the PC with `scsender.py`).
+  - Fixed: `~nebSynth`. New `tools/sc_osc_tests.py` runs each patch live and reads every control back from the
+    synth: 01-04 all OK. No firmware change: copy the three .scd files to the stick again.

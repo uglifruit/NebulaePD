@@ -54,12 +54,12 @@ if(~nrtTest.isNil, {
 	s.waitForBoot({
 		~neb.def.add;
 		s.sync;
-		~neb.synth = Synth(~neb.name);
+		~nebSynth = Synth(~neb.name);
 		~neb.controls.do { |name|
-			OSCdef(("neb_" ++ name).asSymbol, { |msg| ~neb.synth.set(name, msg[1]) }, ("/neb/" ++ name).asSymbol,
+			OSCdef(("neb_" ++ name).asSymbol, { |msg| ~nebSynth.set(name, msg[1]) }, ("/neb/" ++ name).asSymbol,
 				recvPort: 3000);
 		};
-		OSCdef(\neb_reset, { |msg| if(msg[1] > 0.5, { ~neb.synth.set(\t_reset, 1) }) }, '/neb/reset',
+		OSCdef(\neb_reset, { |msg| if(msg[1] > 0.5, { ~nebSynth.set(\t_reset, 1) }) }, '/neb/reset',
 			recvPort: 3000);
 		"02_sc_drift running".postln;
 	});
