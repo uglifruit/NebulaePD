@@ -7,3 +7,7 @@ sc/** text eol=lf
 
 # Pearls stick files: stored byte-exact, so their sha256 matches the build (pearls/README.md)
 pearls/** -text
+# Bluetooth keyboard: shell, C and Csound files run on the Pi (bt/README.txt is read on Windows)
+bt/** text eol=lf
+bt/README.txt text eol=crlf
+tools/*.sh text eol=lf

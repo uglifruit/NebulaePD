@@ -1,0 +1,86 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+nebconfigend
+
+; bt_test.instr - Bluetooth keyboard test (docs/BLUETOOTH.md, stages 1 and 2).
+; Needs on the stick: the bt_keyboard/ folder (btkbd, run.sh). Nothing on the SD card is installed or changed:
+; bt/run.sh runs from RAM (/dev/shm/neb_bt) and writes bt_keyboard/probe.txt and log.txt on the stick.
+;
+; 1. Probe: checks the Pi 4's Bluetooth and starts the chip once (a few seconds), result in probe.txt.
+; 2. Keyboard: the module is a Bluetooth keyboard called "Nebulae". Pair it on the PC (Settings, Bluetooth,
+;    Add device, Bluetooth, Nebulae; no PIN). Once connected it types a hello line every 10 s, e.g. into Notepad.
+;    The pairing is stored on the stick (bt_keyboard/pairing.tlv); after that it reconnects by itself.
+; Loading another instrument switches Bluetooth off again.
+;
+; What you hear (audio passes through), every 4 s:
+;   two soft blips  = waiting to be paired (discoverable as "Nebulae")
+;   one soft blip   = paired before: reconnecting to that PC
+;   a rising chime  = connected (once)
+;   one long low tone = failed (see probe.txt / log.txt on the stick)
+; The shell commands avoid dollar signs and semicolons (Csound macro and comment characters).
+
+gkbtstate init 0
+gachime init 0
+
+instr 1
+ires system_i 1, {{mkdir -p /mnt/memory
+grep -q " /mnt/memory " /proc/mounts || mount /dev/sda1 /mnt/memory
+systemctl stop neb-bt
+rm -rf /dev/shm/neb_bt
+mkdir -p /dev/shm/neb_bt
+if [ -f /mnt/memory/bt_keyboard/run.sh ]
+then
+cp /mnt/memory/bt_keyboard/run.sh /dev/shm/neb_bt/run.sh
+systemd-run --unit=neb-bt --collect sh /dev/shm/neb_bt/run.sh test
+else
+echo "failed: no bt_keyboard folder on the stick" > /dev/shm/neb_bt/state
+fi}}
+kpoll metro 1
+schedkwhen kpoll, 0, 1, 2, 0, 0.01
+; state sounds, repeating every 4 s
+kph phasor 0.25
+kt = kph * 4
+kwait = (gkbtstate == 1 && (kt < 0.06 || (kt > 0.2 && kt < 0.26)) ? 0.08 : 0)
+krec = (gkbtstate == 2 && kt < 0.06 ? 0.08 : 0)
+kfail = (gkbtstate == 4 && kt < 1.5 ? 0.15 : 0)
+kwait portk kwait + krec, 0.004
+kfail portk kfail, 0.01
+ablip oscili kwait, 880
+afail oscili kfail, 220
+; a rising chime once, when it connects
+kprev init 0
+if gkbtstate == 3 && kprev != 3 then
+event "i", 3, 0, 0.9
+endif
+kprev = gkbtstate
+ainl, ainr inch 1, 2
+outs ainl + ablip + afail + gachime, ainr + ablip + afail + gachime
+gachime = 0
+endin
+
+; reads the helper's state once a second: 1 waiting, 2 reconnecting, 3 connected, 4 failed
+instr 2
+iwait system_i 1, {{grep -q "^waiting" /dev/shm/neb_bt/state}}
+irec system_i 1, {{grep -q "^reconnecting" /dev/shm/neb_bt/state}}
+icon system_i 1, {{grep -q "^connected" /dev/shm/neb_bt/state}}
+ifail system_i 1, {{grep -q "^failed" /dev/shm/neb_bt/state}}
+if icon == 0 then
+gkbtstate init 3
+elseif iwait == 0 then
+gkbtstate init 1
+elseif irec == 0 then
+gkbtstate init 2
+elseif ifail == 0 then
+gkbtstate init 4
+endif
+endin
+
+; connected: three rising notes
+instr 3
+kf = (timeinsts() < 0.3 ? 880 : (timeinsts() < 0.6 ? 1109 : 1320))
+kenv linseg 0, 0.01, 0.12, 0.85, 0
+gachime = gachime + oscili(kenv, kf)
+endin

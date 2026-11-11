@@ -1,0 +1,81 @@
+#!/bin/sh
+# run.sh: the Nebulae Bluetooth keyboard helper, started by bt_test.instr / bt_storyteller.instr with
+#   systemd-run --unit=neb-bt --collect sh /dev/shm/neb_bt/run.sh <test|story>
+# Everything runs from RAM (/dev/shm/neb_bt); nothing on the SD card is written. The stick's bt_keyboard/ folder
+# holds the programs, the pairing (pairing.tlv) and the logs (probe.txt, log.txt).
+#   test   probe the Pi 4's Bluetooth (probe.txt), then be a keyboard that types a hello line every 10 s
+#   story  narrator.py (the instrument's events -> chatty English) piped into the keyboard
+#   save   (btkbd's hook) copy the new pairing to the stick
+# It stops when the module loads another instrument (btkbd --watch on the firmware's bootinstr.txt), or when
+# systemd stops the unit (the next launch). btkbd then powers the Bluetooth chip off.
+M=/mnt/memory
+S=$M/bt_keyboard
+W=/dev/shm/neb_bt
+BOOTINSTR=/home/alarm/QB_Nebulae_V2/Code/config/bootinstr.txt
+
+mounted() { grep -q " $M " /proc/mounts; }
+
+# copy a file to the stick: mount it if needed, unmount it again if this mounted it
+to_stick() {
+    was=1
+    if ! mounted; then was=0; mkdir -p $M; mount /dev/sda1 $M || return 1; fi
+    mkdir -p $S && cp "$1" "$S/$2" && sync
+    [ $was = 1 ] || umount $M
+}
+
+if [ "$1" = save ]; then
+    to_stick $W/pairing.tlv pairing.tlv && echo "pairing saved to the stick" >> $W/log.txt
+    exit 0
+fi
+
+mkdir -p $W
+exec >> $W/log.txt 2>&1
+echo "=== run.sh $1, uptime $(cut -d ' ' -f 1 /proc/uptime) s"
+
+# the programs and the pairing, from the stick into RAM
+if ! mounted; then mkdir -p $M; mount /dev/sda1 $M; fi
+for f in btkbd narrator.py; do [ -f $S/$f ] && cp $S/$f $W/$f; done
+chmod +x $W/btkbd
+rm -f $W/pairing.tlv $W/state
+[ -f $S/pairing.tlv ] && cp $S/pairing.tlv $W/pairing.tlv && echo "pairing loaded from the stick"
+
+# this instrument's name, as the firmware wrote it before starting it; btkbd stops once it names another
+NAME=$(sed -n 's/^instr,//p' $BOOTINSTR | head -n 1)
+echo "instrument: $NAME"
+KBD="$W/btkbd --state $W/state --tlv $W/pairing.tlv --hook 'sh $W/run.sh save' --hcd-dir $S"
+[ -n "$NAME" ] && KBD="$KBD --watch $BOOTINSTR $NAME"
+
+finish() {
+    echo "=== run.sh end, uptime $(cut -d ' ' -f 1 /proc/uptime) s"
+    # stopped by itself because another instrument is loading: the firmware is copying from the stick right now,
+    # so wait before mounting it (when the next bt instrument stops us, it holds the stick mounted already)
+    [ -z "$TERMED" ] && sleep 6
+    to_stick $W/log.txt log.txt
+}
+trap finish EXIT
+trap 'TERMED=1; exit 0' TERM INT
+
+case "$1" in
+test)
+    $W/btkbd --probe --state $W/state > $W/probe.txt 2>&1
+    PROBE=$?
+    cat $W/probe.txt
+    to_stick $W/probe.txt probe.txt
+    if [ $PROBE != 0 ]; then
+        echo "probe failed ($PROBE): no keyboard"
+        exit 0
+    fi
+    sleep 1
+    eval "$KBD --hello"
+    ;;
+story)
+    if ! python2 -m py_compile $W/narrator.py; then
+        echo "failed: narrator.py does not compile" > $W/state
+        exit 0
+    fi
+    python2 -u $W/narrator.py --state $W/state --events $W/events | eval "$KBD --type"
+    ;;
+*)
+    echo "unknown mode: $1"
+    ;;
+esac
