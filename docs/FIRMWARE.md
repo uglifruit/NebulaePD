@@ -227,7 +227,7 @@ change set. The base is the unit's own tree (from the SD image), so `fwbuild` wr
 
   - Button LEDs: lit = a patch is there, bright = the one running now, off = empty slot (a press does nothing).
   - The selector opens on the running instrument's page.
-  - Decided by the owner (2026-11-10), replacing the first uf1 design (Next = page, Pitch = cursor, Reset = load).
+  - Decided by the owner (2026-11-10), replacing the first uf1 design (File = page, Pitch = cursor, Reset = load).
   - Up to 25 files per bank are reachable.
   - File lists are re-read each time the selector opens, so new files on the stick show up without a reboot.
 - **Alt layer reset on every Pd patch load** (including a reload and the patch at boot). Every `*_alt` goes back to
@@ -486,9 +486,9 @@ How it works:
    few seconds longer, once. `neb_log.txt` should say "uf2: Csound plugin libpearls.so installed" (uf2_1 writes it
    there; uf2 printed it only to the journal). The full test list is `docs/PEARLS_GUIDE.md`.
    - Load `pearls` from the user (Csound) bank. It's a granular processor: patch audio in.
-   - Freeze/Reset gates, Next cycles the quality (the encoder LEDs show the colour), the EOL output gives grain
+   - Freeze/Reset gates, File cycles the quality (the encoder LEDs show the colour), the EOL output gives grain
      gates.
-   - Source + Next loads a sample from the stick, Source + Reset saves the buffer.
+   - Source + File loads a sample from the stick, Source + Reset saves the buffer.
    - Other Csound instruments behave as before.
 
 ## Status

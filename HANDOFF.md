@@ -119,6 +119,9 @@ tools/csound609/ (gitignored) unzipped csound-emscripten-6.09.1 from the Csound 
 both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md at commit are harmless).
 
 ## 4. Nebulae facts that matter (verified from upstream source)
+- **Button names:** the panel labels are Record, **File**, Source, Reset and Freeze. In owner-facing text, always
+  call the second button **File**, never "Next", even though stock firmware uses it to step to the next file.
+  `PIN_NEXT`/`ADDR_NEXT`/`NEXT_GATE_PIN` in the stock code and the upstream Pearls notes say "Next"; they mean File.
 - **How a Pd patch is launched:**
   - The Python app (`Code/nebulae/*.py`, Python 2) runs `pd -rt -callback -nogui -audiobuf 5 /home/alarm/pd/<name>.pd`.
   - USB-root `*.pd` files are copied to `/home/alarm/pd` at boot. Audio files go to `/home/alarm/audio`.

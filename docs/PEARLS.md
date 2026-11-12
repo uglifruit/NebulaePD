@@ -71,5 +71,5 @@ The panel and the secondary layer are in Pearls' README (`external/xponent_QB_Ne
 "Panel"). In short:
 - Start = TIME, Size = SIZE (fully clockwise = delay mode), Window = SHAPE, Density = DENSITY;
 - Pitch = PITCH, Overlap = FEEDBACK, Blend = DRY/WET, Speed = REVERB;
-- Freeze = FREEZE, Reset = SEED, Next = QUALITY, Source = wavetable synth, Record = tap tempo;
+- Freeze = FREEZE, Reset = SEED, File = QUALITY, Source = wavetable synth, Record = tap tempo;
 - EOL = grain gates.

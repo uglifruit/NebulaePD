@@ -43,7 +43,7 @@ anything odd about them.
 | **Blend** | DRY/WET |
 | **Speed** | REVERB amount: turn clockwise from speed 0. Click toggles a light reverb on/off |
 
-**Buttons and gates**
+**Buttons and gates** (the File button is the one Pearls' own notes in `pearls.instr` call "Next")
 
 | Nebulae | Pearls |
 |---|---|
@@ -51,10 +51,10 @@ anything odd about them.
 | **Freeze** gate | Frozen while the gate is high |
 | **Reset** button | SEED: a tap plays one grain (in delay mode, a tap tempo). **Re-lock** the grain generator: hold 4 s and release, or press Freeze while holding |
 | **Reset** gate | SEED input: each trigger plays a grain; a clock plays grains in time. Counts as patched while edges arrive (4 s timeout) |
-| **Next** button / gate | QUALITY, on release: hi-fi → cold digital → sunny tape → scorched cassette → hi-fi. **Hold 1.5 s**: restart the automatic input gain |
+| **File** button / gate | QUALITY, on release: hi-fi → cold digital → sunny tape → scorched cassette → hi-fi. **Hold 1.5 s**: restart the automatic input gain |
 | **Source** button / gate | Wavetable synth mode on/off |
 | **Record** button | TAP TEMPO *(new)*: tap 2+ times to clock the grains. Later single taps re-align the beat; hold 1 s to stop |
-| **Next held + Record** | PITCH SCALE *(new)*: off → chromatic → major → minor → major pent. → minor pent. → octaves + fifths → octaves → off |
+| **File held + Record** | PITCH SCALE *(new)*: off → chromatic → major → minor → major pent. → minor pent. → octaves + fifths → octaves → off |
 | **EOL** out | A gate per grain (in delay mode, per delay tap) |
 
 **LEDs**
@@ -63,7 +63,7 @@ anything odd about them.
 |---|---|
 | Reset | Grain activity (dim while locked and idle) |
 | Freeze | Frozen (button, gate, or after loading a sample) |
-| Next | Lit while pressed. **Slow blink**: the automatic gain is measuring the input (~5 s after start or a new input). Fast blink: loading or saving |
+| File | Lit while pressed. **Slow blink**: the automatic gain is measuring the input (~5 s after start or a new input). Fast blink: loading or saving |
 | Record | Tap-tempo beat (dim between beats) |
 | Encoder LEDs, 1.5 s after a quality change | hi-fi = white, cold digital = cyan-green, sunny tape = amber, scorched cassette = purple |
 | Pitch LEDs, 1.5 s after a scale change | off = white, chromatic = red, major = amber, minor = yellow, maj. pent. = green, min. pent. = cyan, oct + 5th = blue, octaves = magenta |
@@ -81,7 +81,7 @@ anything odd about them.
 | Speed encoder | The Nebulae input level (as usual) |
 | Freeze | Randomness shape: off = even, on = mostly small with occasional big jumps |
 | Record | Mono buffer: left input only, twice the time |
-| Next | **Load** the next WAV from the stick into the buffer *(new)* |
+| File | **Load** the next WAV from the stick into the buffer *(new)* |
 | Reset | **Save** the buffer to the stick as `pearls_001.wav`, … *(new)* |
 
 Changing quality, mono or synth mode **clears the buffer**, as on Beads. While frozen, those changes wait until you
@@ -93,7 +93,7 @@ Tick each step. Where it says "expect", that's what Beads does.
 
 **A. Basics**
 - [ ] Load `pearls`. Audio passes through (Blend fully clockwise = all wet, so start at noon).
-- [ ] Next LED blinks slowly for a few seconds: the automatic gain is measuring.
+- [ ] File LED blinks slowly for a few seconds: the automatic gain is measuring.
 - [ ] Density at 12 o'clock: no grains (dry only, plus reverb/feedback tails).
 - [ ] Density a bit clockwise: random grains appear; further = denser. Reset LED flickers with grain activity.
 - [ ] Density a bit anticlockwise: grains at a steady rate; further = faster.
@@ -116,11 +116,11 @@ Tick each step. Where it says "expect", that's what Beads does.
 - [ ] Hold Reset 4 s and release: the generator re-locks (Reset LED dim while idle).
 - [ ] EOL out into a module/scope: a gate per grain.
 
-**D. Quality (Next)**
-- [ ] Each Next press steps hi-fi → cold digital → sunny tape → scorched cassette; the encoder LEDs flash the
+**D. Quality (File)**
+- [ ] Each File press steps hi-fi → cold digital → sunny tape → scorched cassette; the encoder LEDs flash the
   colour; the sound changes (cleaner → crunchier, longer buffer).
-- [ ] While frozen, a Next press waits until you unfreeze.
-- [ ] Hold Next 1.5 s: the slow blink restarts (gain re-measured).
+- [ ] While frozen, a File press waits until you unfreeze.
+- [ ] Hold File 1.5 s: the slow blink restarts (gain re-measured).
 
 **E. Delay mode**
 - [ ] Size fully clockwise: it becomes a delay. Start = delay time, Overlap = feedback.
@@ -136,7 +136,7 @@ Tick each step. Where it says "expect", that's what Beads does.
 - [ ] Tap Record 3–4 times: grains (or the delay) follow that tempo; the Record LED blinks on the beat.
 - [ ] One more tap later re-aligns the beat. Hold Record 1 s: the clock stops.
 
-**H. Pitch scales (Next held + Record)** *(new)*
+**H. Pitch scales (File held + Record)** *(new)*
 - [ ] Each combo steps the scale; the Pitch LEDs flash its colour.
 - [ ] With Pitch randomness up (Source + Pitch), random grain pitches land on scale notes.
 - [ ] Pitch CV near a note boundary doesn't flicker between notes.
@@ -148,7 +148,7 @@ Tick each step. Where it says "expect", that's what Beads does.
 - [ ] Record: mono buffer (left input only), noticeably longer.
 
 **J. Samples and memory** *(new)*
-- [ ] Source + Next: loads the next WAV from the stick. Encoder LEDs green, Freeze LED on (loaded = frozen).
+- [ ] Source + File: loads the next WAV from the stick. Encoder LEDs green, Freeze LED on (loaded = frozen).
   Grains now play the sample. Press again for the next file.
 - [ ] Source + Reset: saves the buffer. Blue flash; `pearls_001.wav` appears on the stick (check on the PC).
 - [ ] With no WAVs or no stick: red flash, nothing breaks.

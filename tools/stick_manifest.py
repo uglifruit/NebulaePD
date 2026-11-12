@@ -22,7 +22,7 @@ BANKS = [  # (title, Speed position / light, extension, hide "_" files, stick fo
     ("SuperCollider", "Speed clockwise again (right light BLUE)", ".scd", True),
 ]
 COLOURS = ["white", "orange", "yellow", "blue", "green"]
-BUTTONS = ["Record", "Next", "Source", "Reset", "Freeze"]
+BUTTONS = ["Record", "File", "Source", "Reset", "Freeze"]
 MAX_FILES = 25
 
 
