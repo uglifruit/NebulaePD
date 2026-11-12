@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # narrator.py: the Nebulae storyteller's mind (docs/BLUETOOTH.md, stage 3). Python 2.7 (the module) and 3 (tests).
 #
-#   python2 narrator.py --events /dev/shm/neb_bt/events --state /dev/shm/neb_bt/state [--no-data] [--log F]
+#   python2 narrator.py --events /dev/shm/neb_bt/events --state /dev/shm/neb_bt/state [--settings F] [--no-data]
+#                       [--log F]
 #   python3 narrator.py --replay events.txt          (the PC: prints the story a recorded event file would tell)
 #
 # bt_storyteller.instr (tools/storyteller.py) appends one line per happening to the events file:
@@ -32,9 +33,38 @@ SETTLE = 0.7          # s without change: a hand move is over
 CV_SETTLE = 3.0       # s without change: a CV-like motion is over
 CPS = 26.0            # btkbd types about 28 characters a second
 GAP = 3.5             # s between observations (1 s for urgent ones)
+# settings.txt on the stick (bt_keyboard/), "name = value" lines; anything missing or unreadable keeps its default
+DEFAULTS = {"data": "full",    # full: [time, what happened / the sound]; short: [time, what happened]; off: none
+            "pace": GAP,       # seconds between observations: 1 = chatty .. 60 = taciturn (urgent ones: 1 s)
+            "coda": 20.0}      # % of lines that get a closing musing (0 .. 100)
 INTERVALS = {1: "a semitone", 2: "a whole tone", 3: "a minor third", 4: "a major third", 5: "a fourth",
              6: "a tritone", 7: "a fifth", 8: "a minor sixth", 9: "a major sixth", 10: "a minor seventh",
              11: "a major seventh", 12: "an octave", 19: "an octave and a fifth", 24: "two octaves"}
+
+
+def read_settings(path, base=None):
+    """settings.txt -> {"data", "pace", "coda"}, keeping defaults for anything missing or wrong."""
+    out = dict(DEFAULTS if base is None else base)
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines()
+    except (IOError, OSError, TypeError):
+        return out
+    for line in lines:
+        line = line.split("#", 1)[0]
+        if "=" not in line:
+            continue
+        k, v = [x.strip().lower() for x in line.split("=", 1)]
+        try:
+            if k == "data" and v in ("full", "short", "off"):
+                out[k] = v
+            elif k == "pace":
+                out[k] = min(60.0, max(1.0, float(v)))
+            elif k == "coda":
+                out[k] = min(100.0, max(0.0, float(v)))
+        except ValueError:
+            pass
+    return out
 
 
 def clean(text):
@@ -175,10 +205,12 @@ class Pulses(object):
 
 
 class Narrator(object):
-    def __init__(self, rng=None, show_data=True):
+    def __init__(self, rng=None, show_data=True, settings=None):
         self.rng = rng or random.Random()
         self.voice = Voice(self.rng)
-        self.show_data = show_data
+        self.settings = dict(settings or DEFAULTS)
+        if not show_data:
+            self.settings["data"] = "off"
         self.ctl = dict((n, Control(n)) for n in KNOBS)
         self.latch = {}
         self.now = 0.0
@@ -653,7 +685,7 @@ class Narrator(object):
         if not self.connected or not self.cands or now < self.busy_until:
             return None
         top = max(c[0] for c in self.cands)
-        if now - self.last_said < (1.0 if top >= 7 else GAP):
+        if now - self.last_said < (1.0 if top >= 7 else self.settings["pace"]):
             return None
         moves = [c for c in self.cands if c[1].startswith("move:")]
         if len(moves) >= 3 and top < 7:
@@ -669,11 +701,13 @@ class Narrator(object):
         prio, key, data, text_fn, t0, snap = chosen
         self.spoken[key] = now
         poem = text_fn()
-        if key != "greet" and "?" not in poem and self.rng.random() < 0.2:
+        if key != "greet" and "?" not in poem and self.rng.random() * 100.0 < self.settings["coda"]:
             poem += " " + self.voice.pick("coda", P.CODA)
         out = ""
-        if self.show_data:
-            out = "[%s %s%s]\n" % (clock(t0), data, (" / " + snap) if snap and key != "greet" else "")
+        level = self.settings["data"]
+        if level != "off":
+            full = level == "full" and snap and key != "greet"
+            out = "[%s %s%s]\n" % (clock(t0), data, (" / " + snap) if full else "")
         out += poem + "\n\n"
         out = clean(out)
         self.last_said = now
@@ -690,14 +724,14 @@ def read_state(path):
         return ""
 
 
-def run(events, state, show_data, log_path):
+def run(events, state, show_data, log_path, settings=None):
     log = open(log_path, "a") if log_path else None
 
     def note(msg):
         if log:
             log.write("%.1f %s\n" % (time.time(), msg))
             log.flush()
-    nar = Narrator(show_data=show_data)
+    nar = Narrator(show_data=show_data, settings=settings)
     while not os.path.exists(events):
         time.sleep(0.2)
     # os.read on a raw descriptor: always sees appended lines (glibc 2.28+ makes stdio's end-of-file sticky,
@@ -707,7 +741,7 @@ def run(events, state, show_data, log_path):
     last_data = time.time()
     seen = False
     next_state = 0.0
-    note("narrator started")
+    note("narrator started, settings: data %(data)s, pace %(pace)g s, coda %(coda)g%%" % nar.settings)
     while True:
         chunk = os.read(fd, 65536)
         if chunk:
@@ -736,9 +770,9 @@ def run(events, state, show_data, log_path):
         time.sleep(0.1)
 
 
-def replay(path, show_data=True, seed=1):
+def replay(path, show_data=True, seed=1, settings=None):
     """The story of a recorded events file (PC tests): returns [(t, text)]."""
-    nar = Narrator(rng=random.Random(seed), show_data=show_data)
+    nar = Narrator(rng=random.Random(seed), show_data=show_data, settings=settings)
     with open(path) as f:
         lines = [l for l in f.read().split("\n") if l.strip()]
     told = []
@@ -758,22 +792,23 @@ def replay(path, show_data=True, seed=1):
 
 def main(argv):
     args = {"events": "/dev/shm/neb_bt/events", "state": "/dev/shm/neb_bt/state", "log": None, "data": True,
-            "replay": None}
+            "replay": None, "settings": None}
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a in ("--events", "--state", "--log", "--replay") and i + 1 < len(argv):
+        if a in ("--events", "--state", "--log", "--replay", "--settings") and i + 1 < len(argv):
             args[a[2:]] = argv[i + 1]
             i += 1
         elif a == "--no-data":
             args["data"] = False
         i += 1
+    settings = read_settings(args["settings"])
     if args["replay"]:
-        for t, text in replay(args["replay"], args["data"]):
+        for t, text in replay(args["replay"], args["data"], settings=settings):
             sys.stdout.write(text)
         return 0
     try:
-        run(args["events"], args["state"], args["data"], args["log"])
+        run(args["events"], args["state"], args["data"], args["log"], settings)
     except Exception:
         # on the module: the reason goes to narrator.log (copied to the stick), not just to the journal
         import traceback

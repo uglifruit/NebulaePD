@@ -290,6 +290,69 @@ class TestStory(unittest.TestCase):
         self.assertNotIn("[", out)
 
 
+class TestSettings(unittest.TestCase):
+    """bt/settings.txt: data full / short / off, pace, coda."""
+
+    def write(self, text):
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix=".txt")
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        self.addCleanup(os.remove, path)
+        return path
+
+    def test_shipped_file_is_the_defaults(self):
+        self.assertEqual(N.read_settings(os.path.join(BT, "settings.txt")), N.DEFAULTS)
+
+    def test_missing_file_and_bad_values_keep_defaults(self):
+        self.assertEqual(N.read_settings("/nonexistent/settings.txt"), N.DEFAULTS)
+        self.assertEqual(N.read_settings(None), N.DEFAULTS)
+        got = N.read_settings(self.write("data = loud\npace = soon\ncoda\n  # data = off\n"))
+        self.assertEqual(got, N.DEFAULTS)
+
+    def test_values_parse_and_clamp(self):
+        got = N.read_settings(self.write("Data = SHORT   # just what happened\npace=0.2\ncoda = 250\n"))
+        self.assertEqual(got, {"data": "short", "pace": 1.0, "coda": 100.0})
+
+    def busy_story(self, settings):
+        s = Sim(seed=4)
+        s.nar.settings = settings
+        s.run(2)
+        knobs = ["density", "size", "window", "blend", "start", "overlap"]
+
+        def each(sim, t):                    # a one-second hand sweep of a different knob every 5 s
+            ph, n = t % 5.0, int(t / 5)
+            if ph < 1.0:
+                sim.k(knobs[n % 6], 0.2 + 0.6 * ph if n % 2 == 0 else 0.8 - 0.6 * ph)
+        s.run(90, each)
+        return s
+
+    def test_short_data_has_no_sound_snapshot(self):
+        full = self.busy_story(dict(N.DEFAULTS)).text()
+        short = self.busy_story(dict(N.DEFAULTS, data="short")).text()
+        off = self.busy_story(dict(N.DEFAULTS, data="off")).text()
+        self.assertIn(" dB", full)
+        self.assertIn("[", short)
+        self.assertNotIn(" dB", short)
+        self.assertNotIn("[", off)
+
+    def test_pace_spaces_the_lines(self):
+        chatty = self.busy_story(dict(N.DEFAULTS, pace=1.0)).out
+        slow = self.busy_story(dict(N.DEFAULTS, pace=12.0)).out
+        self.assertGreater(len(chatty), len(slow))
+        for (t0, o0), (t1, o1) in zip(slow, slow[1:]):
+            self.assertGreaterEqual(t1 - t0, 1.0 - 1e-6)
+        ordinary = [t1 - t0 for (t0, _), (t1, _) in zip(slow, slow[1:])]
+        self.assertGreaterEqual(sorted(ordinary)[len(ordinary) // 2], 12.0 - 1e-6)
+
+    def test_coda_zero_and_hundred(self):
+        never = self.busy_story(dict(N.DEFAULTS, coda=0.0))
+        always = self.busy_story(dict(N.DEFAULTS, coda=100.0))
+        codas = set(P.CODA)
+        self.assertFalse([o for t, o in never.out if any(c and c in o for c in codas)])
+        self.assertTrue([o for t, o in always.out if any(c and c in o for c in codas)])
+
+
 class TestLiveLoop(unittest.TestCase):
     """narrator.py as on the module: tails a growing events file, types when connected, exits when it stops."""
 

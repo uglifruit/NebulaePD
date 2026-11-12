@@ -6,7 +6,8 @@
 #   test   diagnose the chip's power and UART (diag.txt), probe BTstack's start (probe.txt), then be a keyboard
 #          that types a hello line every 10 s
 #   story  narrator.py + phrases.py (the instrument's events -> data + poetry) piped into the keyboard;
-#          a file named hide_data in bt_keyboard/ leaves out the [data] lines
+#          bt_keyboard/settings.txt sets the data lines (full / short / off), the pace and the codas;
+#          a file named hide_data in bt_keyboard/ also leaves out the [data] lines
 #   save   (btkbd's hook) copy the new pairing to the stick
 # It stops when the module loads another instrument (btkbd --watch on the firmware's bootinstr.txt), or when
 # systemd stops the unit (the next launch). btkbd then powers the Bluetooth chip off.
@@ -17,11 +18,17 @@ BOOTINSTR=/home/alarm/QB_Nebulae_V2/Code/config/bootinstr.txt
 
 mounted() { grep -q " $M " /proc/mounts; }
 
-# copy a file to the stick: mount it if needed, unmount it again if this mounted it
+# copy a file to the stick: mount it if needed, unmount it again if this mounted it.
+# With "keep", the stick's older copies move along first (name.1 = the run before, up to name.3).
 to_stick() {
     was=1
     if ! mounted; then was=0; mkdir -p $M; mount /dev/sda1 $M || return 1; fi
-    mkdir -p $S && cp "$1" "$S/$2" && sync
+    mkdir -p $S
+    if [ "$3" = keep ]; then
+        for n in 2 1; do [ -f "$S/$2.$n" ] && mv -f "$S/$2.$n" "$S/$2.$((n + 1))"; done
+        [ -f "$S/$2" ] && mv -f "$S/$2" "$S/$2.1"
+    fi
+    cp "$1" "$S/$2" && sync
     [ $was = 1 ] || umount $M
 }
 
@@ -36,7 +43,8 @@ echo "=== run.sh $1, uptime $(cut -d ' ' -f 1 /proc/uptime) s"
 
 # the programs and the pairing, from the stick into RAM
 if ! mounted; then mkdir -p $M; mount /dev/sda1 $M; fi
-for f in btkbd narrator.py phrases.py; do [ -f $S/$f ] && cp $S/$f $W/$f; done
+rm -f $W/settings.txt
+for f in btkbd narrator.py phrases.py settings.txt; do [ -f $S/$f ] && cp $S/$f $W/$f; done
 chmod +x $W/btkbd
 rm -f $W/pairing.tlv $W/state
 [ -f $S/pairing.tlv ] && cp $S/pairing.tlv $W/pairing.tlv && echo "pairing loaded from the stick"
@@ -52,8 +60,8 @@ finish() {
     # stopped by itself because another instrument is loading: the firmware is copying from the stick right now,
     # so wait before mounting it (when the next bt instrument stops us, it holds the stick mounted already)
     [ -z "$TERMED" ] && sleep 6
-    to_stick $W/log.txt log.txt
-    [ -f $W/narrator.log ] && to_stick $W/narrator.log narrator.log
+    to_stick $W/log.txt log.txt keep
+    [ -f $W/narrator.log ] && to_stick $W/narrator.log narrator.log keep
 }
 trap finish EXIT
 trap 'TERMED=1; exit 0' TERM INT
@@ -84,7 +92,7 @@ story)
     fi
     DATA=""
     [ -f $S/hide_data ] && DATA="--no-data" && echo "data lines hidden (hide_data on the stick)"
-    python2 -u $W/narrator.py --state $W/state --events $W/events --log $W/narrator.log $DATA | eval "$KBD --type"
+    python2 -u $W/narrator.py --state $W/state --events $W/events --settings $W/settings.txt --log $W/narrator.log $DATA | eval "$KBD --type"
     ;;
 *)
     echo "unknown mode: $1"

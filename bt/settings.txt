@@ -1,0 +1,17 @@
+# Storyteller settings (bt_storyteller). Edit on the PC, save, put the stick back, reload the instrument.
+# One "name = value" per line. Anything after # is a note. A missing or misspelt line keeps its default.
+
+# The [data] line above each poem:
+#   full   time, what happened, and the sound at that moment
+#          [1:05 density 0.42 > 0.71 in 0.8 s / in -18 dB, out -12 dB, 1840 Hz, lows 22%, calm]
+#   short  time and what happened only
+#          [1:05 density 0.42 > 0.71 in 0.8 s]
+#   off    poetry only
+data = full
+
+# Seconds between observations: 1 = chatty, 3.5 = the default, 10 = thoughtful, 30 = taciturn.
+# Urgent things (a sudden interruption, being frozen) can still come after 1 s.
+pace = 3.5
+
+# Percent of lines that end with an extra closing musing ("I am still listening."): 0 = never, 100 = always.
+coda = 20

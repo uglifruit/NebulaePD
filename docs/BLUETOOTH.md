@@ -80,6 +80,8 @@ Stages 1 and 2 are one instrument, `bt_test.instr`.
 old PC.
 
 ## Stage 3: the storyteller, `bt_storyteller.instr`
+**Owner's guide: `docs/STORYTELLER.md`** (pairing, reading it, `settings.txt`, editing the voice, logs).
+
 The factory granular looper (copied verbatim by `tools/storyteller.py`) plus the storyteller's ears. Load it from
 the Csound user bank; once the PC connects, open Notepad. Each observation is typed as two lines:
 
@@ -94,7 +96,9 @@ I know this. I heard it 94 seconds ago. There is more weight underneath. The edg
   - after the `/`, the input level, the output level, the input's brightness (spectral centroid, Hz), the share of
     low end (below 160 Hz), and the mood (calm or busy).
 
-  An empty file named `hide_data` in `bt_keyboard/` leaves these lines out.
+  `bt_keyboard/settings.txt` sets them to `full`, `short` (without the part after the `/`) or `off`, plus the
+  pace (`pace`, seconds between observations, default 3.5) and the share of codas (`coda`, %). An empty file named
+  `hide_data` still means `data = off`.
 - **The poem line** comes from `bt/phrases.py`: 343 lines in 94 pools, picked like a shuffled deck so nothing
   repeats until a pool is used up. Edit or add lines freely, using only the characters listed at its top.
   `bt/tests/test_narrator.py` checks every line.
@@ -104,13 +108,13 @@ What it notices (`bt/narrator.py`):
 |---|---|
 | Knobs | each move as from > to, how long, reversals. Kinds: indecision (back and forth), small, big, to the top or bottom, back to an earlier setting, the first touch of each control, several at once. Pitch moves as intervals (octave, fifth, ...); speed through backwards, stopped and normal |
 | CV | a control moving by itself: a wave (with its period), steps (a sequence: a jump after a plateau), or wandering |
-| Buttons and gates | Freeze, Record, Source, Next file, the hidden layer (Source held), Reset as a single press or a burst |
+| Buttons and gates | Freeze, Record, Source, File (next file), the hidden layer (Source held), Reset as a single press or a burst |
 | Pulses | on the Reset gate and in the input's onsets: regular, loose or irregular, the tempo, faster or slower, stopped |
 | Sound | a transient after calm or silence, silence (20 s, 60 s, then every 3 minutes), sound arriving, gradual brightening or darkening, more or less low end, louder or softer, the output louder than the input, frozen and alone |
 | Memory | a sound heard more than 45 s before, back after something else: "I recognise this sound", and how it differs (lows, brightness, level, tempo) |
 | Time | idle musings when nobody touches it; minutes together (5, 15, 30, ...) |
 
-**Pacing.** One observation at a time, at least 3.5 s apart (1 s for urgent ones: transients, the greeting), and
+**Pacing.** One observation at a time, at least 3.5 s apart (`pace` in `settings.txt`) (1 s for urgent ones: transients, the greeting), and
 never while the previous one is still being typed (about 28 characters a second). The most important pending
 observation goes first; stale ones are dropped after 12 s.
 
@@ -122,7 +126,7 @@ small file once a second through a GEN23 table, so no process is started (`bt_te
 `narrator.py` runs as its own process at a 10 Hz tick.
 
 **Tests.**
-- `python bt/tests/test_narrator.py` (24 tests): phrases, the pacing, the live file loop, Python 2 syntax, and every
+- `python bt/tests/test_narrator.py` (30 tests): phrases, the pacing, the live file loop, Python 2 syntax, and every
   detector with scripted events.
 - `wsl -u andy -- python3 tools/story_sim.py`: the whole chain in Csound 6.18, with the story it tells in
   `firmware/dist/story_sim/story.txt`.
@@ -185,3 +189,6 @@ Bluetooth firmware is the card's own file and isn't redistributed.
   - Staged in `firmware/dist/stage_bt/` and copied to the stick (`pairing.tlv` kept). Awaiting hardware.
 - 2026-11-11: **stage 3 works on hardware**: the owner loaded bt_storyteller and it narrated to the PC. No tuning
   notes or logs yet.
+- 2026-11-12: owner's guide `docs/STORYTELLER.md`; `settings.txt` (data full/short/off, pace, coda); `run.sh`
+  keeps the three previous `narrator.log` / `log.txt` (the stick's last log was a 7 s run that had overwritten
+  the working session). Not yet on hardware.
