@@ -1,0 +1,47 @@
+==============================================================================
+Csound, user bank  -  Speed anticlockwise (left light)  -  9 files
+  [1-5] Pitch light white
+      Record   1  001_a_granular_looper_Factory_Default
+      File     2  002_avalon
+      Source   3  003_bowed_drone
+      Reset    4  004_mars_affects
+      Freeze   5  005_realms_v1.0
+  [6-10] Pitch light orange
+      Record   6  999_fw_backup
+      File     7  bt_storyteller
+      Source   8  bt_test
+      Reset    9  pearls
+==============================================================================
+Factory (built in)  -  Speed in the middle (both lights)  -  5 files
+  [1-5] Pitch light white
+      Record   1  a_granularlooper
+      File     2  b_oneshot
+      Source   3  c_synth
+      Reset    4  d_effects
+      Freeze   5  e_testio
+==============================================================================
+Pd  -  Speed clockwise (right light green)  -  11 files
+  [1-5] Pitch light white
+      Record   1  A_durm
+      File     2  B_Plasma_Membrane
+      Source   3  C_ReconetC
+      Reset    4  D_rhythmic_chords
+      Freeze   5  E_echo
+  [6-10] Pitch light orange
+      Record   6  F_glitch
+      File     7  G_spectral
+      Source   8  H_topo
+      Reset    9  I_shimmer
+      Freeze  10  J_resonator
+  [11-15] Pitch light yellow
+      Record  11  ZZ_pitchlog
+==============================================================================
+SuperCollider  -  Speed clockwise again (right light BLUE)  -  5 files
+  [1-5] Pitch light white
+      Record   1  01_sctest
+      File     2  02_sc_drift
+      Source   3  03_sc_strike
+      Reset    4  04_sc_cloud
+      Freeze   5  31-simple
+==============================================================================
+Hold Speed 1.5 s = selector. Pitch turn = group of five. Lit button = loads at once. Pitch/Speed click = leave.
