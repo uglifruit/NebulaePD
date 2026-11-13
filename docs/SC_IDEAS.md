@@ -2,6 +2,8 @@
 
 Written 2026-11-12 for the owner, who is new to SuperCollider (SC). Nothing here is built yet. The current SC bank
 (uf2) and our four patches are in `sc/README.md`, and the plumbing is in `docs/FIRMWARE.md` "Stage 2".
+The owner's shortlist across all engines is in `docs/INSTRUMENT_IDEAS.md` (SC: sc_pattern, sc_follow,
+sc_mosaic).
 
 ## 1. SC in one page
 SC is two programs:

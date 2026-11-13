@@ -107,6 +107,7 @@ docs/manual/         00_*.md (front: selector + stick map) and NN_*.md sections 
                      tools/manual_odt.py -> docs/manual/Nebulae instruments.odt (+ .pdf). Update the stick map when
                      the stick changes; new instrument guides go here as NN_name.md (or "@include ../X.md")
 docs/SC_IDEAS.md     Technobear's SC patches reviewed + SC instrument ideas (none built)
+docs/INSTRUMENT_IDEAS.md  Pd/Csound/SC/platform proposals + the owner's shortlist (first build: stretch)
 docs/HDMI_KEYBOARD.md  feasibility: HDMI visualiser, USB/BT keyboard, tracker, live coding (none built)
 tools/sctest.py      run sclang on the PC: syntax check / NRT renders of .scd files
 tools/scbundle.py    SuperCollider runtime bundle (Technobear's SC 3.10.4 + Debian avahi) + the probe's stick folder
