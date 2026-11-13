@@ -52,6 +52,22 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
   keep a known-good drive and `revert_to_factory_firmware` in mind (manual p.23). Remove the offending `.instr` from the USB
   root to recover.
 - Test IO (`e_testio.instr`) is the recommended minimal template.
+- **The owner's module runs Csound 6.11.0** (inventory, `csound 6.11.0-1`, double samples). The PC's WSL Csound is
+  6.18, and they differ in ways found while building `stretch.instr` (2026-11-13; test with
+  `tools/run_csound609.js`, which has 6.11-like semantics, as well as 6.18):
+  - **An array element inside an expression evaluates to 0 in 6.09** (and very likely 6.11): `gisr[kidx] / sr` → 0,
+    `(gichn[kidx] == 2 ? a : b)` → always b. 6.18 is fine. **Read array elements into a variable first**
+    (`kr = gisr[kidx]` then `kr / sr`).
+  - **`mincer` reads its table at sr in 6.09/6.11**; 6.18 corrects for the table's own sample rate. For a 44.1 kHz
+    file in a 48 kHz orchestra, scale both the time pointer and the pitch by file sr / sr yourself (6.11), and test
+    pitch-sensitive file playback in 6.09, or with 48 kHz files in 6.18.
+  - **Held notes (p3 < 0) with the same p1 tie into one instance.** Several always-on copies of one instrument
+    started with `event_i` need fractional numbers (10.1, 10.2, …), or only the last survives.
+  - `filesr` / `filenchnls` may return 0 / 1 in the wasm build; fall back to `ftsr(table)` and then sr.
+  - `pvsblur`'s cost grows with its blur time (a moving average over every frame in the window); `pvsmooth` (one
+    pole per bin) gives a similar smear at constant cost.
+  - `run_csound609.js`: `CS609_MEM=512` for big tables, `CS609_FILES=a.wav,…` to load audio files; there is no live
+    input, and `printks` prints only once in that build.
 
 ## How a bad instrument becomes a boot loop (from upstream nebulae.py)
 1. The selected bank/instr is saved to `Code/config/bootinstr.txt` and reloaded on every start.

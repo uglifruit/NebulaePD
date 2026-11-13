@@ -1,0 +1,346 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,triggered,rising
+speed,0.56
+pitch,0.6
+start_alt,0.5
+size_alt,0.47
+density_alt,0.3
+window_alt,0.5
+overlap_alt,0.5
+blend_alt,0.15
+pitch_alt,0.5
+nebconfigend
+
+; stretch.instr - extreme time-stretch and freeze of stick audio files or of what you just played.
+; NebulaePD (docs/INSTRUMENT_IDEAS.md, design agreed with the owner 2026-11-13). MIT.
+;
+; A phase vocoder (mincer, 4096-point, phase-locked) reads the sound through a time pointer that moves as slowly
+; as you like, so the sound stretches 1000x without changing pitch, freezes, or plays backwards.
+;
+; Speed    centre = frozen. CW forward, CCW backwards. The clicks = original speed; between centre and a click
+;          = up to 1000x slower; past the clicks = up to 4x faster
+; Start    position in the sound (turning it scrubs the playhead)
+; Size     the region the playhead travels in, from Start (wraps); fully CW = to the end
+; Pitch    transpose, 1V/oct (click = original pitch), independent of the speed
+; Density  layers 1-4: extra readers offset in time, panned apart
+; Window   smear: clear -> washy (paulstretch-like: every frame read from a slightly different place)
+; Overlap  blur: the spectrum smoothed over time (CCW = none, CW = 2 s)
+; Blend    dry input <-> stretched sound
+; Freeze   pause / resume (button or gate), whatever Speed says
+; Reset    jump back to Start (soft), button or gate: clock it to re-strike in time
+; Record   grab the last N seconds of the input (it is always listening); heard when Source is on
+; File     next stick file
+; Source   off = stick files, on = the grabbed input (LED on)
+; alt (hold Source): Start = layer spread (stereo), Size = grab length N (5-120 s, default 30),
+;   Density = how far apart the layers read in time, Window = tone (dark <-> bright),
+;   Overlap = reverb size, Blend = reverb amount, Pitch = layer detune (cents), Speed = input gain (Nebulae's own)
+;
+; Instruments: 1 = controls, playhead, rolling recorder (always on); 10 = one reader per layer (4 instances);
+; 90 = blur, tone, reverb, mix, output. They run in that order every k-cycle.
+
+giCapMax = 120                       ; seconds each rolling buffer holds
+giCapN = giCapMax * sr
+giCap0L ftgen 0, 0, giCapN, 7, 0, giCapN, 0
+giCap0R ftgen 0, 0, giCapN, 7, 0, giCapN, 0
+giCap1L ftgen 0, 0, giCapN, 7, 0, giCapN, 0
+giCap1R ftgen 0, 0, giCapN, 7, 0, giCapN, 0
+giFFT = 4096
+giDecim = 4
+giHop = giFFT / giDecim
+
+; shared state, written by instr 1, read by the layers (10) and the output (90)
+gkTabL init giCap0L                  ; tables of the current sound (mincer needs a valid table at its init)
+gkTabR init giCap0R
+gkS init 0                           ; region start, sound seconds
+gkR init 1                           ; region length, sound seconds
+gkP init 0                           ; playhead, sound seconds
+gkOffs init 0                        ; where the sound starts in its table, table seconds (the grab is circular)
+gkRatio init 1                       ; table seconds per sound second (file sr / sr)
+gkPitch init 1                       ; read increment: transpose x file sr / sr
+gkAmp init 1                         ; level normaliser
+gkDip init 1                         ; soft jump envelope
+gkG1 init 0                          ; layer gains
+gkG2 init 0
+gkG3 init 0
+gkLayOff init 0.3                    ; layer time offset, sound seconds
+gkSilent init 1                      ; nothing to play (live, nothing grabbed yet)
+gaMixL init 0
+gaMixR init 0
+giRate[] init 100                    ; each file's sample rate, filled by instr 1 (declared here, as gisr is)
+
+instr 1
+; ---- init: the right channel of stereo files (tables 599 + n), as the factory looper does
+gifile_right_offset = 599
+itempidx = 0
+loop:
+    ichn = gichn[itempidx]
+    if ichn == 2 then
+        giwoffset ftgen (itempidx + gifile_right_offset), 0, 0, 1, gSname[itempidx], 0, 0, 2
+    endif
+    itempidx += 1
+    if (itempidx < 100) igoto loop
+; each file's sample rate (gisr, else the table's own, else sr): mincer reads tables at sr in Csound 6.11
+itempidx = 0
+rates:
+    if itempidx < ginumfiles then
+        irate = gisr[itempidx]
+        if irate <= 0 then
+            irate = ftsr(400 + itempidx)
+        endif
+        giRate[itempidx] = (irate > 0 ? irate : sr)
+    endif
+    itempidx += 1
+    if (itempidx < 100) igoto rates
+; fractional numbers: held notes with the same p1 would tie into one instance
+event_i "i", 10.1, 0, -1, 0
+event_i "i", 10.2, 0, -1, 1
+event_i "i", 10.3, 0, -1, 2
+event_i "i", 10.4, 0, -1, 3
+event_i "i", 90, 0, -1
+
+; ---- rolling recorder: the input always goes into the active buffer
+ainl, ainr inch 1, 2
+kRecBuf init 0
+kFill init 0                         ; seconds recorded into the active buffer since the last grab
+kRecL = (kRecBuf == 0 ? giCap0L : giCap1L)
+kRecR = (kRecBuf == 0 ? giCap0R : giCap1R)
+kWposL tablewa kRecL, ainl, 0
+kWposR tablewa kRecR, ainr, 0
+kWpos = kWposL % giCapN
+kFill = min(kFill + ksmps / sr, giCapMax)
+
+; ---- grab: Record press (or, live with nothing grabbed yet, once 5 s - or N if shorter - are recorded)
+kHave init 0
+kCapBuf init 0
+kCapEnd init 0
+kCapLen init 0
+kNew init 0
+kNew = 0
+kgrab trigger gkrecord, 0.5, 0
+kN = 5 + 115 * gkloopsize_alt * gkloopsize_alt
+if (kgrab == 1 && kFill > 0.5) || (gksource == 1 && kHave == 0 && kFill >= min(kN, 5)) then
+    kCapBuf = kRecBuf
+    kCapEnd = kWpos
+    kCapLen = min(kN, kFill)
+    kRecBuf = 1 - kRecBuf
+    kFill = 0
+    kHave = 1
+    if gksource == 1 then
+        kNew = 1
+    endif
+endif
+
+; ---- the current sound
+kLive = (gksource == 1 || ginumfiles == 0 ? 1 : 0)
+if kLive == 1 then
+    ktl = (kCapBuf == 0 ? giCap0L : giCap1L)
+    ktr = (kCapBuf == 0 ? giCap0R : giCap1R)
+    klen = max(kCapLen, 0.05)
+    kratio = 1
+    koffs = kCapEnd / sr - kCapLen
+    kamp = 1
+    gkSilent = 1 - kHave
+else
+    kidx = min(max(int(gkfilesel), 0), ginumfiles - 1)
+    ; array reads go into a variable first: in Csound 6.09 an array element inside an expression
+    ; (e.g. gisr[kidx] / sr) evaluates to 0
+    kchn = gichn[kidx]
+    kflen = gilen[kidx]
+    kfrate = giRate[kidx]
+    kfpeak = gipeak[kidx]
+    ktl = 400 + kidx
+    ktr = (kchn == 2 ? gifile_right_offset + kidx : 400 + kidx)
+    klen = max(kflen, 0.05)
+    kratio = kfrate / sr
+    koffs = 0
+    kamp = min(0.5 / max(kfpeak, 0.05), 6)
+    gkSilent = 0
+endif
+kch changed ktl, kLive
+if kch == 1 then
+    kNew = 1
+endif
+
+; ---- region
+kS = gkloopstart * klen
+kR = 0.05 + gkloopsize * gkloopsize * max(klen - kS - 0.05, 0)
+
+; ---- Speed -> rate (centre frozen; clicks at 0.375 / 0.625 = 1x)
+kd = (gkspeed - 0.5) / 0.125
+kad = abs(kd)
+if kad < 0.04 then
+    krate = 0
+elseif kad <= 1 then
+    krate = pow(10, -3 * (1 - (kad - 0.04) / 0.96))
+    if krate > 0.97 then
+        krate = 1
+    endif
+else
+    krate = min(1 + (kad - 1), 4)
+endif
+krate = (kd < 0 ? -krate : krate)
+if gkfreeze == 1 then
+    krate = 0
+endif
+
+; ---- playhead, with soft jumps (Reset, a new sound) and scrubbing (Start)
+kP init 0
+kLastStart init -1
+kPend init 0                         ; a jump waiting for the dip to reach the bottom
+kDip init 1
+kreset trigger gkreset, 0.5, 0
+if kreset == 1 || kNew == 1 then
+    kPend = 1
+endif
+if abs(gkloopstart - kLastStart) > 0.0004 then
+    kP = kS                          ; scrub: the vocoder follows smoothly
+    kLastStart = gkloopstart
+endif
+if kPend == 1 then
+    kDip = max(kDip - ksmps / (sr * 0.02), 0)
+    if kDip == 0 then
+        kP = kS
+        kPend = 0
+    endif
+else
+    kDip = min(kDip + ksmps / (sr * 0.04), 1)
+endif
+kP = kP + krate * ksmps / sr
+if kP >= kS + kR then
+    kP = kS + (kP - kS) % kR
+    gkeol = 1
+elseif kP < kS then
+    kP = kS + kR - (kS - kP) % kR
+    gkeol = 1
+endif
+
+; ---- out to the layers and the output
+kst = (gkpitch - 0.6) * 60
+kst = min(max(kst, -36), 36)
+gkTabL = ktl
+gkTabR = ktr
+gkS = kS
+gkR = kR
+gkP = kP
+gkOffs = koffs
+gkRatio = kratio
+gkPitch = pow(2, kst / 12) * kratio
+gkAmp = kamp
+gkDip = kDip
+kden = gkdensity * 3
+gkG1 = min(max(kden, 0), 1)
+gkG2 = min(max(kden - 1, 0), 1)
+gkG3 = min(max(kden - 2, 0), 1)
+gkLayOff = 0.02 + 4 * gkdensity_alt * gkdensity_alt
+endin
+
+instr 10
+; one reader (layer p4 = 0..3): mincer on each channel of the current sound
+ilay = p4
+ioff = (ilay == 0 ? 0 : (ilay == 1 ? -1 : (ilay == 2 ? 1 : -2)))
+ipan = (ilay == 0 ? 0 : (ilay == 1 ? -1 : (ilay == 2 ? 1 : -0.5)))
+idet = (ilay == 0 ? 0 : (ilay == 1 ? -1 : (ilay == 2 ? 1 : 2)))
+iseed = 0.13 + ilay * 0.21
+kgt = (ilay == 0 ? 1 : (ilay == 1 ? gkG1 : (ilay == 2 ? gkG2 : gkG3)))
+kg portk kgt, 0.05
+aL = 0
+aR = 0
+if kgt > 0 || kg > 0.001 then
+    ; smear: each analysis frame reads from a slightly different place
+    kjit randh gkwindow * gkwindow * 0.25, sr / giHop, iseed
+    kp = gkP + ioff * gkLayOff + kjit
+    kp wrap kp, gkS, gkS + gkR
+    ktim = gkOffs + kp * gkRatio
+    atim upsamp ktim
+    kdet = max(gkpitch_alt - 0.5, 0) * 60 * idet
+    kpitch = gkPitch * pow(2, kdet / 1200)
+    klock = (gkwindow > 0.7 ? 0 : 1)
+    kx = ipan * gkloopstart_alt
+    if ilay == 0 then
+        ; the main reader: stereo, 4096-point
+        aL mincer atim, 1, kpitch, gkTabL, klock, giFFT, giDecim
+        if gkTabR != gkTabL then
+            aR mincer atim, 1, kpitch, gkTabR, klock, giFFT, giDecim
+        else
+            aR = aL
+        endif
+        aL = aL * kg
+        aR = aR * kg
+    else
+        ; the extra layers: one channel each (left or right of the sound, alternately), 2048-point, panned:
+        ; a quarter of the main reader's cost
+        ktab = (ilay == 2 ? gkTabR : gkTabL)
+        am mincer atim, 1, kpitch, ktab, klock, giFFT / 2, giDecim
+        kang = (kx + 1) * 0.785398
+        aL = am * kg * cos(kang) * 1.4142
+        aR = am * kg * sin(kang) * 1.4142
+    endif
+endif
+gaMixL = gaMixL + aL
+gaMixR = gaMixR + aR
+endin
+
+instr 90
+; layers -> level -> blur -> tone -> reverb -> dry/wet -> soft clip
+knorm = 1 / sqrt(1 + gkG1 + gkG2 + gkG3)
+kgain = gkAmp * knorm * (1 - gkSilent)
+kgain portk kgain, 0.02
+adip upsamp gkDip
+aL = gaMixL * kgain * adip
+aR = gaMixR * kgain * adip
+gaMixL = 0
+gaMixR = 0
+
+; blur (Overlap): each bin's amplitude and frequency smoothed over time (pvsmooth: a one-pole per bin, so the
+; cost doesn't grow with the blur time, unlike pvsblur's moving average). Time constant 0.02 .. 2 s; the
+; cutoff is a fraction of the frame rate's Nyquist (48000 / 512 / 2 = 46.9 Hz). Crossfaded in over the first
+; tenth of the knob.
+kbmix = min(max((gkoverlap - 0.01) / 0.09, 0), 1)
+kbmix portk kbmix, 0.05
+if gkoverlap > 0.005 || kbmix > 0.001 then
+    kblur = 0.02 + 1.98 * gkoverlap * gkoverlap
+    kcf = min(1 / (6.2832 * kblur * 46.875), 1)
+    fL pvsanal aL, 2048, 512, 2048, 1
+    fR pvsanal aR, 2048, 512, 2048, 1
+    fbL pvsmooth fL, kcf, kcf
+    fbR pvsmooth fR, kcf, kcf
+    abL pvsynth fbL
+    abR pvsynth fbR
+    aL = aL * (1 - kbmix) + abL * kbmix
+    aR = aR * (1 - kbmix) + abR * kbmix
+endif
+
+; tone (alt Window): high shelf at 1.5 kHz, -18 dB (dark) .. +6 dB (bright), noon = flat
+kw = gkwindow_alt
+kdb = (kw < 0.5 ? (kw - 0.5) * 36 : (kw - 0.5) * 12)
+kdb portk kdb, 0.05
+kv = ampdb(kdb)
+aL pareq aL, 1500, kv, 0.7, 2
+aR pareq aR, 1500, kv, 0.7, 2
+
+; reverb (alt Overlap = size, alt Blend = amount)
+kfb = 0.6 + 0.37 * gkoverlap_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc aL, aR, kfb, 9000
+aL = aL + arL * krev
+aR = aR + arR * krev
+
+; dry input <-> stretched (equal power)
+ainl, ainr inch 1, 2
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708)
+aoL = ainl * kdry + aL * kwet
+aoR = ainr * kdry + aR * kwet
+aoL = tanh(aoL)
+aoR = tanh(aoR)
+outs aoL, aoR
+endin

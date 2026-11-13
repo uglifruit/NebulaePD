@@ -1,6 +1,7 @@
 // Run a .csd's orchestra+score in Csound 6.09.1 (emscripten build) under Node, like the Nebulae does:
 // compileOrc (result checked here, unlike nebulae.py), readScore, start, performKsmps.
 // usage: node tools/run_csound609.js file.csd seconds [out.wav]   (out.wav: stereo 32-bit float render)
+//        CS609_FILES=a.wav,b.wav node ...   preloads audio files the orchestra reads (no live input in wasm)
 // Needs csound-emscripten-6.09.1.zip (GitHub release 6.09.1) unzipped into tools/csound609/ (gitignored),
 // or CS609_DIR pointing at the unzipped csound-emscripten-6.09.1 folder.
 const fs = require('fs');
@@ -8,6 +9,8 @@ const path = require('path');
 const BASE = process.env.CS609_DIR || path.join(__dirname, 'csound609', 'csound-emscripten-6.09.1');
 const lib = path.join(BASE, 'javascripts', 'libcsound.js');
 global.require = require; global.__dirname = path.join(BASE,'javascripts'); global.Module = { memoryInitializerPrefixURL: BASE + '/', print: s => console.log(s), printErr: s => console.log(s) };
+// CS609_MEM=256: heap size in MB (the build's default is small; big tables need more)
+if (process.env.CS609_MEM) global.Module.TOTAL_MEMORY = parseInt(process.env.CS609_MEM, 10) * 1024 * 1024;
 const src = fs.readFileSync(lib, 'utf8');
 // eval in this scope so Module/cwrap end up global
 (0, eval)(src);
@@ -26,6 +29,10 @@ function go() {
   const _getKsmps = cw('CsoundObj_getKsmps', 'number', ['number']);
   const _getOut = cw('CsoundObj_getOutputBuffer', 'number', ['number']);
   const cs = _new();
+  // CS609_FILES="a.wav,b.wav": copied into the wasm file system (by base name) for GEN01 / filelen etc.
+  for (const f of (process.env.CS609_FILES || '').split(',').filter(Boolean)) {
+    M.FS_createDataFile('/', path.basename(f), new Uint8Array(fs.readFileSync(f)), true, true);
+  }
   const r = _compileOrc(cs, orc);
   console.log('### compileOrc returned', r);
   _readScore(cs, sco);

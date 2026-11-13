@@ -30,7 +30,7 @@ Effort: S = a few sessions, M = like topo or resonator, L = bigger. CPU is again
 ## Csound
 | | Idea | What it is | Effort / CPU |
 |---|---|---|---|
-| ★ | **stretch** (first) | Extreme time-stretch and freeze of stick files or a captured input (`mincer`, phase-locked vocoder): 10×–1000× slower with the pitch unchanged. Start scrubs, Speed = stretch, Pitch = transpose (V/oct), layers, blur and a reverb tail | S / medium |
+| ★ | **stretch**: **built 2026-11-13**, awaiting hardware (`instr/stretch.instr`, guide `docs/manual/15_stretch.md`) | Extreme time-stretch and freeze of stick files or a captured input (`mincer`, phase-locked vocoder): 10×–1000× slower with the pitch unchanged. Start scrubs, Speed = stretch, Pitch = transpose (V/oct), layers, blur and a reverb tail. Measured at 1.2–1.5× the factory looper's CPU | S / medium |
 | ★ | **morph**: cross-synthesis | `pvscross` / `pvsmorph` / `pvsvoc`: one source's spectral envelope on the other (L↔R, or input ↔ stick file). Blend morphs between them, with freeze per side and a spectral arpeggiator (`pvsarp`) on V/oct | M / medium |
 | ★ | **scan**: scanned synthesis | A mass-spring string whose shape is the waveform. Knobs = mass, stiffness, damping, centring; Reset strikes it; audio input can excite it | M / low–medium |
 | | **pulsar**: a granular oscillator | `partikkel` as a playable V/oct voice: pulsar/trainlet synthesis, formant grains, per-grain FM, grain masks | M / medium |
