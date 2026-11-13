@@ -36,7 +36,7 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | | File | B_Plasma_Membrane | No notes on the stick. Its knobs each control two parameters (split down the middle) |
 | | Source | C_ReconetC | Reconetc: a generative dual sample slicer with four micro-algorithms in zones, trigger probability, repeats and two reverbs. Needs its six samples (`Atmos`, `Kick`, `Piano1`, `Piano2`, `SnareCrickets`, `Stabs` .wav). Notes: `Reconetc redme.txt` |
 | | Reset | D_rhythmic_chords | Qu-Bit's Pd example (also in the firmware): chords on V/oct with a rhythm |
-| | Freeze | E_echo | **This is gloop** (the 4-head looper, guide in this manual) under another name: the file is identical to `03_gloop.pd` |
+| | Freeze | E_echo | Echo: the 4-head looper (the "gloop" guide in this manual; named Echo on the stick so it isn't taken for the Cutlasses Gloop) |
 | **Pd**, orange | Record | F_glitch | glitch: clocked beat-repeater |
 | | File | G_spectral | spectral: Spectral Clouds+ |
 | | Source | H_topo | topo: drum patterns + drum synth |
