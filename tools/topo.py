@@ -849,10 +849,11 @@ def mutate(Canvas):
     return c
 
 
-def voice_ctl(c, x, y, V):
-    """tp_trig_V vel -> read V's kit parameters (Sound-interpolated) into [v tp_V_*] -> round-robin go."""
+def voice_ctl(c, x, y, V, trig="tp_trig_"):
+    """tp_trig_V vel -> read V's kit parameters (Sound-interpolated) into [v tp_V_*] -> round-robin go. (11_topokits:
+    trig = tp_syn_, the hits its router leaves to the synth.)"""
     params = KITS[V]
-    t = op(c, x, y + 22, "t f b", c.obj(x, y, f"r tp_trig_{V}"))
+    t = op(c, x, y + 22, "t f b", c.obj(x, y, f"r {trig}{V}"))
     tp = op(c, x, y + 44, "t" + " b" * len(params), (t, 1))
     base = snd_base(V)
     for p, (name, kind, _) in enumerate(params):
@@ -1065,7 +1066,7 @@ def mixset(c, x, y, s, name, metal, noise):
     c.connect(chain(c, x, y + 22, t, ["* -1", "+ 1"]), 0, metal, 1)
 
 
-def voices(Canvas):
+def voices(Canvas, trig="tp_trig_"):
     """Six analog-model voices, two round-robin halves each, panned -> two outlet~."""
     c = Canvas("#N canvas 0 50 1400 900 %NAME% 0;")
     c.text(10, 5, "Per voice: kit params from tp_snd at each hit (Sound-interpolated) -> one of two halves (the other "
@@ -1074,7 +1075,7 @@ def voices(Canvas):
     sums = [None, None]
     for vi, V in enumerate(VOICES):
         x0 = 10 + vi * 2400
-        voice_ctl(c, x0, 60, V)
+        voice_ctl(c, x0, 60, V, trig)
         noise = c.obj(x0 + 1300, 560, "noise~")
         halves = [half(c, x0 + k * 1000, 560, V, k, lb, noise) for k in (0, 1)]
         v = op(c, x0, 1300, "+~", halves[0], halves[1])
@@ -1129,9 +1130,15 @@ def crunch(c, x, y, src):
     return op(c, x, y + 286, "+~", dry, op(c, x + 300, y + 264, "*~", dec, mw))
 
 
-def topo_patch(Canvas, controls_canvas, test=None):
+def topo_patch(Canvas, controls_canvas, test=None, kits=False, kit_dir="/home/alarm/audio"):
+    """kits=True: 11_topokits (tools/topokits.py): the same instrument + sample kits from the stick."""
     c = Canvas("#N canvas 0 50 1000 600 10;")
-    c.text(10, 5, "06_topo: clocked drum-pattern generator (Grids-style map) + analog-model drum synth. See docs/TOPO.md.")
+    if kits:
+        c.text(10, 5, "11_topokits: topo + sample kits (kit<N>_<voice>.wav on the stick, alt Pitch = kit). See "
+                      "docs/TOPOKITS.md and docs/TOPO.md.")
+    else:
+        c.text(10, 5, "06_topo: clocked drum-pattern generator (Grids-style map) + analog-model drum synth. See "
+                      "docs/TOPO.md.")
     c.text(10, 20, "Clock (16ths) into Reset. Source gate = back to step 1. Freeze = lock. Record = mutate. "
                    "File: short = recall home / long = store home.")
     c.text(10, 35, "start/size = map X/Y. density = fill. overlap = chaos. window = auto-mutate. blend = sound. "
@@ -1150,10 +1157,15 @@ def topo_patch(Canvas, controls_canvas, test=None):
     c.sub(320, 90, "thr", thr(Canvas))
     c.sub(390, 90, "steps", steps(Canvas))
     c.sub(470, 90, "mutate", mutate(Canvas))
-    vo = c.sub(10, 140, "voices", voices(Canvas))
+    vo = c.sub(10, 140, "voices", voices(Canvas, "tp_syn_" if kits else "tp_trig_"))
+    src = [(vo, 0), (vo, 1)]
+    if kits:
+        import topokits
+        kt = c.sub(100, 140, "kits", topokits.kits(Canvas, kit_dir, bool(test)))
+        src = [(op(c, 10 + ch * 210, 155, "+~", (vo, ch), (kt, ch)), 0) for ch in (0, 1)]
     outs = []
     for ch, x in [(0, 10), (1, 220)]:
-        outs.append(softclip(c, x, 300, op(c, x, 270, "*~ 0.8", crunch(c, x, 170, (vo, ch)))))
+        outs.append(softclip(c, x, 300, op(c, x, 270, "*~ 0.8", crunch(c, x, 170, src[ch]))))
     dac = c.obj(10, 340, "dac~ 1 2")
     c.connect(outs[0], 0, dac, 0)
     c.connect(outs[1], 0, dac, 1)

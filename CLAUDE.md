@@ -6,7 +6,7 @@ Building the next instruments (the owner's shortlist)? Then read [`docs/NEXT_BUI
 the current status, the build queue, and the engine rules.
 
 Key rules:
-- `.pd` files are generated: edit `tools/gen.py` or an instrument builder (`tools/gloop.py`, `tools/glitch.py`, `tools/spectral.py`, `tools/topo.py`, `tools/shimmer.py`, `tools/resonator.py`, `tools/chop.py`, `tools/vocoder.py`, …),
+- `.pd` files are generated: edit `tools/gen.py` or an instrument builder (`tools/gloop.py`, `tools/glitch.py`, `tools/spectral.py`, `tools/topo.py`, `tools/shimmer.py`, `tools/resonator.py`, `tools/chop.py`, `tools/vocoder.py`, `tools/topokits.py`, …),
   then run `python tools/gen.py`.
 - Test offline (`pd -nogui -batch -r 48000`) before handing a patch to the owner, who tests on real hardware.
   - Record WAVs with `tabwrite~` + `soundfiler`, **not** `writesf~` (it drops audio in batch mode).

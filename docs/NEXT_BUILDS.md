@@ -26,6 +26,9 @@ file brings the status up to date and gives you the build queue.
 - **vocoder** (Pd, `patches/10_vocoder.pd`) built 2026-11-14 that way (`docs/VOCODER.md`: 15 decisions to
   review). Offline tests pass (`python tools/vocoder_tests.py`, 10 scenarios). Stick file:
   `firmware/dist/stage_vocoder/L_vocoder.pd` (Pd yellow page, File; `ZZ_pitchlog` moves to Source).
+- **topo kits** (Pd, `patches/11_topokits.pd`, a sibling: `06_topo.pd` unchanged) built 2026-11-14 the same way
+  (`docs/TOPOKITS.md`). Tests pass (`python tools/topokits_tests.py`). Stick file:
+  `firmware/dist/stage_topokits/M_topokits.pd` (Pd yellow page, Source; `ZZ_pitchlog` moves to Reset).
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**
@@ -98,7 +101,7 @@ still uses its own detector (see `docs/CHOP.md`). The notes below are what the b
   - What does Source pick: external or internal carrier?
 - **Output:** `patches/10_vocoder.pd` (or the next free number). On the stick: `L_vocoder.pd`.
 
-### 3.3 topo kits (Pd): an extension of 06_topo, not a new patch
+### 3.3 topo kits (Pd) — **built 2026-11-14** as the sibling `11_topokits.pd` (`docs/TOPOKITS.md`)
 - **Pitch:** topo's patterns triggering sample kits from the stick instead of (or as well as) the synth voices.
 - **The known clash:** the **Source gate jack is topo's step-1 reset, and it also toggles the Source latch**. That's
   why kit choice goes on the alt layer and not on Source. Read `docs/TOPO.md` and `tools/topo.py`: `KITS`, `voices`,
