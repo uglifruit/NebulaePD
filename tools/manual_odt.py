@@ -227,7 +227,7 @@ def build(src, out, sections):
     content = content[:end] + back_xml + content[end:]
     a = content.index("</office:automatic-styles>")
     content = content[:a] + STYLES + "".join(b.styles) + content[a:]
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with zipfile.ZipFile(out, "w") as z:
         for info in zin.infolist():                      # mimetype first and stored, as ODF requires
             data = content.encode("utf8") if info.filename == "content.xml" else zin.read(info.filename)
