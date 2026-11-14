@@ -58,18 +58,23 @@ def make_inputs():
     N.write_wav(N.OUT + "/spin_mix.wav", [mx.astype(np.float32)] * 2)
 
 
-def render(name, init, events, dur, inp, patch=PATCH, synth="~neb.name"):
+def render(name, init, events, dur, inp, patch=PATCH, synth="~neb.name", defload=False):
+    """defload: write the SynthDef to a file and /d_load it (a big def doesn't fit in one OSC message; live,
+    SynthDef.add does the same)."""
     wav = "%s/%s.wav" % (N.OUT, name)
     if os.path.exists(wav):
         os.remove(wav)
     args = "".join(", \\%s, %r" % (k, float(v)) for k, v in init.items())
-    rows = ["[0.0, ['/d_recv', ~neb.def.asBytes]]", "[0.001, [\\s_new, %s, 1000, 0, 0%s]]" % (synth, args)]
+    load = ("[0.0, ['/d_load', \"%s/\" ++ ~neb.name ++ \".scsyndef\"]]" % N.OUT if defload
+            else "[0.0, ['/d_recv', ~neb.def.asBytes]]")
+    rows = [load, "[0.001, [\\s_new, %s, 1000, 0, 0%s]]" % (synth, args)]
     for t, sets in events:
         a = "".join(", \\%s, %r" % (k, float(v)) for k, v in sets.items())
         rows.append("[%r, [\\n_set, 1000%s]]" % (float(t), a))
     rows.append("[%r, [\\c_set, 0, 0]]" % float(dur))
     scd = """~nrtTest = true;
 thisProcess.interpreter.executeFile("%s");
+%s
 ~score = Score([
 %s
 ]);
@@ -77,7 +82,8 @@ thisProcess.interpreter.executeFile("%s");
 ~score.recordNRT(outputFilePath: "%s", inputFilePath: "%s", sampleRate: 48000, headerFormat: "WAV",
     sampleFormat: "float", options: ~opts, duration: %r, action: { "SCNRT done".postln; 0.exit });
 SystemClock.sched(200, { "SCNRT timeout".postln; 1.exit; nil });
-""" % (patch, ",\n".join(rows), wav, "%s/%s" % (N.OUT, inp), float(dur))
+""" % (patch, ('~neb.def.writeDefFile("%s");' % N.OUT) if defload else "", ",\n".join(rows), wav,
+       "%s/%s" % (N.OUT, inp), float(dur))
     path = "%s/%s.scd" % (N.OUT, name)
     open(path, "w").write(scd)
     t0 = time.time()
