@@ -66,6 +66,13 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
   - `filesr` / `filenchnls` may return 0 / 1 in the wasm build; fall back to `ftsr(table)` and then sr.
   - `pvsblur`'s cost grows with its blur time (a moving average over every frame in the window); `pvsmooth` (one
     pole per bin) gives a similar smear at constant cost.
+  - **`scanu` / `scans` / `scanu2` are not in the module's build** (`libcsound64.so.6.0` and the plugin folder in
+    the SD image, 2026-11-14; `scanhammer` is). The PC's 6.18 lacks them too. `instr/scan.instr` writes the
+    mass-spring model out in orchestra code. The pvs opcodes (`pvsmorph`, `pvsvoc`, `pvsfreeze`, `pvscale`,
+    `pvsmooth`) and `mincer` are there. Check any new opcode with `strings` on that library.
+  - **`copya2ftab` gives different results in 6.09** (a k-rate array copied into a table each cycle and read
+    back with `poscil3`: half the level, another pitch). A written-out `tablewkt` loop (guard-point mode 1)
+    matches 6.18 exactly.
   - `run_csound609.js`: `CS609_MEM=512` for big tables, `CS609_FILES=a.wav,…` to load audio files; there is no live
     input, and `printks` prints only once in that build.
 

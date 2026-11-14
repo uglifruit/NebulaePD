@@ -32,6 +32,11 @@ file brings the status up to date and gives you the build queue.
 - **morph** (Csound, `instr/morph.instr`) built 2026-11-14 the same way (`docs/MORPH.md`). Tests: WSL
   `tools/morph_sim.py` 13/13 (6.18) + `python tools/morph_sim.py m609` (6.09.1). Stick file:
   `firmware/dist/stage_morph/007_morph.instr` (Csound user orange page, File; Pearls moves to the yellow page).
+- **scan** (Csound, `instr/scan.instr`) built 2026-11-14 the same way (`docs/SCAN.md`). `scanu`/`scans` are
+  missing from the module's Csound 6.11 (checked in the SD image), so the string is written out. Tests: WSL
+  `tools/scan_sim.py` 11/11 + `python tools/scan_sim.py m609`. Stick file:
+  `firmware/dist/stage_scan/008_scan.instr` (Csound user orange page, Source; `bt_test` and Pearls move to the
+  yellow page).
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**
@@ -119,7 +124,7 @@ still uses its own detector (see `docs/CHOP.md`). The notes below are what the b
 - **Output:** a new version of `patches/06_topo.pd`, or a sibling `06_topo_kits.pd` if the owner wants the original
   kept. Ask.
 
-### 3.4 morph and scan (Csound) — morph **built 2026-11-14** (`docs/MORPH.md`)
+### 3.4 morph and scan (Csound) — both **built 2026-11-14** (`docs/MORPH.md`, `docs/SCAN.md`)
 The owner wrote "morph / scan". **Ask whether they want one (which?) or both.**
 - **morph:** cross-synthesis with `pvscross` / `pvsmorph` / `pvsvoc`: one source's spectral envelope on the other
   (L↔R, or input ↔ stick file). Blend morphs between them. Freeze per side with `pvsbufread` or a frozen `pvsfreeze`,

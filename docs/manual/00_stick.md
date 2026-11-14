@@ -1,7 +1,7 @@
 # Nebulae instruments: what is on the stick, and how to choose
 
 The guides in this manual cover the instruments we made: Pure Data (gloop, glitch, spectral, topo, shimmer,
-resonator, chop, vocoder, topo kits), SuperCollider (drift, strike, cloud), Csound (Pearls, stretch, morph) and the Bluetooth storyteller. The other
+resonator, chop, vocoder, topo kits), SuperCollider (drift, strike, cloud), Csound (Pearls, stretch, morph, scan) and the Bluetooth storyteller. The other
 instruments on the stick have their own manuals (listed below).
 
 ## Choosing an instrument (custom firmware uf2)
@@ -29,10 +29,11 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | | Freeze | 005_realms_v1.0 | Realms (Robert Pabst, Ian Hoogeboom): morph through up to seven "rooms" of paired ambient loops (the `11_…72_` .flac files). Manual: `realms.pdf`, `realms.txt` |
 | **Csound user**, orange | Record | 006_stretch | stretch: extreme time-stretch and freeze of stick files or of what you just played (its guide is in this manual) |
 | | File | 007_morph | morph: spectral morphing / cross-synthesis of the input with a stick file (its guide is in this manual). *To copy: not on the stick yet* |
-| | Source | 999_fw_backup | Utility: backs up the firmware and writes an inventory to the stick (see Utilities) |
-| | Reset | bt_storyteller | The granular looper, telling your PC what happens to it over Bluetooth (its guide is in this manual) |
-| | Freeze | bt_test | Utility: the Bluetooth check (see Utilities) |
-| **Csound user**, yellow | Record | pearls | Pearls: Mutable Instruments Beads (its guide is in this manual) |
+| | Source | 008_scan | scan: scanned synthesis, a struck / bowed string whose shape is the waveform (its guide is in this manual). *To copy: not on the stick yet* |
+| | Reset | 999_fw_backup | Utility: backs up the firmware and writes an inventory to the stick (see Utilities) |
+| | Freeze | bt_storyteller | The granular looper, telling your PC what happens to it over Bluetooth (its guide is in this manual) |
+| **Csound user**, yellow | Record | bt_test | Utility: the Bluetooth check (see Utilities) |
+| | File | pearls | Pearls: Mutable Instruments Beads (its guide is in this manual) |
 | **Factory** (built in) | 1–5 | a_granularlooper, b_oneshot, c_synth, d_effects, e_testio | Qu-Bit's own: see the Nebulae manual |
 | **Pd**, white | Record | A_durm | No notes on the stick. From its patch: a drum processor with side-chain compression, trigger glitches, filter and downsampler; holding Source turns the burst off |
 | | File | B_Plasma_Membrane | No notes on the stick. Its knobs each control two parameters (split down the middle) |

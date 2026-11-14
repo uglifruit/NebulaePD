@@ -1,0 +1,232 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.3
+size,0.4
+density,0.5
+window,0.4
+overlap,0.3
+blend,1
+start_alt,0.5
+size_alt,0.5
+density_alt,0.3
+window_alt,0.5
+overlap_alt,0.5
+blend_alt,0.15
+pitch_alt,0.5
+nebconfigend
+
+; scan.instr - scanned synthesis: a ring of masses and springs whose shape is the waveform.
+; NebulaePD (docs/INSTRUMENT_IDEAS.md; built 2026-11-14 while the owner was away: the decisions are listed in
+; docs/SCAN.md for review). MIT.
+;
+; 64 masses on a circular string (each tied to its neighbours, pulled to rest, damped) move 750 times a second;
+; their positions are the waveform an oscillator reads at the pitch. Strike the string and the waveform evolves as
+; the wave travels and dies away: the timbre moves, not just the level. (Csound's scanu/scans are not in the
+; module's Csound 6.11 build - checked in the SD image - so the model is written out here.)
+;
+; Pitch    the oscillator, 1V/oct (click = C3)
+; Start    where a strike hits the string
+; Size     mass: light (fast, bright motion) -> heavy (slow, dark)
+; Density  stiffness: loose -> tight (the wave travels faster)
+; Window   damping: long ring -> short
+; Overlap  centring: how hard the masses are pulled back to rest (adds a springy wobble)
+; Blend    dry input <-> string
+; Speed    a second reader: none between the clicks; CW = detuned (chorus, stereo), CCW = an octave below
+; Reset    strike (button or gate)
+; Record   bow: a constant push keeps the string moving (latching, LED on)
+; Source   the audio input drives the string (latching, LED on)
+; Freeze   hold the waveform as it is (the string carries on underneath)
+; File     next strike shape: narrow bump, wide bump, square, noise
+; alt (hold Source): Start = strike strength, Size = stereo width, Density = bow pressure, Window = tone,
+;   Overlap = reverb size, Blend = reverb amount, Speed = input gain (Nebulae's own)
+;
+; Instruments: 1 = builds the tables, then starts 20 (the string, the output).
+
+giN = 64
+giInit ftgen 0, 0, giN, 7, 0, giN, 0           ; the strike shape (added at the strike position)
+giShA ftgen 0, 0, giN, 7, 0, giN, 0            ; the string's shape, written alternately into A and B
+giShB ftgen 0, 0, giN, 7, 0, giN, 0
+giFrozen ftgen 0, 0, giN, 7, 0, giN, 0
+giShp0 ftgen 0, 0, giN, 7, 0, giN, 0
+giShp1 ftgen 0, 0, giN, 7, 0, giN, 0
+giShp2 ftgen 0, 0, giN, 7, 0, giN, 0
+giShp3 ftgen 0, 0, giN, 7, 0, giN, 0
+gkShape init 0
+
+instr 1
+; ---- the four strike shapes (File steps through them), the first copied into the hammer's table
+i_ = 0
+shapes:
+    ix = i_ - giN / 2
+    tableiw exp(-(ix / 3) * (ix / 3)), i_, giShp0
+    tableiw exp(-(ix / 12) * (ix / 12)), i_, giShp1
+    tableiw (abs(ix) < 8 ? 1 : 0), i_, giShp2
+    irn random -1, 1
+    tableiw (abs(ix) < 10 ? irn : 0), i_, giShp3
+    tableiw exp(-(ix / 3) * (ix / 3)), i_, giInit
+    i_ += 1
+    if (i_ < giN) igoto shapes
+event_i "i", 20, 0, -1
+
+; ---- File: next strike shape (copied into the table the hammer reads)
+kf trigger gkfilestate, 0.5, 0
+if kf == 1 then
+    gkShape = (gkShape + 1) % 4
+    if gkShape == 0 then
+        tablecopy giInit, giShp0
+    elseif gkShape == 1 then
+        tablecopy giInit, giShp1
+    elseif gkShape == 2 then
+        tablecopy giInit, giShp2
+    else
+        tablecopy giInit, giShp3
+    endif
+endif
+endin
+
+instr 20
+ain, ainr inch 1, 2
+; ---- the string: 64 masses on a ring, one update per k-cycle (750 a second), semi-implicit Euler:
+;   a = (stiffness (x[i-1] + x[i+1] - 2 x[i]) - centring x[i]) / mass - damping v[i];  v += a;  x += v
+; kept stable: stiffness / mass < 1, damping < 1
+kmass = 0.5 * exp(gkloopsize * 2.9957)          ; 0.5 .. 10
+kinvm = 1 / kmass
+kstif = (0.02 + 0.43 * gkdensity) * min(kmass, 1)
+kdamp = 0.0003 * exp(gkwindow * 4.6052)         ; 0.0003 .. 0.03 of the velocity per update
+kcent = 0.0002 * exp(gkoverlap * 4.6052)        ; 0.0002 .. 0.02
+kX[] init giN
+kV[] init giN
+; ---- excitation: a strike (Reset) adds the strike shape at Start to the positions; the bow (Record) pushes one
+; mass that moves slowly round the ring; the audio input (Source) pushes mass 0
+kst trigger gkreset, 0.5, 0
+; (labels stay outside if-blocks: a loop inside an if/endif ran only once in Csound 6.09)
+if kst == 0 kgoto nostrike
+kc = int(gkloopstart * giN)
+kamt = 0.25 * (0.2 + 1.6 * gkloopstart_alt)
+ki = 0
+strike:
+    kj = (ki - kc + giN / 2 + giN) % giN
+    kh table kj, giInit
+    kx0 = kX[ki]
+    kX[ki] = kx0 + kh * kamt
+    ki += 1
+    if (ki < giN) kgoto strike
+nostrike:
+kbp phasor 0.37
+kb = int(kbp * giN) % giN
+kbv = kV[kb]
+kV[kb] = kbv + gkrecord * 0.004 * (0.2 + 1.6 * gkdensity_alt)
+kin portk gksource, 0.02
+kain downsamp (ain + ainr) * 0.5, ksmps
+kv0 = kV[0]
+kV[0] = kv0 + kain * kin * 0.05
+; ---- update: every velocity from the old positions first, then the positions (no array assignment: in
+; Csound 6.09 "kX = kXn" doesn't copy, and the update ran in place - different, wrong dynamics)
+ki = 0
+updv:
+    kim = (ki + giN - 1) % giN
+    kip = (ki + 1) % giN
+    kxm = kX[kim]
+    kx0 = kX[ki]
+    kxp = kX[kip]
+    kv0 = kV[ki]
+    ka = (kstif * (kxm + kxp - 2 * kx0) - kcent * kx0) * kinvm - kdamp * kv0
+    kV[ki] = kv0 + ka
+    ki += 1
+    if (ki < giN) kgoto updv
+ki = 0
+updx:
+    kx0 = kX[ki]
+    kv0 = kV[ki]
+    kX[ki] = kx0 + kv0
+    ki += 1
+    if (ki < giN) kgoto updx
+; guard: a string pushed hard for a long time (bow + input, light, undamped) is scaled back, so its state stays
+; bounded forever (the output is soft-clipped anyway)
+kmx maxarray kX
+kmn minarray kX
+kpk = max(kmx, -kmn)
+if kpk > 1.5 then
+    kX = kX * (1.5 / kpk)
+    kV = kV * (1.5 / kpk)
+endif
+; ---- into the tables: alternately A and B, crossfaded across the k-cycle (the shape glides between updates)
+kab init 0
+kab = 1 - kab
+; (a written-out copy: copya2ftab gives different results in Csound 6.09; tablewkt with guard-point mode 1 also
+; keeps poscil3's guard point right)
+ktw = (kab == 1 ? giShA : giShB)
+kfz trigger gkfreeze, 0.5, 0
+kq = 0
+wloop:
+    kqv = kX[kq]
+    tablewkt kqv, kq, ktw, 0, 0, 1
+    if kfz == 0 kgoto nofz
+    tablewkt kqv, kq, giFrozen, 0, 0, 1          ; Freeze: a copy of the shape at the press
+nofz:
+    kq += 1
+    if (kq < giN) kgoto wloop
+aw interp kab
+
+kfr portk gkfreeze, 0.02
+
+; ---- the readers
+kst = (gkpitch - 0.6) * 60
+kfreq = 130.8128 * pow(2, kst / 12)
+kfreq = min(max(kfreq, 20), 4000)
+a1a poscil3 1, kfreq, giShA
+a1b poscil3 1, kfreq, giShB
+a1f poscil3 1, kfreq, giFrozen
+a1 = (a1a * aw + a1b * (1 - aw)) * (1 - kfr) + a1f * kfr
+; Speed: right of the right click = a detuned second reader (to 1 %), left of the left click = an octave below
+kd = (gkspeed - 0.625) / 0.375
+kd = min(max(kd, 0), 1)
+ks = (0.375 - gkspeed) / 0.375
+ks = min(max(ks, 0), 1)
+k2f = (ks > 0 ? kfreq * 0.5 : kfreq * (1 + 0.01 * kd))
+k2g = max(kd, ks)
+k2g portk k2g, 0.05
+a2a poscil3 1, k2f, giShA
+a2b poscil3 1, k2f, giShB
+a2f poscil3 1, k2f, giFrozen
+a2 = ((a2a * aw + a2b * (1 - aw)) * (1 - kfr) + a2f * kfr) * k2g
+; stereo: the second reader leans right by the width (alt Size)
+kw = gkloopsize_alt
+aL = a1 + a2 * (1 - 0.8 * kw)
+aR = a1 + a2 * (1 + 0.8 * kw)
+aL dcblock2 aL * 4
+aR dcblock2 aR * 4
+
+; ---- tone (alt Window): high shelf at 1.5 kHz, -18 dB .. +6 dB, noon = flat
+kwt = gkwindow_alt
+kdb = (kwt < 0.5 ? (kwt - 0.5) * 36 : (kwt - 0.5) * 12)
+kdb portk kdb, 0.05
+kv = ampdb(kdb)
+aL pareq aL, 1500, kv, 0.7, 2
+aR pareq aR, 1500, kv, 0.7, 2
+
+; ---- reverb (alt Overlap = size, alt Blend = amount)
+kfb = 0.6 + 0.37 * gkoverlap_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc aL, aR, kfb, 9000
+aL = aL + arL * krev
+aR = aR + arR * krev
+
+; ---- dry <-> string (equal power), soft clip
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708)
+aoL = tanh(ain * kdry + aL * kwet)
+aoR = tanh(ainr * kdry + aR * kwet)
+outs aoL, aoR
+endin
