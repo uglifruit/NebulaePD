@@ -1,7 +1,7 @@
 # Nebulae instruments: what is on the stick, and how to choose
 
 The guides in this manual cover the instruments we made: Pure Data (gloop, glitch, spectral, topo, shimmer,
-resonator, chop, vocoder, topo kits), SuperCollider (drift, strike, cloud, pattern, follow), Csound (Pearls, stretch, morph, scan) and the Bluetooth storyteller. The other
+resonator, chop, vocoder, topo kits), SuperCollider (drift, strike, cloud, pattern, follow, mosaic), Csound (Pearls, stretch, morph, scan) and the Bluetooth storyteller. The other
 instruments on the stick have their own manuals (listed below).
 
 ## Choosing an instrument (custom firmware uf2)
@@ -55,4 +55,5 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | | Reset | 04_sc_cloud | cloud: granular input |
 | | Freeze | 05_sc_pattern | sc_pattern: generative sequencer with four voices (its guide is in this manual). *To copy: not on the stick yet* |
 | **SuperCollider**, orange | Record | 06_sc_follow | sc_follow: listens and plays a harmony along (its guide is in this manual). *To copy: not on the stick yet* |
-| | File | 31-simple | Technobear's example: a saw on Pitch. **Loud**: turn the output down first |
+| | File | 07_sc_mosaic | sc_mosaic: rebuilds the input from pieces of a stick file (its guide is in this manual). *To copy: not on the stick yet* |
+| | Source | 31-simple | Technobear's example: a saw on Pitch. **Loud**: turn the output down first |

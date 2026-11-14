@@ -57,6 +57,9 @@ file brings the status up to date and gives you the build queue.
 - **sc_follow** (SC, `sc/06_sc_follow.scd`) built 2026-11-14, auto (`docs/SC_FOLLOW.md`). Tests:
   `python tools/sc_follow_tests.py` + `python tools/sc_osc_tests.py sc/06_sc_follow.scd`. Stick: SC orange page,
   Record (`31-simple` moves to File).
+- **sc_mosaic** (SC, `sc/07_sc_mosaic.scd`) built 2026-11-14, auto (`docs/SC_MOSAIC.md`). Tests:
+  `python tools/sc_mosaic_tests.py`, `tools/sc_mosaic_files_test.py`, `tools/sc_osc_tests.py sc/07_sc_mosaic.scd`.
+  Stick: SC orange page, File (`31-simple` moves to Source). **The whole shortlist is now built.**
 - **Then (owner: "move onto SC ones", then away again):** sc_follow and sc_mosaic, auto-designed (see their
   design docs). The sc_pattern test pattern (pure functions in sclang + an NRT Score + a live OSC run) is the
   template.
