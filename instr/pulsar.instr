@@ -1,0 +1,200 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.45
+size,0.35
+density,1
+window,0.5
+overlap,0
+blend,1
+start_alt,0.4
+size_alt,0
+density_alt,0.3
+window_alt,0.5
+overlap_alt,0.5
+blend_alt,0.15
+pitch_alt,0
+nebconfigend
+
+; pulsar.instr - pulsar synthesis: a playable granular oscillator (Csound's partikkel).
+; NebulaePD (docs/INSTRUMENT_IDEAS.md; built 2026-11-14 while the owner was away: the decisions are listed in
+; docs/PULSAR.md for review). MIT.
+;
+; A pulsar is a short grain (a pulsaret) followed by silence, repeated at the pitch. The grain's own frequency is
+; a formant that stays put while the pitch moves (vowel-like), its share of the period (the duty cycle) sets the
+; brightness, and dropping pulses (masking) turns a tone into rhythm and texture. Far below audio rate (alt
+; Pitch) the pulses become a rhythm.
+;
+; Pitch    fundamental (the pulse rate), 1V/oct, click = C3
+; Start    formant 1: 100 Hz .. 8 kHz (Freeze on: 0.5x .. 16x the pitch)
+; Size     duty cycle: 3 % (thin, buzzy) .. 100 % (continuous, round)
+; Density  masking: CW = every pulse, down = pulses drop out at random
+; Window   grain shape: square-ish -> smooth bell -> sharp attack, long tail
+; Overlap  FM inside each grain (by a sine at the pitch): clean -> brassy -> noisy
+; Speed    chirp: none between the clicks; CW = each grain sweeps up, CCW = down (to 2 octaves)
+; Blend    dry input <-> pulsar
+; Reset    sync / note: restarts the pulse train; with Record on it also plays a note
+; Record   Pluck: notes on Reset with a decay (alt Window); off = drone (latching, LED on)
+; Source   the pulsaret is the live input instead of a waveform (latching, LED on)
+; Freeze   formant follows the pitch (latching, LED on): the timbre stays the same as you play
+; File     next waveform: sine, saw, square, vowel, noise
+; alt (hold Source): Start = formant 2 ratio (0.5x .. 4x formant 1), Size = formant 2 level, Density = stereo
+;   scatter, Window = pluck decay, Overlap = reverb size, Blend = reverb amount, Pitch = sub-octaves (0 .. 8:
+;   rhythm), Speed = input gain (Nebulae's own)
+;
+; Instruments: 1 = tables + File, 20 = the voice (always on).
+
+giSine ftgen 0, 0, 8192, 10, 1
+giCos ftgen 0, 0, 8193, 9, 1, 1, 90
+giSaw ftgen 0, 0, 8192, 10, 1, 0.5, 0.3333, 0.25, 0.2, 0.1667, 0.1429, 0.125, 0.1111, 0.1, 0.0909, 0.0833
+giSqr ftgen 0, 0, 8192, 10, 1, 0, 0.3333, 0, 0.2, 0, 0.1429, 0, 0.1111, 0, 0.0909
+giVow ftgen 0, 0, 8192, 10, 1, 0.6, 0.9, 0.2, 0.4, 0.1, 0.15
+giNoise ftgen 0, 0, 8192, 21, 1, 1
+giWave ftgen 0, 0, 8192, 10, 1                  ; the waveform in use (File copies one of the five into it)
+giIn ftgen 0, 0, 65536, 2, 0                     ; the live input, written round and round (1.37 s)
+giRise ftgen 0, 0, 8193, 19, 0.5, 1, 270, 1      ; grain attack (half a Hann)
+giFall ftgen 0, 0, 8193, 19, 0.5, 1, 90, 1       ; grain decay
+giDist ftgen 0, 0, 16, 16, 1, 16, -10, 0
+giSweepA ftgen 0, 0, 4, -2, 0, 0, 1              ; per-grain start / end frequency (loop 0..0, one value)
+giSweepB ftgen 0, 0, 4, -2, 0, 0, 1
+giPan ftgen 0, 0, 4, -2, 0, 1, 0.5, 0.5          ; grains alternate between these two pans
+giAmps ftgen 0, 0, 8, -2, 0, 0, 1, 0, 0, 0, 0    ; per-grain levels: wave 1, wave 2 (formant 2), 3, 4, trainlet
+giInFill = 0
+gkWave init 0
+
+instr 1
+event_i "i", 20, 0, -1
+kf trigger gkfilestate, 0.5, 0
+if kf == 1 then
+    gkWave = (gkWave + 1) % 5
+    if gkWave == 0 then
+        tablecopy giWave, giSine
+    elseif gkWave == 1 then
+        tablecopy giWave, giSaw
+    elseif gkWave == 2 then
+        tablecopy giWave, giSqr
+    elseif gkWave == 3 then
+        tablecopy giWave, giVow
+    else
+        tablecopy giWave, giNoise
+    endif
+endif
+endin
+
+instr 20
+ain, ainr inch 1, 2
+amono = (ain + ainr) * 0.5
+
+; ---- the pulse rate: Pitch 1V/oct (click = C3), alt Pitch = sub-octaves (down to a rhythm)
+kst = (gkpitch - 0.6) * 60
+kfund = 130.8128 * pow(2, kst / 12 - gkpitch_alt * 8)
+kfund = min(max(kfund, 0.25), 4000)
+agf interp kfund
+
+; ---- formant 1: fixed Hz, or a ratio of the pitch (Freeze on)
+kfx = 100 * exp(gkloopstart * 4.382)             ; 100 Hz .. 8 kHz
+kfr = 0.5 * exp(gkloopstart * 3.4657)            ; 0.5x .. 16x
+kform = (gkfreeze > 0.5 ? kfr * kfund : kfx)
+kform = min(max(kform, 20), 12000)
+kform portk kform, 0.01
+
+; ---- duty cycle -> grain length (ms); level made up for short grains
+kduty = 0.03 * exp(gkloopsize * 3.5066)          ; 0.03 .. 1
+kdur = min(1000 * kduty / kfund, 2000)
+kmk = 0.8 / sqrt(max(kduty, 0.03))
+kmk = min(kmk, 3.5)
+
+; ---- grain shape (Window): sustain share and attack/decay ratio
+kw = gkwindow
+ksus = (kw < 0.5 ? 0.9 * (1 - 2 * kw) : 0)
+kad = (kw < 0.5 ? 0.5 : 0.5 - (kw - 0.5) * 0.96)
+
+; ---- chirp (Speed): none between the clicks, up to 2 octaves across the grain at the ends
+kcu = min(max((gkspeed - 0.625) / 0.375, 0), 1)
+kcd = min(max((0.375 - gkspeed) / 0.375, 0), 1)
+koct = 2 * (kcu - kcd)
+koct portk koct, 0.02
+ksa = pow(2, -koct * 0.5)
+ksb = pow(2, koct * 0.5)
+tablew ksa, 2, giSweepA
+tablew ksb, 2, giSweepB
+
+; ---- formant 2 (alt Start = ratio, alt Size = level), stereo scatter (alt Density)
+kr2 = 0.5 * exp(gkloopstart_alt * 2.0794)        ; 0.5x .. 4x
+kl2 = gkloopsize_alt
+tablew 1, 2, giAmps
+tablew kl2, 3, giAmps
+ksc = gkdensity_alt
+tablew 0.5 - 0.5 * ksc, 2, giPan
+tablew 0.5 + 0.5 * ksc, 3, giPan
+
+; ---- the live input, written round and round (Source reads grains from just behind the write head)
+awp phasor sr / 65536
+tablew amono, awp, giIn, 1
+ksrc portk gksource, 0.02
+
+; ---- FM inside the grains (Overlap), by a sine at the pitch
+kfm = gkoverlap * gkoverlap * 4
+afm poscil kfm, kfund
+
+; ---- Reset: sync the pulse train; Pluck (Record) plays a note on it
+ksy trigger gkreset, 0.5, 0
+; (a one-sample pulse: partikkel adds the sync input to its clock's phase, so 1 = a grain now)
+ksyv = (ksy == 1 ? 1 : 0)
+aup upsamp ksyv
+adf diff aup
+async limit adf, 0, 1
+kdec = 0.02 * exp(gkwindow_alt * 5.2983)         ; 20 ms .. 4 s
+kpl init 0
+kpl = (ksy == 1 ? 1 : kpl * exp(-6.9078 * ksmps / (sr * kdec)))
+kenv = (gkrecord > 0.5 ? kpl : 1)
+kenv portk kenv, 0.002
+
+; ---- masking (Density): the chance a pulse drops out
+krm = 1 - gkdensity
+
+; ---- two partikkels: the waveform, and the live input; crossfaded by Source
+kamp = kmk * kenv
+azero = 0                                        ; (partikkel's sample positions must be a-rate)
+kwf = kform                                      ; a 1-cycle table: kwavfreq = the formant in Hz
+aw1, aw2 partikkel agf, 0, giDist, async, 0, giRise, giRise, giFall, ksus, kad, kdur, kamp * (1 - ksrc), -1, \
+    kwf, 0.5, giSweepA, giSweepB, afm, -1, -1, giCos, 1, 1, 1, giPan, krm, giWave, giWave, giWave, giWave, \
+    giAmps, azero, azero, azero, azero, 1, kr2, 1, 1, 100
+; the input: grains read from just over a grain's worth (at its transposition) behind the write head, at the
+; input's own pitch x Start (+-2 octaves)
+ktr = pow(2, (gkloopstart - 0.5) * 4)
+kinf = ktr * sr / 65536
+aipos = awp - (kdur * max(ktr, 1) + 5) / 1000 * sr / 65536
+aipos wrap aipos, 0, 1
+ai1, ai2 partikkel agf, 0, giDist, async, 0, giRise, giRise, giFall, ksus, kad, kdur, kamp * ksrc * 2, -1, \
+    kinf, 0.5, giSweepA, giSweepB, afm, -1, -1, giCos, 1, 1, 1, giPan, krm, giIn, giIn, giIn, giIn, \
+    giAmps, aipos, aipos, aipos, aipos, 1, kr2, 1, 1, 100, 1
+aL = aw1 + ai1
+aR = aw2 + ai2
+aL dcblock aL                                    ; (dcblock2 delays ~3 ms: the pulses must land on Reset)
+aR dcblock aR
+
+; ---- reverb (alt Overlap = size, alt Blend = amount)
+krfb = 0.6 + 0.37 * gkoverlap_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc aL, aR, krfb, 9000
+aL = aL + arL * krev
+aR = aR + arR * krev
+
+; ---- dry <-> pulsar (equal power), soft clip
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708)
+aoL = tanh(ain * kdry + aL * kwet)
+aoR = tanh(ainr * kdry + aR * kwet)
+outs aoL, aoR
+endin
