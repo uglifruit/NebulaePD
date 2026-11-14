@@ -54,6 +54,9 @@ file brings the status up to date and gives you the build queue.
 - **sc_pattern** (SC, `sc/05_sc_pattern.scd`) built 2026-11-14 after a 4-question walk-through, details auto
   (`docs/SC_PATTERN.md`). Tests: `python tools/sc_pattern_tests.py`. Stick: `sc/05_sc_pattern.scd` (SC white page,
   Freeze; `31-simple` moves to orange).
+- **sc_follow** (SC, `sc/06_sc_follow.scd`) built 2026-11-14, auto (`docs/SC_FOLLOW.md`). Tests:
+  `python tools/sc_follow_tests.py` + `python tools/sc_osc_tests.py sc/06_sc_follow.scd`. Stick: SC orange page,
+  Record (`31-simple` moves to File).
 - **Then (owner: "move onto SC ones", then away again):** sc_follow and sc_mosaic, auto-designed (see their
   design docs). The sc_pattern test pattern (pure functions in sclang + an NRT Score + a live OSC run) is the
   template.

@@ -10,6 +10,7 @@ Then press a lit button. Expect about 5–10 s of silence while SuperCollider st
 | `03_sc_strike` | Plucked string with a resonant body | Reset (button or gate), or Record for auto-pluck |
 | `04_sc_cloud` | Granular clouds from the audio input | Audio patched in |
 | `05_sc_pattern` | Generative sequencer: lead, bell, bass, hat on Euclidean patterns in a scale | Nothing (its own tempo), or a 16th clock into Reset |
+| `06_sc_follow` | Listens to a melody and plays a harmony in its key, held or arpeggiated | A melody patched in |
 | `31-simple` | Technobear's example: a saw drone. **Loud: turn the output down first** | Nothing |
 
 Each control's CV jack adds to its knob, as on every Nebulae instrument. Pitch follows 1 V/oct, and a Pitch click
@@ -79,6 +80,12 @@ Pitch = root, Start = scale, Size = length, Density = hits, Overlap = mutation, 
 Speed = tempo (free) / swing (clocked); Reset = 16th clock (scheduled ahead: on time despite the 32 ms latency),
 Freeze = lock, Record = mutate, File = home (held: store), Source = voice set B. Tests:
 `python tools/sc_pattern_tests.py` (logic in sclang, an NRT render, and the live clock with real OSC pulses).
+
+## 06_sc_follow: it listens and plays along
+The full guide is in the manual (`docs/manual/19_sc_follow.md`), the design in `docs/SC_FOLLOW.md`. Pitch = the
+harmony interval in scale steps (click = a third), Start = voice, Density = arpeggio, Overlap = voices, Freeze =
+hold, Record = below, Source = chromatic, Reset = arpeggio clock, File = arpeggio order. Tests:
+`python tools/sc_follow_tests.py` (NRT) and `python tools/sc_osc_tests.py sc/06_sc_follow.scd`.
 
 ## How they were tested
 `python tools/sc_nrt_tests.py` renders each patch in SuperCollider 3.10.4, the module's version, on the PC, with
