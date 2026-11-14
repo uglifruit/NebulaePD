@@ -37,6 +37,24 @@ file brings the status up to date and gives you the build queue.
   `tools/scan_sim.py` 11/11 + `python tools/scan_sim.py m609`. Stick file:
   `firmware/dist/stage_scan/008_scan.instr` (Csound user orange page, Source; `bt_test` and Pearls move to the
   yellow page).
+- **To copy to the stick (2026-11-14), all from `firmware/dist/`** (then regenerate `manifest.txt` and
+  `D:\nebulae_banks.txt` with `tools/stick_manifest.py`, and copy `docs/manual/Nebulae instruments.pdf`):
+
+  | File | Bank, page, button |
+  |---|---|
+  | `stage_stretch/006_stretch.instr` | Csound user, orange, Record |
+  | `stage_morph/007_morph.instr` | Csound user, orange, File |
+  | `stage_scan/008_scan.instr` | Csound user, orange, Source (`999_fw_backup`, `bt_storyteller` move along; `bt_test`, `pearls` to yellow) |
+  | `stage_chop/K_chop.pd` | Pd, yellow, Record |
+  | `stage_vocoder/L_vocoder.pd` | Pd, yellow, File |
+  | `stage_topokits/M_topokits.pd` | Pd, yellow, Source (`ZZ_pitchlog` moves to Reset) |
+- **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
+  `docs/MORPH.md`, `docs/SCAN.md` (each lists the alternatives). Their Python builders/instruments make changes
+  cheap.
+- **Not built yet:** the SuperCollider group (3.5: sc_pattern, sc_follow, sc_mosaic). They were held back on
+  2026-11-14 so the owner can review the auto-designed builds first. sc_pattern also needs new test plumbing: its
+  sequencer runs in sclang, and `tools/sc_nrt_tests.py` only drives single SynthDefs. A pure step function that the
+  NRT test can turn into a Score is the suggested route.
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**
