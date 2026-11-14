@@ -51,10 +51,12 @@ file brings the status up to date and gives you the build queue.
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
   `docs/MORPH.md`, `docs/SCAN.md` (each lists the alternatives). Their Python builders/instruments make changes
   cheap.
-- **Not built yet:** the SuperCollider group (3.5: sc_pattern, sc_follow, sc_mosaic). They were held back on
-  2026-11-14 so the owner can review the auto-designed builds first. sc_pattern also needs new test plumbing: its
-  sequencer runs in sclang, and `tools/sc_nrt_tests.py` only drives single SynthDefs. A pure step function that the
-  NRT test can turn into a Score is the suggested route.
+- **sc_pattern** (SC, `sc/05_sc_pattern.scd`) built 2026-11-14 after a 4-question walk-through, details auto
+  (`docs/SC_PATTERN.md`). Tests: `python tools/sc_pattern_tests.py`. Stick: `sc/05_sc_pattern.scd` (SC white page,
+  Freeze; `31-simple` moves to orange).
+- **Then (owner: "move onto SC ones", then away again):** sc_follow and sc_mosaic, auto-designed (see their
+  design docs). The sc_pattern test pattern (pure functions in sclang + an NRT Score + a live OSC run) is the
+  template.
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**

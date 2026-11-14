@@ -9,6 +9,7 @@ Then press a lit button. Expect about 5–10 s of silence while SuperCollider st
 | `02_sc_drift` | Evolving drone / pad | Nothing, it sounds at once |
 | `03_sc_strike` | Plucked string with a resonant body | Reset (button or gate), or Record for auto-pluck |
 | `04_sc_cloud` | Granular clouds from the audio input | Audio patched in |
+| `05_sc_pattern` | Generative sequencer: lead, bell, bass, hat on Euclidean patterns in a scale | Nothing (its own tempo), or a 16th clock into Reset |
 | `31-simple` | Technobear's example: a saw drone. **Loud: turn the output down first** | Nothing |
 
 Each control's CV jack adds to its knob, as on every Nebulae instrument. Pitch follows 1 V/oct, and a Pitch click
@@ -71,6 +72,13 @@ A 4-second buffer records the input all the time, and grains read it back pitche
 | Source | Reverse: grains play backwards |
 
 Try: patch a melody in, Blend fully wet, Density at noon, Size small, then Freeze and play with Start and Pitch.
+
+## 05_sc_pattern: generative sequencer
+The full guide is in the manual (`docs/manual/18_sc_pattern.md`); the design and the clock in `docs/SC_PATTERN.md`.
+Pitch = root, Start = scale, Size = length, Density = hits, Overlap = mutation, Window = tone, Blend = space,
+Speed = tempo (free) / swing (clocked); Reset = 16th clock (scheduled ahead: on time despite the 32 ms latency),
+Freeze = lock, Record = mutate, File = home (held: store), Source = voice set B. Tests:
+`python tools/sc_pattern_tests.py` (logic in sclang, an NRT render, and the live clock with real OSC pulses).
 
 ## How they were tested
 `python tools/sc_nrt_tests.py` renders each patch in SuperCollider 3.10.4, the module's version, on the PC, with

@@ -39,7 +39,7 @@ Effort: S = a few sessions, M = like topo or resonator, L = bigger. CPU is again
 ## SuperCollider (detail in `docs/SC_IDEAS.md`)
 | | Idea | What it is | Effort / CPU |
 |---|---|---|---|
-| ★ | **sc_pattern** | A generative sequencer with its own 4 voices: Euclidean/probability patterns quantised to a scale; mutate, lock, home | M / low |
+| ★ | **sc_pattern** (**built 2026-11-14**, `sc/05_sc_pattern.scd`, docs/SC_PATTERN.md) | A generative sequencer with its own 4 voices: Euclidean/probability patterns quantised to a scale; mutate, lock, home | M / low |
 | ★ | **sc_follow** | Tracks the input's pitch and beat; adds a harmony in the detected key, a sub-octave, or arpeggios in time | M / medium |
 | ★ | **sc_mosaic** | Concatenative resynthesis: the input answered with matching fragments of a stick file | M / medium |
 | | **sc_space** | `Greyhole` diffuse delays into `JPverb`, with freeze and ducking | S / low–medium |
