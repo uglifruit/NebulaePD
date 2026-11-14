@@ -2,6 +2,8 @@
 """Build the updated instrument manual from the owner's ODT plus markdown sections.
 
   python tools/manual_odt.py                       # "Nebulae PD instruments.odt" -> docs/manual/Nebulae instruments.odt
+  python tools/manual_odt.py --into-owner          # the same, written into the owner's own document (asked for
+                                                   # 2026-11-14), with a dated backup copy in docs/manual/
 
 The owner's document ("Nebulae PD instruments.odt", repo root, edited in LibreOffice) is kept as it is. The new
 sections are written in a small markdown subset in docs/manual/*.md, and get the document's own look (its heading,
@@ -10,7 +12,11 @@ body, table and grey panel-map styles):
   # / ## / ###  headings (each # starts a new page),  - bullets,  1. numbered,  | tables | (first row = header),
   ``` blocks = the grey fixed-width panel maps,  **bold**,  `code` (fixed width),  blank line = new paragraph;
   a file whose first line is "@include ../OTHER.md" uses that doc instead (one source for both)
-FIXES below corrects text in the owner's part (each must match exactly once).
+FIXES below corrects text in the owner's part (each must match exactly once, or already be fixed).
+
+The generated parts are wrapped in bookmarks (NebulaePD-front-start/end, NebulaePD-back-start/end), so building
+from a document that already holds them (--into-owner, again) first removes them and their NB* styles: the owner's
+own text is never touched, and nothing is duplicated.
 """
 import argparse
 import os
@@ -177,13 +183,31 @@ class Builder(object):
         return "".join(out)
 
 
+MARK = '<text:p text:style-name="Standard"><text:bookmark text:name="NebulaePD-%s"/></text:p>'
+
+
+def strip_generated(content):
+    """Remove earlier generated parts (between our bookmarks) and our NB* automatic styles."""
+    for part in ("front", "back"):
+        a = re.search(r'<text:p[^>]*>\s*<text:bookmark text:name="NebulaePD-%s-start"/>\s*</text:p>' % part, content)
+        b = re.search(r'<text:p[^>]*>\s*<text:bookmark text:name="NebulaePD-%s-end"/>\s*</text:p>' % part, content)
+        if a and b and b.end() > a.start():
+            content = content[:a.start()] + content[b.end():]
+    content = re.sub(r'<style:style style:name="NB[^"]*"[^>]*>.*?</style:style>\n?', "", content, flags=re.S)
+    content = re.sub(r'<text:list-style style:name="NB[^"]*"[^>]*>.*?</text:list-style>\n?', "", content, flags=re.S)
+    return content
+
+
 def build(src, out, sections):
     files = sorted(f for f in os.listdir(sections) if f.endswith(".md"))
     front = [f for f in files if f.startswith("00_")]
     back = [f for f in files if not f.startswith("00_")]
     zin = zipfile.ZipFile(src)
     content = zin.read("content.xml").decode("utf8")
+    content = strip_generated(content)
     for old, new in FIXES:
+        if content.count(old) == 0 and content.count(new) >= 1:
+            continue                                     # already fixed (the owner's document, rebuilt)
         if content.count(old) != 1:
             sys.exit("FIXES: %r found %d times" % (old, content.count(old)))
         content = content.replace(old, new)
@@ -195,8 +219,8 @@ def build(src, out, sections):
         return text
     front_xml = "".join(b.convert(read(f)) for f in front)
     if front_xml:
-        front_xml += '<text:p text:style-name="NBpageend"/>'
-    back_xml = "".join(b.convert(read(f)) for f in back)
+        front_xml = MARK % "front-start" + front_xml + '<text:p text:style-name="NBpageend"/>' + MARK % "front-end"
+    back_xml = MARK % "back-start" + "".join(b.convert(read(f)) for f in back) + MARK % "back-end"
     m = re.search(r"<office:text[^>]*>(\s*<text:sequence-decls>.*?</text:sequence-decls>)?", content, re.S)
     content = content[:m.end()] + front_xml + content[m.end():]
     end = content.rindex("</office:text>")
@@ -215,8 +239,26 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=SRC)
     ap.add_argument("--out", default=OUT)
+    ap.add_argument("--into-owner", action="store_true", help="write into the owner's document (backup first)")
     a = ap.parse_args()
-    front, back = build(a.src, a.out, SECTIONS)
+    if a.into_owner:
+        import shutil
+        import time
+        bak = os.path.join(SECTIONS, "Nebulae PD instruments (backup %s).odt" % time.strftime("%Y-%m-%d %H%M"))
+        shutil.copy2(SRC, bak)
+        tmp = SRC + ".new"
+        front, back = build(SRC, tmp, SECTIONS)
+        try:
+            os.replace(tmp, SRC)
+        except PermissionError:
+            os.remove(tmp)
+            os.remove(bak)
+            sys.exit("The owner's document is open (LibreOffice holds it): close it there, then run this again. "
+                     "Nothing was changed.")
+        print("backup: %s" % bak)
+        a.out = SRC
+    else:
+        front, back = build(a.src, a.out, SECTIONS)
     print("front: %s\nappended: %s\nwritten: %s" % (", ".join(front), ", ".join(back), a.out))
 
 

@@ -48,6 +48,9 @@ file brings the status up to date and gives you the build queue.
   | `stage_chop/K_chop.pd` | Pd, yellow, Record |
   | `stage_vocoder/L_vocoder.pd` | Pd, yellow, File |
   | `stage_topokits/M_topokits.pd` | Pd, yellow, Source (`ZZ_pitchlog` moves to Reset) |
+  | `sc/05_sc_pattern.scd` (from the repo) | SuperCollider, white, Freeze |
+  | `sc/06_sc_follow.scd` | SuperCollider, orange, Record |
+  | `sc/07_sc_mosaic.scd` | SuperCollider, orange, File (`31-simple` moves to Source) |
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
   `docs/MORPH.md`, `docs/SCAN.md` (each lists the alternatives). Their Python builders/instruments make changes
   cheap.
@@ -251,7 +254,10 @@ sc_mosaic.
    - add the instrument to the intro list and the stick table in `docs/manual/00_stick.md`;
    - rebuild with `python tools/manual_odt.py`, check the PDF pages render (pymupdf), and keep panel-map lines
      short, because long ones wrap in the PDF;
-   - **never edit the owner's own `Nebulae PD instruments.odt`.**
+   - the owner's own `Nebulae PD instruments.odt`: on 2026-11-14 they asked for the guides to go **into it**.
+     `python tools/manual_odt.py --into-owner` does that (a dated backup first; the generated parts sit between
+     bookmarks, so running it again replaces them and never touches their own text). It refuses while
+     LibreOffice has the file open. Never edit their text by hand.
 5. **Bookkeeping:** mark the instrument built in `docs/INSTRUMENT_IDEAS.md`, then update the layout lines in
    HANDOFF.md §3, its status in §2, and this file.
 6. **Stick:** stage the stick file in `firmware/dist/stage_<name>/`, or copy it to D: if the stick is plugged in.
