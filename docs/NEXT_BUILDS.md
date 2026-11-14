@@ -45,14 +45,18 @@ file brings the status up to date and gives you the build queue.
   | `stage_stretch/006_stretch.instr` | Csound user, orange, Record |
   | `stage_morph/007_morph.instr` | Csound user, orange, File |
   | `stage_scan/008_scan.instr` | Csound user, orange, Source (`999_fw_backup`, `bt_storyteller` move along; `bt_test`, `pearls` to yellow) |
+  | `stage_pulsar/009_pulsar.instr` | Csound user, orange, Reset (`999_fw_backup` to Freeze; `bt_storyteller`, `bt_test`, `pearls` to yellow) |
   | `stage_chop/K_chop.pd` | Pd, yellow, Record |
   | `stage_vocoder/L_vocoder.pd` | Pd, yellow, File |
-  | `stage_topokits/M_topokits.pd` | Pd, yellow, Source (`ZZ_pitchlog` moves to Reset) |
+  | `stage_topokits/M_topokits.pd` | Pd, yellow, Source |
+  | `stage_shift/N_shift.pd` | Pd, yellow, Reset (`ZZ_pitchlog` moves to Freeze) |
   | `sc/05_sc_pattern.scd` (from the repo) | SuperCollider, white, Freeze |
   | `sc/06_sc_follow.scd` | SuperCollider, orange, Record |
-  | `sc/07_sc_mosaic.scd` | SuperCollider, orange, File (`31-simple` moves to Source) |
+  | `sc/07_sc_mosaic.scd` | SuperCollider, orange, File |
+  | `sc/08_sc_space.scd` | SuperCollider, orange, Source (`31-simple` moves to Reset) |
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
-  `docs/MORPH.md`, `docs/SCAN.md` (each lists the alternatives). Their Python builders/instruments make changes
+  `docs/MORPH.md`, `docs/SCAN.md`, `docs/SC_FOLLOW.md`, `docs/SC_MOSAIC.md`, `docs/SHIFT.md`, `docs/PULSAR.md`,
+  `docs/SC_SPACE.md` (each lists the alternatives). Their Python builders/instruments make changes
   cheap.
 - **sc_pattern** (SC, `sc/05_sc_pattern.scd`) built 2026-11-14 after a 4-question walk-through, details auto
   (`docs/SC_PATTERN.md`). Tests: `python tools/sc_pattern_tests.py`. Stick: `sc/05_sc_pattern.scd` (SC white page,
@@ -63,6 +67,18 @@ file brings the status up to date and gives you the build queue.
 - **sc_mosaic** (SC, `sc/07_sc_mosaic.scd`) built 2026-11-14, auto (`docs/SC_MOSAIC.md`). Tests:
   `python tools/sc_mosaic_tests.py`, `tools/sc_mosaic_files_test.py`, `tools/sc_osc_tests.py sc/07_sc_mosaic.scd`.
   Stick: SC orange page, File (`31-simple` moves to Source). **The whole shortlist is now built.**
+- **2026-11-14, round 2 (the owner: "Pd Shift, Pulsar, And sc_Space. Lets make those"):**
+  - **shift** (Pd, `patches/12_shift.pd`): 4 design questions answered (all recommended), then "afk - auto choose
+    sensible options". Two walk-through promises couldn't be kept: Pd can't blink the Source LED (so Ring = Source,
+    Barber = File), and 1 V/oct can't span 0.1 Hz - 1 kHz on one knob. Both are flagged in `docs/SHIFT.md`. Tests
+    `python tools/shift_tests.py`.
+  - **pulsar** (Csound, `instr/pulsar.instr`), auto (`docs/PULSAR.md`). `partikkel` is in the module's 6.11 (SD
+    image). Tests: `wsl ... tools/pulsar_sim.py` 20/20, `python tools/pulsar_sim.py m609`.
+  - **sc_space** (SC, `sc/08_sc_space.scd`), auto (`docs/SC_SPACE.md`). Tests `python tools/sc_space_tests.py`,
+    `python tools/sc_osc_tests.py sc/08_sc_space.scd`.
+  - Found on the way: `[change]` starts at 0, so a knob reading exactly 0 at load keeps a patch's load default
+    (shift now uses `[change -1]`; the older patches aren't changed). `dcblock2` delays ~3 ms (pulsar uses
+    `dcblock`).
 - **Then (owner: "move onto SC ones", then away again):** sc_follow and sc_mosaic, auto-designed (see their
   design docs). The sc_pattern test pattern (pure functions in sclang + an NRT Score + a live OSC run) is the
   template.
