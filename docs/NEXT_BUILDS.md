@@ -29,6 +29,9 @@ file brings the status up to date and gives you the build queue.
 - **topo kits** (Pd, `patches/11_topokits.pd`, a sibling: `06_topo.pd` unchanged) built 2026-11-14 the same way
   (`docs/TOPOKITS.md`). Tests pass (`python tools/topokits_tests.py`). Stick file:
   `firmware/dist/stage_topokits/M_topokits.pd` (Pd yellow page, Source; `ZZ_pitchlog` moves to Reset).
+- **morph** (Csound, `instr/morph.instr`) built 2026-11-14 the same way (`docs/MORPH.md`). Tests: WSL
+  `tools/morph_sim.py` 13/13 (6.18) + `python tools/morph_sim.py m609` (6.09.1). Stick file:
+  `firmware/dist/stage_morph/007_morph.instr` (Csound user orange page, File; Pearls moves to the yellow page).
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**
@@ -116,7 +119,7 @@ still uses its own detector (see `docs/CHOP.md`). The notes below are what the b
 - **Output:** a new version of `patches/06_topo.pd`, or a sibling `06_topo_kits.pd` if the owner wants the original
   kept. Ask.
 
-### 3.4 morph and scan (Csound)
+### 3.4 morph and scan (Csound) — morph **built 2026-11-14** (`docs/MORPH.md`)
 The owner wrote "morph / scan". **Ask whether they want one (which?) or both.**
 - **morph:** cross-synthesis with `pvscross` / `pvsmorph` / `pvsvoc`: one source's spectral envelope on the other
   (L↔R, or input ↔ stick file). Blend morphs between them. Freeze per side with `pvsbufread` or a frozen `pvsfreeze`,

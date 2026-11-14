@@ -1,0 +1,264 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,triggered,rising
+speed,0.625
+pitch,0.6
+blend,0.5
+overlap,0
+density,1
+start_alt,0.5
+size_alt,0.3
+density_alt,0.5
+window_alt,0.5
+overlap_alt,0.5
+blend_alt,0.1
+pitch_alt,0.5
+nebconfigend
+
+; morph.instr - spectral morphing / cross-synthesis of the live input with a stick file (or the right input).
+; NebulaePD (docs/INSTRUMENT_IDEAS.md; built 2026-11-14 while the owner was away: the decisions are listed in
+; docs/MORPH.md for review). MIT.
+;
+; A = the left input, live. B = a stick file read by a phase vocoder (mincer) through a time pointer (as stretch:
+; Speed centre = frozen, clicks = 1x), or the right input (Source on), or the last seconds of A (Record).
+; Both go through pvsanal (2048 / 512); pvsmorph interpolates their amplitudes and frequencies.
+;
+; Blend    morph: A <-> B
+; Overlap  cross: CCW = the plain morph; CW = cross-synthesis, A's partials (its notes) under B's spectral envelope
+;          (B's colour), whatever Blend says
+; Window   blur: the morphed spectrum smoothed over time (none -> 2 s)
+; Density  mix: dry input <-> morph
+; Pitch    transpose the morph, 1V/oct (click = none)
+; Speed    B's speed (centre = frozen, clicks = 1x forward / backwards, ends = 4x)
+; Start    position in B (turning it scrubs); Size = the region B loops in
+; Freeze   hold A's spectrum (button or gate): morph a frozen moment of the input against a moving B
+; Reset    B back to Start (soft)
+; Record   B = the last N seconds of A (alt Size), until File is pressed
+; File     next stick file (and back to files after a Record)
+; Source   B = the right input, live (LED on)
+; alt (hold Source): Size = grab length (2-30 s), Window = tone (dark <-> bright), Overlap = reverb size,
+;   Blend = reverb amount, Speed = input gain (Nebulae's own); the others are not used
+;
+; Instruments: 1 = controls, B's pointer, rolling recorder of A (always on); 90 = the spectral chain and output.
+
+giCapMax = 30                        ; seconds each rolling buffer holds
+giCapN = giCapMax * sr
+giCap0 ftgen 0, 0, giCapN, 7, 0, giCapN, 0
+giCap1 ftgen 0, 0, giCapN, 7, 0, giCapN, 0
+giFFT = 2048
+giHop = 512
+
+gkTab init giCap0                    ; B's table (mincer needs a valid table at its init)
+gkP init 0                           ; B's playhead, sound seconds
+gkOffs init 0                        ; where B starts in its table, table seconds (the grab is circular)
+gkRatio init 1                       ; table seconds per sound second (file sr / sr)
+gkAmp init 1                         ; B's level normaliser
+gkDip init 1                         ; soft jump envelope
+gkSilent init 1                      ; no B yet (grab mode with nothing grabbed)
+giRate[] init 100
+
+instr 1
+; ---- init: each file's sample rate (gisr, else the table's own, else sr): mincer reads tables at sr in 6.11
+itempidx = 0
+rates:
+    if itempidx < ginumfiles then
+        irate = gisr[itempidx]
+        if irate <= 0 then
+            irate = ftsr(400 + itempidx)
+        endif
+        giRate[itempidx] = (irate > 0 ? irate : sr)
+    endif
+    itempidx += 1
+    if (itempidx < 100) igoto rates
+event_i "i", 90, 0, -1
+
+; ---- rolling recorder: A (the left input) always goes into the active buffer
+ainl, ainr inch 1, 2
+kRecBuf init 0
+kFill init 0
+kRec = (kRecBuf == 0 ? giCap0 : giCap1)
+kWpos tablewa kRec, ainl, 0
+kWpos = kWpos % giCapN
+kFill = min(kFill + ksmps / sr, giCapMax)
+
+; ---- B's source: files, or a grab (Record) until File is pressed
+kMode init 0                         ; 0 = files, 1 = grab
+kHave init 0
+kCapBuf init 0
+kCapEnd init 0
+kCapLen init 0
+kNew init 0
+kNew = 0
+kgrab trigger gkrecord, 0.5, 0
+kN = 2 + 28 * gkloopsize_alt
+if kgrab == 1 && kFill > 0.5 then
+    kCapBuf = kRecBuf
+    kCapEnd = kWpos
+    kCapLen = min(kN, kFill)
+    kRecBuf = 1 - kRecBuf
+    kFill = 0
+    kHave = 1
+    kMode = 1
+    kNew = 1
+endif
+kfch changed gkfilesel
+kfpr trigger gkfilestate, 0.5, 0     ; also the button itself: with one file the index doesn't change
+if kfch == 1 || kfpr == 1 then
+    kMode = 0
+endif
+if ginumfiles == 0 then
+    kMode = 1
+endif
+
+if kMode == 1 then
+    ktab = (kCapBuf == 0 ? giCap0 : giCap1)
+    klen = max(kCapLen, 0.05)
+    kratio = 1
+    koffs = kCapEnd / sr - kCapLen
+    kamp = 1
+    gkSilent = 1 - kHave
+else
+    kidx = min(max(int(gkfilesel), 0), ginumfiles - 1)
+    ; array reads go into a variable first (in Csound 6.09 an array element inside an expression is 0)
+    kflen = gilen[kidx]
+    kfrate = giRate[kidx]
+    kfpeak = gipeak[kidx]
+    ktab = 400 + kidx
+    klen = max(kflen, 0.05)
+    kratio = kfrate / sr
+    koffs = 0
+    kamp = min(0.5 / max(kfpeak, 0.05), 6)
+    gkSilent = 0
+endif
+kch changed ktab, kMode
+if kch == 1 then
+    kNew = 1
+endif
+
+; ---- region
+kS = gkloopstart * klen
+kR = 0.05 + gkloopsize * gkloopsize * max(klen - kS - 0.05, 0)
+
+; ---- Speed -> B's rate (centre frozen; the clicks at 0.375 / 0.625 = 1x)
+kd = (gkspeed - 0.5) / 0.125
+kad = abs(kd)
+if kad < 0.04 then
+    krate = 0
+elseif kad <= 1 then
+    krate = pow(10, -3 * (1 - (kad - 0.04) / 0.96))
+    if krate > 0.97 then
+        krate = 1
+    endif
+else
+    krate = min(1 + (kad - 1), 4)
+endif
+krate = (kd < 0 ? -krate : krate)
+
+; ---- B's playhead, with soft jumps (Reset, a new sound) and scrubbing (Start)
+kP init 0
+kLastStart init -1
+kPend init 0
+kDip init 1
+kreset trigger gkreset, 0.5, 0
+if kreset == 1 || kNew == 1 then
+    kPend = 1
+endif
+if abs(gkloopstart - kLastStart) > 0.0004 then
+    kP = kS
+    kLastStart = gkloopstart
+endif
+if kPend == 1 then
+    kDip = max(kDip - ksmps / (sr * 0.02), 0)
+    if kDip == 0 then
+        kP = kS
+        kPend = 0
+    endif
+else
+    kDip = min(kDip + ksmps / (sr * 0.04), 1)
+endif
+kP = kP + krate * ksmps / sr
+if kP >= kS + kR then
+    kP = kS + (kP - kS) % kR
+    gkeol = 1
+elseif kP < kS then
+    kP = kS + kR - (kS - kP) % kR
+    gkeol = 1
+endif
+
+gkTab = ktab
+gkP = kP
+gkOffs = koffs
+gkRatio = kratio
+gkAmp = kamp
+gkDip = kDip
+endin
+
+instr 90
+ainl, ainr inch 1, 2
+; ---- B: the file / grab through mincer (left channel), or the right input
+ktim = gkOffs + gkP * gkRatio
+atim upsamp ktim
+abf mincer atim, 1, gkRatio, gkTab, 1, giFFT, 4
+kbg = gkAmp * gkDip * (1 - gkSilent)
+kbg portk kbg, 0.02
+abf = abf * kbg
+ksrc portk gksource, 0.02
+aB = abf * (1 - ksrc) + ainr * ksrc
+
+; ---- spectra
+fA pvsanal ainl, giFFT, giHop, giFFT, 1
+fB pvsanal aB, giFFT, giHop, giFFT, 1
+fAh pvsfreeze fA, gkfreeze, gkfreeze
+; morph (Blend): A's and B's amplitudes and frequencies interpolated
+kpos portk gkblend, 0.05
+fM pvsmorph fAh, fB, kpos, kpos
+; cross (Overlap): towards A's partials under B's spectral envelope (pvsvoc: envelope of the first, frequencies of
+; the second), crossfaded with the morph in the spectral domain (one resynthesis)
+fV pvsvoc fB, fAh, 1, 1
+kx portk gkoverlap, 0.05
+fX pvsmorph fM, fV, kx, kx
+; blur (Window): one pole per bin, 0.02 .. 2 s (the cut-off is a fraction of the frame rate's Nyquist: 46.9 Hz)
+kblur = 0.02 + 1.98 * gkwindow * gkwindow
+kcf = (gkwindow < 0.01 ? 1 : min(1 / (6.2832 * kblur * 46.875), 1))
+fS pvsmooth fX, kcf, kcf
+; transpose (Pitch)
+kst = (gkpitch - 0.6) * 60
+kst = min(max(kst, -36), 36)
+kscal = pow(2, kst / 12)
+fP pvscale fS, kscal
+am pvsynth fP
+; makeup towards the cross side: cross-synthesis puts B's thin per-bin envelope on A's few partials, so it comes
+; out far quieter than either input: up to +20 dB at full Overlap (fixed: an adaptive gain pumped and spiked on
+; near-empty spectra)
+kgc portk 1 + 9 * gkoverlap, 0.05
+am = am * kgc
+
+; ---- tone (alt Window): high shelf at 1.5 kHz, -18 dB .. +6 dB, noon = flat
+kw = gkwindow_alt
+kdb = (kw < 0.5 ? (kw - 0.5) * 36 : (kw - 0.5) * 12)
+kdb portk kdb, 0.05
+kv = ampdb(kdb)
+am pareq am, 1500, kv, 0.7, 2
+
+; ---- reverb (alt Overlap = size, alt Blend = amount): also the stereo image
+kfb = 0.6 + 0.37 * gkoverlap_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc am, am, kfb, 9000
+aL = am + arL * krev
+aR = am + arR * krev
+
+; ---- dry input <-> morph (Density, equal power)
+km portk gkdensity, 0.02
+kdry = cos(km * 1.5708)
+kwet = sin(km * 1.5708)
+aoL = tanh(ainl * kdry + aL * kwet)
+aoR = tanh(ainr * kdry + aR * kwet)
+outs aoL, aoR
+endin
