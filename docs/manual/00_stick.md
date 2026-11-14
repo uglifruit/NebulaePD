@@ -1,7 +1,7 @@
 # Nebulae instruments: what is on the stick, and how to choose
 
 The guides in this manual cover the instruments we made: Pure Data (gloop, glitch, spectral, topo, shimmer,
-resonator, chop), SuperCollider (drift, strike, cloud), Csound (Pearls, stretch) and the Bluetooth storyteller. The other
+resonator, chop, vocoder), SuperCollider (drift, strike, cloud), Csound (Pearls, stretch) and the Bluetooth storyteller. The other
 instruments on the stick have their own manuals (listed below).
 
 ## Choosing an instrument (custom firmware uf2)
@@ -44,7 +44,8 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | | Reset | I_shimmer | shimmer: shimmer reverb |
 | | Freeze | J_resonator | resonator: exciter → resonator → delay |
 | **Pd**, yellow | Record | K_chop | chop: slice sequencer (its guide is in this manual). *To copy: not on the stick yet* |
-| | File | ZZ_pitchlog | Utility: measures the Pitch control's timing (see Utilities) |
+| | File | L_vocoder | vocoder: 20-band vocoder (its guide is in this manual). *To copy: not on the stick yet* |
+| | Source | ZZ_pitchlog | Utility: measures the Pitch control's timing (see Utilities) |
 | **SuperCollider**, white | Record | 01_sctest | Test patch: a plucked saw for checking the controls |
 | | File | 02_sc_drift | drift: drone / pad |
 | | Source | 03_sc_strike | strike: plucked string |

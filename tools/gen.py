@@ -985,6 +985,7 @@ if __name__ == "__main__":
     import shimmer
     import resonator
     import chop
+    import vocoder
     import pitchlog
     write("lib/nebulae_controls.pd", controls_canvas(top=True))
     write("patches/00_template.pd", template_patch())
@@ -997,6 +998,7 @@ if __name__ == "__main__":
     write("patches/07_shimmer.pd", shimmer.shimmer_patch(Canvas, controls_canvas))
     write("patches/08_resonator.pd", resonator.resonator_patch(Canvas, controls_canvas))
     write("patches/09_chop.pd", chop.chop_patch(Canvas, controls_canvas))
+    write("patches/10_vocoder.pd", vocoder.vocoder_patch(Canvas, controls_canvas))
     write("patches/99_pitchlog.pd", pitchlog.pitchlog_patch(Canvas, controls_canvas))
     write("sim/sim_controls.pd", sim_patch())
     write("sim/test_02_echo.pd", echo_patch(test=True))

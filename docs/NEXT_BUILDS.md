@@ -23,6 +23,9 @@ file brings the status up to date and gives you the build queue.
 - **2026-11-14, the owner (away from the keyboard): "Make auto decisions and carry on to next instruments for me to
   check."** So the builds after chop were designed without a walk-through: each design doc lists its decisions
   and the alternatives, for the owner to review before (or after) a hardware test.
+- **vocoder** (Pd, `patches/10_vocoder.pd`) built 2026-11-14 that way (`docs/VOCODER.md`: 15 decisions to
+  review). Offline tests pass (`python tools/vocoder_tests.py`, 10 scenarios). Stick file:
+  `firmware/dist/stage_vocoder/L_vocoder.pd` (Pd yellow page, File; `ZZ_pitchlog` moves to Source).
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**
@@ -79,7 +82,7 @@ still uses its own detector (see `docs/CHOP.md`). The notes below are what the b
 - **Output:** `patches/09_chop.pd` in the repo. On the stick the owner renames Pd patches to letters (`A_durm` …
   `J_resonator`), so suggest `K_chop.pd`: it's the first slot on the yellow page, ahead of `ZZ_pitchlog`.
 
-### 3.2 vocoder (Pd)
+### 3.2 vocoder (Pd) — **built 2026-11-14** (`docs/VOCODER.md`)
 - **Pitch:** a 20-band channel vocoder. The left input is the modulator. The carrier is the right input, or an
   internal supersaw/noise chord on V/oct. Formant shift, envelope freeze, an unvoiced-noise band.
 - **Where to start:** for bandpass banks, `bp~`/`vcf~` pairs in a `block~ 64` subpatch. Envelopes are `env~` at
