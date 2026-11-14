@@ -17,6 +17,12 @@ file brings the status up to date and gives you the build queue.
     `firmware/dist/stage_stretch/006_stretch.instr`.
   - When the stick is back, copy that file, regenerate `manifest.txt` and `D:\nebulae_banks.txt` with
     `tools/stick_manifest.py`, and put `docs/manual/Nebulae instruments.pdf` on the stick.
+- **chop** (Pd, `patches/09_chop.pd`) was built on 2026-11-14 after a full design walk-through. It passed its
+  offline tests (`python tools/chop_tests.py`, 13 scenarios) and is **waiting for the owner's hardware test**.
+  Stick file: `firmware/dist/stage_chop/K_chop.pd` (Pd yellow page, Record; `ZZ_pitchlog` moves to File).
+- **2026-11-14, the owner (away from the keyboard): "Make auto decisions and carry on to next instruments for me to
+  check."** So the builds after chop were designed without a walk-through: each design doc lists its decisions
+  and the alternatives, for the owner to review before (or after) a hardware test.
 - **The shortlist** is in `docs/INSTRUMENT_IDEAS.md`. The owner picked it on 2026-11-13, and its catalogue
   explains why each idea fits its engine. **Platform work (BLE-MIDI, the time machine, gate out) is off the
   table for now.**
@@ -42,7 +48,9 @@ file brings the status up to date and gives you the build queue.
 In the suggested order. Each idea's one-line pitch is in `docs/INSTRUMENT_IDEAS.md`. Below, for each: where to
 start, the questions to put to the owner, and the risks. **Nothing here is decided until the owner picks it.**
 
-### 3.1 chop (Pd): slice sequencer, offered as the next build
+### 3.1 chop (Pd): slice sequencer — **built 2026-11-14** (`docs/CHOP.md`)
+`bonk~` and `sigmund~` do ship on the unit, and so does `[file glob]` (Pd 0.52.2, checked in the SD image). chop
+still uses its own detector (see `docs/CHOP.md`). The notes below are what the build started from.
 - **Pitch:** record a loop or load a stick WAV, slice it at its onsets, and let a step sequencer clocked by Reset
   replay the slices in a new order, with probability, ratchets, reverse and pitch.
 - **Where to start:**

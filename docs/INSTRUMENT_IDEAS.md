@@ -22,7 +22,7 @@ Effort: S = a few sessions, M = like topo or resonator, L = bigger. CPU is again
 ## Pure Data
 | | Idea | What it is | Effort / CPU |
 |---|---|---|---|
-| ★ | **chop**: slice sequencer | Record a loop or load a stick WAV. It is auto-sliced at its onsets (`bonk~`), and a step sequencer clocked by Reset replays the slices in a new order, with per-step probability, ratchets, reverse and pitch. Freeze locks the pattern, Record re-rolls it, File loads the next WAV. In time, with zero added latency | M / low |
+| ★ | **chop**: slice sequencer: **built 2026-11-14**, awaiting hardware (`patches/09_chop.pd`, guide `patches/09_chop_README.md`, design `docs/CHOP.md`; our own onset detector instead of `bonk~`, Freeze holds the dice, Source = step 1) | Record a loop or load a stick WAV. It is auto-sliced at its onsets (`bonk~`), and a step sequencer clocked by Reset replays the slices in a new order, with per-step probability, ratchets, reverse and pitch. Freeze locks the pattern, Record re-rolls it, File loads the next WAV. In time, with zero added latency | M / low |
 | ★ | **vocoder** | A 20-band channel vocoder. Left in = modulator (voice, drums). The carrier is the right input, or an internal supersaw/noise chord on V/oct. Formant shift, freeze of the spectral envelope, unvoiced-noise detection | S–M / low |
 | | **shift**: frequency shifter + barber-pole | A single-sideband shifter (`hilbert~`) with V/oct-able shift, inside a feedback delay: endlessly rising or falling echoes. Ring-mod mode; opposite shift per side | S / low |
 | ★ | **topo kits** | topo's patterns playing sample kits from the stick, with kit choice on the alt layer (the Source gate jack stays step-1 reset) | S–M / low |
