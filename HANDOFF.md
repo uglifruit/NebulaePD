@@ -1,7 +1,8 @@
 # Handoff — NebulaePD (for a new Claude instance)
 
 Last updated 2026-10-22. Read this first, then `docs/PROTOCOL.md`, then the doc for whatever you're touching.
-For a **new instrument**, see §8.
+For a **new instrument**, see §8. **The current status and the build queue (2026-11-14) are in
+`docs/NEXT_BUILDS.md`**; it replaces the §2 table below where they differ.
 
 ## 1. What this is
 - **Goal:** Pure Data instruments (later Csound `.instr`, maybe SuperCollider) for the owner's **Qu-Bit Nebulae V2**
@@ -108,6 +109,7 @@ docs/manual/         00_*.md (front: selector + stick map) and NN_*.md sections 
                      the stick changes; new instrument guides go here as NN_name.md (or "@include ../X.md")
 docs/SC_IDEAS.md     Technobear's SC patches reviewed + SC instrument ideas (none built)
 docs/INSTRUMENT_IDEAS.md  Pd/Csound/SC/platform proposals + the owner's shortlist (first build: stretch)
+docs/NEXT_BUILDS.md  handoff for building the rest of the shortlist: status, queue, engine rules, definition of done
 instr/stretch.instr  Csound time-stretch/freeze (mincer) of stick files or grabbed input; guide docs/manual/15_stretch.md
 tools/stretch_sim.py offline tests of stretch (WSL Csound 6.18; rate609 = Csound 6.09 from Windows, see docs/INSTR.md)
 docs/HDMI_KEYBOARD.md  feasibility: HDMI visualiser, USB/BT keyboard, tracker, live coding (none built)

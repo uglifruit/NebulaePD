@@ -2,6 +2,8 @@
 
 Read [`HANDOFF.md`](HANDOFF.md) before doing anything in this repo. It covers project status, the Nebulae facts that
 constrain every patch, the generate → batch-test → commit workflow, tool gotchas, and a new-instrument checklist (§8).
+Building the next instruments (the owner's shortlist)? Then read [`docs/NEXT_BUILDS.md`](docs/NEXT_BUILDS.md) next:
+the current status, the build queue, and the engine rules.
 
 Key rules:
 - `.pd` files are generated: edit `tools/gen.py` or an instrument builder (`tools/gloop.py`, `tools/glitch.py`, `tools/spectral.py`, `tools/topo.py`, `tools/shimmer.py`, `tools/resonator.py`, …),
