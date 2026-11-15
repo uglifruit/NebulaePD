@@ -45,18 +45,23 @@ file brings the status up to date and gives you the build queue.
   | `stage_stretch/006_stretch.instr` | Csound user, orange, Record |
   | `stage_morph/007_morph.instr` | Csound user, orange, File |
   | `stage_scan/008_scan.instr` | Csound user, orange, Source (`999_fw_backup`, `bt_storyteller` move along; `bt_test`, `pearls` to yellow) |
-  | `stage_pulsar/009_pulsar.instr` | Csound user, orange, Reset (`999_fw_backup` to Freeze; `bt_storyteller`, `bt_test`, `pearls` to yellow) |
+  | `stage_pulsar/009_pulsar.instr` | Csound user, orange, Reset |
+  | `stage_tanpura/010_tanpura.instr` | Csound user, orange, Freeze |
+  | `stage_chorale/011_chorale.instr` | Csound user, yellow, Record (`999_fw_backup`, `bt_storyteller`, `bt_test`, `pearls` follow it) |
   | `stage_chop/K_chop.pd` | Pd, yellow, Record |
   | `stage_vocoder/L_vocoder.pd` | Pd, yellow, File |
   | `stage_topokits/M_topokits.pd` | Pd, yellow, Source |
-  | `stage_shift/N_shift.pd` | Pd, yellow, Reset (`ZZ_pitchlog` moves to Freeze) |
+  | `stage_shift/N_shift.pd` | Pd, yellow, Reset |
+  | `stage_partials/O_partials.pd` | Pd, yellow, Freeze (`ZZ_pitchlog` moves to the blue page, Record) |
   | `sc/05_sc_pattern.scd` (from the repo) | SuperCollider, white, Freeze |
   | `sc/06_sc_follow.scd` | SuperCollider, orange, Record |
   | `sc/07_sc_mosaic.scd` | SuperCollider, orange, File |
-  | `sc/08_sc_space.scd` | SuperCollider, orange, Source (`31-simple` moves to Reset) |
+  | `sc/08_sc_space.scd` | SuperCollider, orange, Source |
+  | `sc/09_sc_swarm.scd` | SuperCollider, orange, Reset (`31-simple` moves to Freeze) |
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
   `docs/MORPH.md`, `docs/SCAN.md`, `docs/SC_FOLLOW.md`, `docs/SC_MOSAIC.md`, `docs/SHIFT.md`, `docs/PULSAR.md`,
-  `docs/SC_SPACE.md` (each lists the alternatives). Their Python builders/instruments make changes
+  `docs/SC_SPACE.md`, `docs/SC_SWARM.md`, `docs/PARTIALS.md`, `docs/TANPURA.md`, `docs/CHORALE.md` (each lists the
+  alternatives). Their Python builders/instruments make changes
   cheap.
 - **sc_pattern** (SC, `sc/05_sc_pattern.scd`) built 2026-11-14 after a 4-question walk-through, details auto
   (`docs/SC_PATTERN.md`). Tests: `python tools/sc_pattern_tests.py`. Stick: `sc/05_sc_pattern.scd` (SC white page,
@@ -76,6 +81,14 @@ file brings the status up to date and gives you the build queue.
     image). Tests: `wsl ... tools/pulsar_sim.py` 20/20, `python tools/pulsar_sim.py m609`.
   - **sc_space** (SC, `sc/08_sc_space.scd`), auto (`docs/SC_SPACE.md`). Tests `python tools/sc_space_tests.py`,
     `python tools/sc_osc_tests.py sc/08_sc_space.scd`.
+  - **Round 3 (2026-11-14/15, the owner: "I quite like the idea of drone synths"; ten ideas brainstormed, listed in
+    `docs/INSTRUMENT_IDEAS.md` under "Drones and listening"; "make the first 4, ask me any questions before I let
+    you loose"):** 7 questions answered (all recommended), then built: **sc_swarm**, **partials** (Pd 13),
+    **tanpura** (010), **chorale** (011). All tested offline, awaiting hardware; decisions in docs/SC_SWARM.md,
+    PARTIALS.md, TANPURA.md, CHORALE.md. Not built yet: spiral, accrete, memory, sympathetic, breathe, answer.
+  - Found on the way (round 3): a big SynthDef doesn't fit one OSC message in NRT (the tests `/d_load` it);
+    `portk` starts at 0 (a pluck at load had no loop gain); `kr` is reserved in Csound; `vco2` takes only a k-rate
+    frequency; LFNoise at rate 0 doesn't hold (use `Gate.kr`).
   - Found on the way: `[change]` starts at 0, so a knob reading exactly 0 at load keeps a patch's load default
     (shift now uses `[change -1]`; the older patches aren't changed). `dcblock2` delays ~3 ms (pulsar uses
     `dcblock`).

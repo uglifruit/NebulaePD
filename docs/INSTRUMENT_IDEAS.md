@@ -44,6 +44,23 @@ Effort: S = a few sessions, M = like topo or resonator, L = bigger. CPU is again
 | ★ | **sc_mosaic** (**built 2026-11-14**, auto-designed: docs/SC_MOSAIC.md) | Concatenative resynthesis: the input answered with matching fragments of a stick file | M / medium |
 | ★ | **sc_space** (**built 2026-11-14**, auto-designed: `sc/08_sc_space.scd`, docs/SC_SPACE.md) | `Greyhole` diffuse delays into `JPverb`, with freeze and ducking | S / low–medium |
 
+## Drones and listening
+Brainstormed 2026-11-14. The owner: "I quite like the idea of drone synths" and "something that detects/interacts
+with incoming audio". They picked the first four.
+
+| | Idea | What it is | Engine / effort |
+|---|---|---|---|
+| ★ | **tanpura**: **built 2026-11-15** (`instr/tanpura.instr`, docs/TANPURA.md) | Four plucked strings with a buzzing (jawari) bridge, cycling by themselves; a clock on Reset takes over | Csound / M |
+| ★ | **partials**: **built 2026-11-14** (`patches/13_partials.pd`, docs/PARTIALS.md) | 16 sine partials: masks, stretch, tilt, drift, random deals | Pd / S-M |
+| ★ | **chorale**: **built 2026-11-15** (`instr/chorale.instr`, docs/CHORALE.md) | A choir drone singing vowels; chords on Source | Csound / M |
+| ★ | **swarm**: **built 2026-11-14** (`sc/09_sc_swarm.scd`, docs/SC_SWARM.md) | 32 drifting detuned oscillators; gathers onto chords | SC / S |
+| | **spiral** | An endless rising/falling Shepard–Risset drone | Pd / S |
+| | **accrete** | Each note you play is caught as a frozen spectrum and layered in: a drone that builds from your playing (recommended next) | SC or Pd / M |
+| | **memory** | Tracks the pitches you play; the most-played become a slowly gathering drone chord | SC / M |
+| | **sympathetic** | 24 resonators tuned to the input's key, rung by your sound (sympathetic strings) | Csound or Pd / M |
+| | **breathe** | A drone that ducks and darkens while you play and swells in the gaps | Pd / S |
+| | **answer** | Call and response: hears a phrase, plays back a variation of its rhythm and contour in the gap | Pd / M-L |
+
 ## The platform (not this round)
 | Idea | What it is | Effort |
 |---|---|---|

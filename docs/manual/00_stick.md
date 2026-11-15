@@ -1,7 +1,7 @@
 # Nebulae instruments: what is on the stick, and how to choose
 
 The guides in this manual cover the instruments we made: Pure Data (gloop, glitch, spectral, topo, shimmer,
-resonator, chop, vocoder, topo kits, shift), SuperCollider (drift, strike, cloud, pattern, follow, mosaic, space), Csound (Pearls, stretch, morph, scan, pulsar) and the Bluetooth storyteller. The other
+resonator, chop, vocoder, topo kits, shift, partials), SuperCollider (drift, strike, cloud, pattern, follow, mosaic, space, swarm), Csound (Pearls, stretch, morph, scan, pulsar, tanpura, chorale) and the Bluetooth storyteller. The other
 instruments on the stick have their own manuals (listed below).
 
 ## Choosing an instrument (custom firmware uf2)
@@ -19,7 +19,7 @@ The module sorts the files by name (digits before letters), so a numeric prefix 
 starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, regenerated from the files
 (`tools/stick_manifest.py`).
 
-## The stick, 2026-11-14
+## The stick, 2026-11-15
 | Bank / page | Button | Instrument | What it is |
 |---|---|---|---|
 | **Csound user**, white | Record | 001_a_granular_looper_Factory_Default | An older release of Qu-Bit's granular looper (its overdub buffers differ from the built-in one) |
@@ -31,10 +31,12 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | | File | 007_morph | morph: spectral morphing / cross-synthesis of the input with a stick file (its guide is in this manual). *To copy: not on the stick yet* |
 | | Source | 008_scan | scan: scanned synthesis, a struck / bowed string whose shape is the waveform (its guide is in this manual). *To copy: not on the stick yet* |
 | | Reset | 009_pulsar | pulsar: a granular oscillator, pulsar synthesis (its guide is in this manual). *To copy: not on the stick yet* |
-| | Freeze | 999_fw_backup | Utility: backs up the firmware and writes an inventory to the stick (see Utilities) |
-| **Csound user**, yellow | Record | bt_storyteller | The granular looper, telling your PC what happens to it over Bluetooth (its guide is in this manual) |
-| | File | bt_test | Utility: the Bluetooth check (see Utilities) |
-| | Source | pearls | Pearls: Mutable Instruments Beads (its guide is in this manual) |
+| | Freeze | 010_tanpura | tanpura: a self-playing drone of four plucked, buzzing strings (its guide is in this manual). *To copy: not on the stick yet* |
+| **Csound user**, yellow | Record | 011_chorale | chorale: a choir drone that sings vowels (its guide is in this manual). *To copy: not on the stick yet* |
+| | File | 999_fw_backup | Utility: backs up the firmware and writes an inventory to the stick (see Utilities) |
+| | Source | bt_storyteller | The granular looper, telling your PC what happens to it over Bluetooth (its guide is in this manual) |
+| | Reset | bt_test | Utility: the Bluetooth check (see Utilities) |
+| | Freeze | pearls | Pearls: Mutable Instruments Beads (its guide is in this manual) |
 | **Factory** (built in) | 1–5 | a_granularlooper, b_oneshot, c_synth, d_effects, e_testio | Qu-Bit's own: see the Nebulae manual |
 | **Pd**, white | Record | A_durm | No notes on the stick. From its patch: a drum processor with side-chain compression, trigger glitches, filter and downsampler; holding Source turns the burst off |
 | | File | B_Plasma_Membrane | No notes on the stick. Its knobs each control two parameters (split down the middle) |
@@ -50,7 +52,8 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | | File | L_vocoder | vocoder: 20-band vocoder (its guide is in this manual). *To copy: not on the stick yet* |
 | | Source | M_topokits | topo kits: topo playing your sample kits (its guide is in this manual). *To copy: not on the stick yet* |
 | | Reset | N_shift | shift: frequency shifter in a feedback delay, barber-pole echoes (its guide is in this manual). *To copy: not on the stick yet* |
-| | Freeze | ZZ_pitchlog | Utility: measures the Pitch control's timing (see Utilities) |
+| | Freeze | O_partials | partials: an additive drone organ of 16 drifting partials (its guide is in this manual). *To copy: not on the stick yet* |
+| **Pd**, blue | Record | ZZ_pitchlog | Utility: measures the Pitch control's timing (see Utilities) |
 | **SuperCollider**, white | Record | 01_sctest | Test patch: a plucked saw for checking the controls |
 | | File | 02_sc_drift | drift: drone / pad |
 | | Source | 03_sc_strike | strike: plucked string |
@@ -59,4 +62,5 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 | **SuperCollider**, orange | Record | 06_sc_follow | sc_follow: listens and plays a harmony along (its guide is in this manual). *To copy: not on the stick yet* |
 | | File | 07_sc_mosaic | sc_mosaic: rebuilds the input from pieces of a stick file (its guide is in this manual). *To copy: not on the stick yet* |
 | | Source | 08_sc_space | sc_space: diffuse delays into a long reverb, with freeze and ducking (its guide is in this manual). *To copy: not on the stick yet* |
-| | Reset | 31-simple | Technobear's example: a saw on Pitch. **Loud**: turn the output down first |
+| | Reset | 09_sc_swarm | sc_swarm: a drone of 32 drifting oscillators that can gather onto chords (its guide is in this manual). *To copy: not on the stick yet* |
+| | Freeze | 31-simple | Technobear's example: a saw on Pitch. **Loud**: turn the output down first |
