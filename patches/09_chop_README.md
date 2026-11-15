@@ -6,7 +6,7 @@ on a bar line) or a WAV from the stick (File). Turned all the way down, chop pla
 was. Turning the knobs up shuffles the hits, drops some, repeats them as ratchets, plays them backwards and makes
 them jump in pitch. The rhythm of the loop always stays: only what plays on each hit changes.
 
-It's in the **Pd bank** as `K_chop` (yellow page, Record button), file `09_chop.pd` in the repo.
+**Bank:** Pd (the page and button are in `nebulae_banks.txt` on the stick). Repo file: `09_chop.pd`.
 
 ## Panel map
 ```

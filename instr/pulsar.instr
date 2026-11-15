@@ -180,8 +180,8 @@ ai1, ai2 partikkel agf, 0, giDist, async, 0, giRise, giRise, giFall, ksus, kad, 
     giAmps, aipos, aipos, aipos, aipos, 1, kr2, 1, 1, 100, 1
 aL = aw1 + ai1
 aR = aw2 + ai2
-aL dcblock aL                                    ; (dcblock2 delays ~3 ms: the pulses must land on Reset)
-aR dcblock aR
+aL dcblock aL, 0.9995                            ; (dcblock2 delays ~3 ms: the pulses must land on Reset;
+aR dcblock aR, 0.9995                            ;  the default gain 0.99 is a 76 Hz high-pass)
 
 ; ---- reverb (alt Overlap = size, alt Blend = amount)
 krfb = 0.6 + 0.37 * gkoverlap_alt

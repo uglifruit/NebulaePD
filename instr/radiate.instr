@@ -249,8 +249,8 @@ instr 30
 ; ---- out: dirty saturation after the peaks, level, dry/wet
 ainL, ainR inch 1, 2
 kdt = gkDirty
-aL dcblock gaWL
-aR dcblock gaWR
+aL dcblock gaWL, 0.9995                         ; (the default 0.99 is a 76 Hz high-pass)
+aR dcblock gaWR, 0.9995
 gaWL = 0
 gaWR = 0
 aL = aL * (1 - kdt) + tanh(aL * 2) * 0.6 * kdt

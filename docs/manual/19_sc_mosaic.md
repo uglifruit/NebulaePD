@@ -5,7 +5,7 @@ through a recording (the **corpus**) for the piece that best matches the input r
 and brightness, and plays that piece instead. Play a drum loop and it answers with matching bits of a choir; talk
 and a piano talks; play anything into it with its own past as the corpus and it stutters and echoes itself.
 
-It's in the **SuperCollider bank** as `07_sc_mosaic` (orange page, File button). Expect 5–10 s of silence while
+**Bank:** SuperCollider (the page and button are in `nebulae_banks.txt` on the stick). Expect 5–10 s of silence while
 SuperCollider starts.
 
 ## Panel map

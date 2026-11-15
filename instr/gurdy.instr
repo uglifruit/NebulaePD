@@ -1,0 +1,254 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.3
+size,0.4
+density,0.7
+window,0.5
+overlap,0.4
+blend,1
+start_alt,0.6
+size_alt,0.3
+density_alt,0.3
+window_alt,0.5
+overlap_alt,0.5
+blend_alt,0.25
+pitch_alt,0
+nebconfigend
+
+; gurdy.instr - a hurdy-gurdy: bowed drone strings, a melody string, a buzzing trompette, sympathetic strings.
+; NebulaePD. Designed with the owner 2026-11-15 (Speed = the crank, Start plays the melody in a scale, Reset
+; strokes + crank surges buzz the trompette, bowed-string models, File = modes); the rest is in docs/GURDY.md. MIT.
+;
+; Pitch    the drone key, 1V/oct (click = C2): the bourdon; the mouche a fifth (or an octave) up; the trompette
+;          an octave up
+; Speed    the crank: stopped fully anticlockwise, a steady turn at noon, fast and bright clockwise
+; Start    the melody note (and its CV jack): two octaves of the mode's scale from an octave above the key
+; Size     bow pressure (rosin): smooth -> scratchy
+; Density  drones: melody alone -> full drones
+; Overlap  sympathetic strings: the halo that rings along
+; Window   the body: small and bright -> large and warm
+; Blend    dry input <-> gurdy (it loads fully clockwise)
+; Reset    a crank stroke: the trompette buzzes (a gate or the button); quick Speed turns up buzz it too
+; Source   the melody string on (latching, LED on). At load: the drones alone
+; Record   the trompette buzzes all the time (latching, LED on)
+; Freeze   hold the melody note: Start and its CV are ignored until released (latching, LED on)
+; File     mode: major (fifth drones) -> mixolydian (fifth) -> dorian (fifth) -> minor (octave drones)
+; alt (hold Source): Start = stereo width, Size = wheel irregularity, Density = melody glide, Overlap = how easily
+;   the trompette buzzes, Window = reverb size, Blend = reverb amount, Speed = input gain (Nebulae's own)
+;
+; Instruments: 10 control, 20.1 .. 20.5 the strings (bourdon, mouche, trompette, melody x 2), 30 out.
+
+giSine ftgen 0, 0, 8192, 10, 1
+; scales (semitones, 7 steps) per mode, and the mouche's interval
+giScale ftgen 0, 0, 32, -2, 0, 2, 4, 5, 7, 9, 11, 0,   0, 2, 4, 5, 7, 9, 10, 0,   0, 2, 3, 5, 7, 9, 10, 0,   0, 2, 3, 5, 7, 8, 10, 0
+giMouche ftgen 0, 0, 4, -2, 7, 7, 7, 12
+gkWheel init 0                                  ; crank speed after the wheel's inertia, 0 .. 1
+gkAmp init 0
+gkPres init 2
+gkRat init 0.12
+gkMel init 130.8
+gkBuzz init 0
+gkMode init 0
+gkF0 init 65.4
+gkTick init 0
+gaS[] init 5                                    ; (unused: kept simple below)
+gaL init 0
+gaR init 0
+gaSym init 0
+gaTr init 0
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20.1, 0, -1, 0
+event_i "i", 20.2, 0, -1, 1
+event_i "i", 20.3, 0, -1, 2
+event_i "i", 20.4, 0, -1, 3
+event_i "i", 20.5, 0, -1, 4
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- the crank, the melody key, the trompette's buzz, the mode
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkMode = (gkMode + 1) % 4
+endif
+; the crank: the wheel has inertia (0.25 s)
+kw = min(max(gkspeed, 0), 1)
+kwh init 0
+kwh = kwh + (kw - kwh) * (1 - exp(-ksmps / (sr * 0.25)))
+; wheel irregularity: the turn isn't perfectly even (once per revolution; alt Size = how much)
+kph init 0
+kph = kph + (0.4 + 2.2 * kwh) * ksmps / sr
+kph = kph - int(kph)
+kirr = 1 + gkloopsize_alt * 0.25 * sin(6.2831853 * kph) * (kwh > 0.02 ? 1 : 0)
+gkWheel = kwh
+; loudness: nothing when stopped, full at noon, a little more when fast
+ka = (kwh < 0.5 ? pow(kwh / 0.5, 1.5) : 1 + 0.3 * (kwh - 0.5))
+gkAmp = ka * kirr
+gkPres = 1.0 + 4.5 * gkloopsize + 1.5 * max(0, kwh - 0.5)    ; bow pressure: Size, and harder when fast
+gkRat = 0.2 - 0.14 * kwh                        ; the contact point: nearer the bridge (brighter) when fast
+; the key
+kst = (gkpitch - 0.6) * 60
+gkF0 = 65.406 * pow(2, kst / 12)
+kdeg = int(min(max(gkloopstart, 0), 0.9999) * 15)          ; 15 notes: two octaves of 7, plus the top
+koct = int(kdeg / 7)
+kstep table gkMode * 8 + (kdeg % 7), giScale
+kmel = gkF0 * 2 * pow(2, koct + kstep / 12)
+kheld init 0
+if gkfreeze < 0.5 || kheld == 0 then
+    kheld = kmel
+endif
+; a key change: the tangent strikes the string (a tick), with alt Density's glide
+gkTick = 0
+kprev init 0
+if kheld != kprev then
+    gkTick = 1
+    kprev = kheld
+endif
+kgl = 0.001 + 0.08 * gkdensity_alt
+kmf init 0
+kmf = (kmf == 0 ? kheld : kmf + (kheld - kmf) * (1 - exp(-ksmps / (sr * kgl))))
+gkMel = kmf
+; the trompette: a stroke on Reset, a quick crank surge, or Record (all the time)
+krs trigger gkreset, 0.5, 0
+kwd delayk kw, 0.08                             ; (the knob itself: the wheel's inertia smoothed surges away)
+ksurge = ((kw - kwd) > 0.08 + 0.2 * gkoverlap_alt ? 1 : 0)
+kb init 0
+kb = kb * exp(-ksmps / (sr * 0.09))
+if krs == 1 || ksurge == 1 then
+    kb = 1
+endif
+gkBuzz = max(kb, (gkrecord > 0.5 ? 0.7 : 0)) * (kwh > 0.03 ? 1 : 0)
+endin
+
+instr 20
+; ---- one bowed string (Csound's bowed waveguide: friction against a string)
+ir = p4
+kmode = gkMode
+kmou table kmode, giMouche
+if ir == 0 then
+    kf = gkF0
+    klev = gkdensity
+elseif ir == 1 then
+    kf = gkF0 * pow(2, kmou / 12)
+    klev = gkdensity * 0.8
+elseif ir == 2 then
+    kf = gkF0 * 2
+    klev = gkdensity * 0.55
+elseif ir == 3 then
+    kf = gkMel
+    klev = (gksource > 0.5 ? 1 : 0)
+else
+    kf = gkMel * 1.0017                         ; the second melody string, 3 cents apart
+    klev = (gksource > 0.5 ? 1 : 0)
+endif
+kf = min(max(kf, 30), 2000)
+kf = 1 / (1 / kf + 0.0000175)                  ; (the bowed waveguide runs sharp by ~0.84 samples of loop: measured)
+klv portk klev, 0.05
+kamp = gkAmp * klv * 0.3
+; each string's pressure and contact differ a little (they aren't identical strings)
+kpres = gkPres * (1 + 0.07 * (ir - 2))
+krat = gkRat * (1 + 0.05 * (ir - 2))
+as wgbow kamp, kf, kpres, krat, 0, 0, giSine, 25
+as dcblock as, 0.9995                           ; (the default 0.99 is a 76 Hz high-pass)
+; rosin: a scratch that follows the bow, more with pressure (Size)
+ksc = gkloopsize * gkloopsize * kamp
+asn noise 1, 0
+asn buthp asn, 3000
+asn = asn * interp(ksc) * 0.5 * (1 + abs(as) * 8)
+as = as + asn
+; the tangent's tick on the melody strings (per-string multipliers, not if-blocks: an i-rate if around audio
+; code left the trompette's rattle silent)
+itk = (ir == 3 ? 1 : 0)
+ktk = gkTick * itk
+kte init 0
+kte = (ktk == 1 ? 1 : kte * exp(-ksmps / (sr * 0.006)))
+an noise 0.25 * itk * klv * min(1, gkAmp + 0.3), 0
+atk butbp an * interp(kte), 2500, 1500
+as = as + atk
+; the trompette: the "dog" rattles against the soundboard at the string's frequency while it buzzes, a rasp
+; louder than the string's own top (scaled from the string's level)
+itr = (ir == 2 ? 1 : 0)
+abz interp gkBuzz * itr
+krm rms as, 50
+asq = tanh(as / (krm * 0.3 + 0.00001))          ; a near-square at the string's frequency ...
+asq1 delay1 asq
+arat = asq - asq1                               ; ... and its edges: a click each half-cycle, the rattle
+arat butbp arat, 2000, 2000                     ; (its rasp sits at 1-3 kHz, over the strings' own top)
+arat butbp arat, 2000, 2000
+as = as * (1 - 0.3 * abz) + arat * abz * krm * 80
+; out: bourdon left, mouche right, trompette right of centre, melody centre (alt Start = width)
+kwd = gkloopstart_alt
+ipan = (ir == 0 ? -0.7 : (ir == 1 ? 0.7 : (ir == 2 ? 0.35 : (ir == 3 ? -0.1 : 0.1))))
+kpn = 0.5 + 0.5 * ipan * kwd
+gaL = gaL + as * sqrt(1 - kpn)
+gaR = gaR + as * sqrt(kpn)
+gaSym = gaSym + as
+endin
+
+instr 30
+; ---- the body, the sympathetic strings, reverb, out
+ain, ainr inch 1, 2
+aL = gaL
+aR = gaR
+asym = gaSym
+gaL = 0
+gaR = 0
+gaSym = 0
+; the body: three wooden resonances, scaled by Window (small/bright .. large/warm)
+kbody = pow(2, (0.5 - gkwindow) * 1.2)
+aL1 butbp aL, 290 * kbody, 120 * kbody
+aL2 butbp aL, 560 * kbody, 220 * kbody
+aL3 butbp aL, 1350 * kbody, 700 * kbody
+aR1 butbp aR, 290 * kbody, 120 * kbody
+aR2 butbp aR, 560 * kbody, 220 * kbody
+aR3 butbp aR, 1350 * kbody, 700 * kbody
+aL = aL * 0.55 + (aL1 * 1.4 + aL2 * 1.1 + aL3 * 0.8)
+aR = aR * 0.55 + (aR1 * 1.4 + aR2 * 1.1 + aR3 * 0.8)
+; sympathetic strings: four, on the mode's root, third, fifth and octave above the melody's range start
+kmode = gkMode
+k3 table kmode * 8 + 2, giScale
+kfs = gkF0 * 2
+; (delay-line resonators, not streson: streson went NaN on C3 in Csound 6.09.1)
+#define SYMP(N'F) #
+ad$N. delayr 0.05
+at$N. deltapi 1 / ($F.)
+at$N. tone at$N., 5000
+delayw asym * 0.05 + at$N. * 0.995
+as$N. = at$N.
+#
+$SYMP(1'kfs)
+$SYMP(2'kfs * pow(2, k3 / 12))
+$SYMP(3'kfs * 1.4983)
+$SYMP(4'kfs * 2)
+ksy = gkoverlap * gkoverlap * 1.6
+aL = aL + (as1 + as3) * ksy
+aR = aR + (as2 + as4) * ksy
+; a faster wheel sounds brighter: a high shelf that opens as the crank passes noon
+ktl = max(0, gkWheel - 0.5) * 2.4
+aLh = aL - tone(aL, 1200)
+aRh = aR - tone(aR, 1200)
+aL = (aL + aLh * ktl) * 2.2
+aR = (aR + aRh * ktl) * 2.2
+; reverb (alt Window = size, alt Blend = amount)
+krfb = 0.6 + 0.37 * gkwindow_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc aL, aR, krfb, 9000
+aL = aL + arL * krev
+aR = aR + arR * krev
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708)
+outs tanh(ain * kdry + aL * kwet), tanh(ainr * kdry + aR * kwet)
+endin

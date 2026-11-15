@@ -1,0 +1,460 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.35
+size,0.45
+density,0.35
+window,0.15
+overlap,0.4
+blend,1
+start_alt,0.5
+size_alt,0.5
+density_alt,0.5
+window_alt,0.6
+overlap_alt,0.4
+blend_alt,0.5
+pitch_alt,0
+nebconfigend
+
+; veil.instr - a drone voice and FX: six algorithms with the same four timbre knobs, slow motion, a diffuse space
+; with shimmer (in the spirit of a multi-algorithm drone voice). NebulaePD. Designed with the owner 2026-11-15
+; (6 algorithms, Speed drifts + Reset randomises, Source processes the input, Overlap space + Record shimmer);
+; the rest is in docs/VEIL.md. MIT.
+;
+; Pitch    the note, 1V/oct (click = C2)
+; Start    OVERTONES: the timbre scan (wave shape, vowel, which harmonics, FM ratio, ring ratio, resonator stretch)
+; Size     FORMANT: where the sound's resonant peak sits (dark/large <-> bright/small)
+; Density  SPREAD: how far the voices detune from each other (a single line -> a wide swarm)
+; Window   CROSS-MOD: the voices modulate each other (FM, ring, roughness)
+; Overlap  SPACE: a diffuse stereo reverb that blurs into the drone
+; Speed    MOTION: none between the clicks; past either click overtones, formant, spread and cross-mod drift at
+;          random, faster towards the ends
+; Blend    dry input <-> veil (it loads fully clockwise)
+; Reset    randomise: a new setting nearby (all four drift targets jump), gliding there over a second or two
+; Freeze   hold: the motion and the glide stop where they are (latching, LED on)
+; Source   process the input instead of the oscillators: the same overtones, formant, spread and cross-mod, then
+;          the space (latching, LED on)
+; Record   shimmer: an octave-up feedback in the space (latching, LED on)
+; File     algorithm: 1 swarm (morphing wavetables) -> 2 choir (vowel formants) -> 3 overtone stack ->
+;          4 FM pair -> 5 ring (two groups and their product) -> 6 resonant noise
+; alt (hold Source): Start = stereo width, Size = motion depth, Density = randomise range, Window = space size,
+;   Overlap = shimmer amount, Blend = output level (+-12 dB), Speed = input gain (Nebulae's own)
+;
+; Instruments: 10 control (algorithm, motion), 21 .. 26 the algorithms (only the current one runs; a switch
+; fades the old one out), 28 the input chain (Source), 30 the space, shimmer and out.
+
+giSin ftgen 0, 0, 4096, 10, 1
+; the waves, band-limited to 48 harmonics (GEN30 from raw shapes): enough top for the formant to find at C2
+giTriR ftgen 0, 0, 4096, 7, 0, 1024, 1, 2048, -1, 1024, 0
+giSawR ftgen 0, 0, 4096, 7, 1, 4096, -1
+giSqrR ftgen 0, 0, 4096, 7, 1, 2048, 1, 0, -1, 2048, -1
+giTri ftgen 0, 0, 4096, 30, giTriR, 1, 48
+giSaw ftgen 0, 0, 4096, 30, giSawR, 1, 48
+giSqr ftgen 0, 0, 4096, 30, giSqrR, 1, 48
+giBel ftgen 0, 0, 4096, 10, 0.4, 0, 0, 1, 0, 0, 0.6, 0, 0.5, 0, 0, 0.3, 0, 0.25, 0, 0, 0.2, 0, 0, 0.15, 0, 0, 0, 0.12, 0, 0, 0, 0.1
+giWaves ftgen 0, 0, 8, -2, giSin, giTri, giSaw, giSqr, giBel, giBel, giBel, giBel
+giMorph ftgen 0, 0, 4096, 10, 1
+; vowel formants (a e i o u): F1 F2 F3, levels
+giVow ftgen 0, 0, 32, -2, 800, 1150, 2900, 400, 1600, 2700, 270, 2300, 3000, 450, 800, 2830, 325, 700, 2530, 325, 700, 2530
+gkAlg init 0
+gkT init 0.35
+gkF init 0.45
+gkS init 0.35
+gkX init 0.15
+gkF0 init 65.4
+gaVL init 0
+gaVR init 0
+gaSh init 0
+
+; the common formant: three resonances that move together (Size), mixed with the dry sound
+opcode Formant, a, ak
+ain, kf xin
+kf1 = 280 * pow(2, kf * 2.6)
+a1 butbp ain, kf1, kf1 * 0.3
+a2 butbp ain, kf1 * 2.6, kf1 * 0.7
+a3 butbp ain, kf1 * 4.3, kf1 * 1.1
+xout ain * 0.12 + a1 * 1.8 + a2 * 1.5 + a3 * 1.2
+endop
+
+; an octave up (two crossfaded delay taps sweeping down: a Doppler pitch shifter)
+opcode OctUp, a, a
+ain xin
+iwin = 0.05
+aph phasor -1 / iwin
+aph2 wrap aph + 0.5, 0, 1
+abuf delayr 0.1
+a1 deltapi aph * iwin + 0.0005
+a2 deltapi aph2 * iwin + 0.0005
+delayw ain
+xout a1 * sin(aph * 3.14159) + a2 * sin(aph2 * 3.14159)
+endop
+
+; the fade every algorithm uses: in when it's current, out (and off) when it isn't
+opcode AlgGain, k, i
+ia xin
+kg init 0
+kon = (gkAlg == ia ? 1 : 0)
+kg = kg + (kon - kg) * (1 - exp(-ksmps / (sr * 0.15)))
+xout kg
+endop
+; (the turnoff is in each algorithm, not in the opcode: a turnoff inside a user opcode crashed Csound 6.18)
+#define ALGEND(I) #
+if gkAlg != $I. && kg < 0.0005 then
+    turnoff
+endif
+#
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 21, 0, -1
+event_i "i", 28, 0, -1
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- the algorithm (File), the motion (Speed), randomise (Reset), hold (Freeze)
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkAlg = (gkAlg + 1) % 6
+    kn active 21 + gkAlg
+    if kn == 0 then
+        event "i", 21 + gkAlg, 0, -1
+    endif
+endif
+kfz = (gkfreeze > 0.5 ? 1 : 0)
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+kamp = kx * 0.4 * (0.25 + 1.5 * gkloopsize_alt)  ; alt Size = motion depth
+klo = 0.03 + 0.5 * kx
+khi = 0.06 + 1.5 * kx
+k1 rspline -1, 1, klo, khi
+k2 rspline -1, 1, klo, khi
+k3 rspline -1, 1, klo, khi
+k4 rspline -1, 1, klo, khi
+; randomise: new targets within alt Density's range, glided to over ~1.5 s
+krs trigger gkreset, 0.5, 0
+krg = 0.15 + 0.5 * gkdensity_alt
+kR1 init 0
+kR2 init 0
+kR3 init 0
+kR4 init 0
+kQ1 init 0
+kQ2 init 0
+kQ3 init 0
+kQ4 init 0
+if krs == 1 then
+    kR1 random -krg, krg
+    kR2 random -krg, krg
+    kR3 random -krg, krg
+    kR4 random -krg, krg
+endif
+km1 init 0
+km2 init 0
+km3 init 0
+km4 init 0
+if kfz == 0 then
+    kc = 1 - exp(-ksmps / (sr * 0.5))
+    kQ1 = kQ1 + (kR1 - kQ1) * kc
+    kQ2 = kQ2 + (kR2 - kQ2) * kc
+    kQ3 = kQ3 + (kR3 - kQ3) * kc
+    kQ4 = kQ4 + (kR4 - kQ4) * kc
+    kca = 1 - exp(-ksmps / (sr * 0.3))
+    km1 = km1 + (k1 * kamp - km1) * kca
+    km2 = km2 + (k2 * kamp - km2) * kca
+    km3 = km3 + (k3 * kamp - km3) * kca
+    km4 = km4 + (k4 * kamp - km4) * kca
+endif
+gkT = min(max(gkloopstart + kQ1 + km1, 0), 1)
+gkF = min(max(gkloopsize + kQ2 + km2, 0), 1)
+gkS = min(max(gkdensity + kQ3 + km3, 0), 1)
+gkX = min(max(gkwindow + kQ4 + km4, 0), 1)
+kst = (gkpitch - 0.6) * 60
+gkF0 = 65.406 * pow(2, kst / 12)
+endin
+
+instr 21
+; ---- 1 swarm: six voices on a morphing wavetable (sine > triangle > saw > square > bell: Overtones), detuned
+; (Spread, plus an octave below and above), each FM'd by the one before (Cross-mod), through the formant
+kg AlgGain 0
+$ALGEND(0)
+ftmorf gkT * 4, giWaves, giMorph
+kf0 = gkF0
+kspr = gkS * 35                                 ; cents
+kxm = gkX * gkX * 2
+aprev init 0
+#define SV(N'R'D) #
+a$N. oscili 0.2, interp(kf0 * $R. * pow(2, $D. * kspr / 1200)) * exp(aprev * kxm), giMorph
+aprev = a$N.
+#
+$SV(1'1'-1)
+$SV(2'1'-0.6)
+$SV(3'1'-0.2)
+$SV(4'1'0.2)
+$SV(5'0.5'0.6)
+$SV(6'2'1)
+kw = gkloopstart_alt
+aL = a1 + a2 * 0.8 + a3 * 0.6 + a4 * 0.4 + a5 * 0.7 + a6 * 0.3
+aR = a1 * 0.3 + a2 * 0.4 + a3 * 0.6 + a4 * 0.8 + a5 * 0.7 + a6
+aM = (aL + aR) * 0.5
+aL = aM + (aL - aM) * kw
+aR = aM + (aR - aM) * kw
+aL Formant aL, gkF
+aR Formant aR, gkF
+gaVL = gaVL + aL * kg * 1.6
+gaVR = gaVR + aR * kg * 1.6
+endin
+
+instr 22
+; ---- 2 choir: four buzzing voices (saw) through a five-band vowel filter. Overtones = the vowel (a e i o u),
+; Formant = the voice size (formants shifted), Spread = detune, Cross-mod = roughness (a shaking fundamental)
+kg AlgGain 1
+$ALGEND(1)
+kf0 = gkF0
+kspr = gkS * 30
+kjit = gkX * gkX * 0.04
+kj1 randi kjit, 37
+kj2 randi kjit, 41
+kj3 randi kjit, 29
+kj4 randi kjit, 47
+a1 vco2 0.25, kf0 * pow(2, -kspr / 1200) * (1 + kj1)
+a2 vco2 0.25, kf0 * pow(2, kspr * 0.4 / 1200) * (1 + kj2)
+a3 vco2 0.25, kf0 * 2 * pow(2, -kspr * 0.6 / 1200) * (1 + kj3)
+a4 vco2 0.25, kf0 * pow(2, kspr / 1200) * (1 + kj4)
+; the vowel: interpolate between the five
+kv = gkT * 3.999
+ki = int(kv)
+kfr = kv - ki
+kshift = pow(2, (gkF - 0.5) * 1.2)
+kfa1 table ki * 3, giVow
+kfa2 table ki * 3 + 1, giVow
+kfa3 table ki * 3 + 2, giVow
+kfb1 table ki * 3 + 3, giVow
+kfb2 table ki * 3 + 4, giVow
+kfb3 table ki * 3 + 5, giVow
+kF1 = (kfa1 + (kfb1 - kfa1) * kfr) * kshift
+kF2 = (kfa2 + (kfb2 - kfa2) * kfr) * kshift
+kF3 = (kfa3 + (kfb3 - kfa3) * kfr) * kshift
+aL = a1 + a3 * 0.7 + a2 * 0.4
+aR = a4 + a2 * 0.7 + a3 * 0.4
+#define VOW(C) #
+a$C.1 reson a$C., kF1, kF1 * 0.12, 1
+a$C.2 reson a$C., kF2, kF2 * 0.1, 1
+a$C.3 reson a$C., kF3, kF3 * 0.08, 1
+a$C.4 reson a$C., kF3 * 1.25, 300, 1
+a$C. = a$C.1 * 3 + a$C.2 * 1.6 + a$C.3 * 0.9 + a$C.4 * 0.5
+#
+$VOW(L)
+$VOW(R)
+kw = gkloopstart_alt
+aM = (aL + aR) * 0.5
+aL = aM + (aL - aM) * kw
+aR = aM + (aR - aM) * kw
+gaVL = gaVL + aL * kg * 0.9
+gaVR = gaVR + aR * kg * 0.9
+endin
+
+instr 23
+; ---- 3 overtone stack: sines shaped by a Chebyshev polynomial, so each harmonic's level is set exactly.
+; Overtones = which harmonics (a bump scanning from the 1st to the 10th), Formant = a peak at a fixed frequency
+; that the harmonics pass through, Spread = three detuned stacks, Cross-mod = ring modulation between stacks
+kg AlgGain 2
+$ALGEND(2)
+kf0 = gkF0
+kh = 1 + gkT * 9                                ; the centre harmonic
+kff = 200 * pow(2, gkF * 5)                     ; the formant: 200 Hz .. 6.4 kHz
+#define HC(N) #
+kc$N. = exp(-(($N. - kh) * ($N. - kh)) / 3) * (0.35 + 0.65 * exp(-pow(log($N. * kf0 / kff), 2) * 1.5))
+#
+$HC(1)
+$HC(2)
+$HC(3)
+$HC(4)
+$HC(5)
+$HC(6)
+$HC(7)
+$HC(8)
+$HC(9)
+$HC(10)
+ksum = kc1 + kc2 + kc3 + kc4 + kc5 + kc6 + kc7 + kc8 + kc9 + kc10
+kn = 0.5 / max(ksum, 0.3)
+kspr = gkS * 25
+as1 oscili 1, kf0 * pow(2, -kspr / 1200), giSin
+as2 oscili 1, kf0, giSin
+as3 oscili 1, kf0 * pow(2, kspr / 1200), giSin
+ac1 chebyshevpoly as1, 0, kc1, kc2, kc3, kc4, kc5, kc6, kc7, kc8, kc9, kc10
+ac2 chebyshevpoly as2, 0, kc1, kc2, kc3, kc4, kc5, kc6, kc7, kc8, kc9, kc10
+ac3 chebyshevpoly as3, 0, kc1, kc2, kc3, kc4, kc5, kc6, kc7, kc8, kc9, kc10
+kxm = gkX
+ar1 = ac1 * ac2 * 2
+ar2 = ac2 * ac3 * 2
+aL = ((ac1 + ac2 * 0.6) * (1 - kxm) + ar1 * kxm) * kn
+aR = ((ac3 + ac2 * 0.6) * (1 - kxm) + ar2 * kxm) * kn
+kw = gkloopstart_alt
+aM = (aL + aR) * 0.5
+aL = aM + (aL - aM) * kw
+aR = aM + (aR - aM) * kw
+gaVL = gaVL + aL * kg
+gaVR = gaVR + aR * kg
+endin
+
+instr 24
+; ---- 4 FM pair: four detuned carrier/modulator pairs. Overtones = the ratio (scanning 0.5 .. 7, through
+; inharmonic places), Cross-mod = the FM index, Spread = detune, through the formant
+kg AlgGain 3
+$ALGEND(3)
+kf0 = gkF0
+krat = 0.5 + gkT * gkT * 6.5
+kidx = 0.3 + gkX * 7
+kspr = gkS * 30
+#define FMV(N'D) #
+kfc$N. = kf0 * pow(2, $D. * kspr / 1200)
+am$N. oscili kfc$N. * krat * kidx, kfc$N. * krat, giSin
+a$N. oscili 0.22, kfc$N. + am$N., giSin
+#
+$FMV(1'-1)
+$FMV(2'-0.33)
+$FMV(3'0.33)
+$FMV(4'1)
+aL = a1 + a2 * 0.7 + a3 * 0.3
+aR = a4 + a3 * 0.7 + a2 * 0.3
+kw = gkloopstart_alt
+aM = (aL + aR) * 0.5
+aL = aM + (aL - aM) * kw
+aR = aM + (aR - aM) * kw
+aL Formant aL, gkF
+aR Formant aR, gkF
+gaVL = gaVL + aL * kg * 2.5
+gaVR = gaVR + aR * kg * 2.5
+endin
+
+instr 25
+; ---- 5 ring: group A on the note, group B at a ratio (Overtones: 1 .. 4, gliding through the in-betweens), and
+; their product (Cross-mod = how much ring), Spread = detune within each group, through the formant
+kg AlgGain 4
+$ALGEND(4)
+kf0 = gkF0
+krat = 1 + gkT * 3
+kspr = gkS * 30
+aa1 vco2 0.2, kf0 * pow(2, -kspr / 1200)
+aa2 vco2 0.2, kf0 * pow(2, kspr / 1200)
+ab1 vco2 0.2, kf0 * krat * pow(2, kspr * 0.5 / 1200), 10
+ab2 vco2 0.2, kf0 * krat * pow(2, -kspr * 0.5 / 1200), 10
+aA = aa1 + aa2
+aB = ab1 + ab2
+aring = aA * aB * 4
+kxm = gkX
+aL = (aA + aB * 0.5) * (1 - kxm) + aring * kxm
+aR = (aA * 0.5 + aB) * (1 - kxm) + aring * kxm
+kw = gkloopstart_alt
+aM = (aL + aR) * 0.5
+aL = aM + (aL - aM) * kw
+aR = aM + (aR - aM) * kw
+aL Formant aL, gkF
+aR Formant aR, gkF
+gaVL = gaVL + aL * kg * 0.8
+gaVR = gaVR + aR * kg * 0.8
+endin
+
+instr 26
+; ---- 6 resonant noise: noise through six tuned resonators per channel. Overtones = their spacing (harmonic ->
+; stretched, bell-like), Formant = which of them ring loudest, Spread = left/right detune (slow beating),
+; Cross-mod = the noise turned crackly (sparse impulses)
+kg AlgGain 5
+$ALGEND(5)
+kf0 = gkF0
+kst = 1 + gkT * 0.6                             ; harmonic n at n ^ kst
+kff = 150 * pow(2, gkF * 5.5)
+kdet = pow(2, gkS * 25 / 1200)
+an noise 0.3, 0
+kxm = gkX
+akr dust 1, 20 + 3000 * (1 - kxm)              ; crackle: sparse impulses (dust: a-rate in 6.11; dust2 is k only)
+aex = an * (1 - kxm) + akr * kxm * 0.6
+#define RZ(N) #
+kfr$N. = min(kf0 * pow($N., kst), 15000)
+kgr$N. = 0.25 + 0.75 * exp(-pow(log(kfr$N. / kff), 2) * 1.2)
+aL$N. reson aex, kfr$N., kfr$N. * 0.004 + 1, 2
+aR$N. reson aex, kfr$N. * kdet, kfr$N. * 0.004 + 1, 2
+#
+$RZ(1)
+$RZ(2)
+$RZ(3)
+$RZ(4)
+$RZ(5)
+$RZ(6)
+aL = (aL1 * kgr1 + aL2 * kgr2 + aL3 * kgr3 + aL4 * kgr4 + aL5 * kgr5 + aL6 * kgr6) * 0.6
+aR = (aR1 * kgr1 + aR2 * kgr2 + aR3 * kgr3 + aR4 * kgr4 + aR5 * kgr5 + aR6 * kgr6) * 0.6
+kw = gkloopstart_alt
+aM = (aL + aR) * 0.5
+aL = aM + (aL - aM) * kw
+aR = aM + (aR - aM) * kw
+gaVL = gaVL + aL * kg
+gaVR = gaVR + aR * kg
+endin
+
+instr 28
+; ---- Source: the input through the same four knobs: overtones (waveshaping), formant, spread (two chorus
+; copies), cross-mod (ring modulation with a sine on the note)
+ksrc portk (gksource > 0.5 ? 1 : 0), 0.15
+ain, ainr inch 1, 2
+kdrv = 1 + gkT * 10
+aL = tanh(ain * kdrv) / sqrt(kdrv)
+aR = tanh(ainr * kdrv) / sqrt(kdrv)
+kdp = gkS * 0.008
+alf1 oscili 1, 0.31, giSin
+alf2 oscili 1, 0.47, giSin
+abL delayr 0.05
+ac1 deltapi 0.012 + kdp * (1 + alf1)
+delayw aL
+abR delayr 0.05
+ac2 deltapi 0.012 + kdp * (1 + alf2)
+delayw aR
+aL = aL + ac1 * gkS
+aR = aR + ac2 * gkS
+arg oscili 1, gkF0 * 2, giSin
+aL = aL * (1 - gkX) + aL * arg * gkX
+aR = aR * (1 - gkX) + aR * arg * gkX
+aL Formant aL, gkF
+aR Formant aR, gkF
+gaVL = gaVL * (1 - ksrc) + aL * ksrc * 0.8
+gaVR = gaVR * (1 - ksrc) + aR * ksrc * 0.8
+endin
+
+instr 30
+; ---- the space (Overlap; alt Window = size), shimmer (Record; alt Overlap = amount), level, dry/wet
+ain, ainr inch 1, 2
+aL dcblock gaVL, 0.9995                         ; (the default 0.99 is a 76 Hz high-pass)
+aR dcblock gaVR, 0.9995
+gaVL = 0
+gaVR = 0
+ksh portk (gkrecord > 0.5 ? 1 : 0), 0.1
+kshm = ksh * (0.25 + 0.5 * gkoverlap_alt)
+ash = gaSh
+aiL = aL + ash * kshm
+aiR = aR + ash * kshm
+; diffusion before the reverb: two allpasses per side
+ad1 alpass aiL, 0.4, 0.0133
+ad1 alpass ad1, 0.4, 0.0237
+ad2 alpass aiR, 0.4, 0.0151
+ad2 alpass ad2, 0.4, 0.0211
+krfb = 0.75 + 0.23 * gkwindow_alt
+arL, arR reverbsc ad1, ad2, krfb, 9000
+aup OctUp (arL + arR) * 0.5
+gaSh tone aup, 6000
+ksp = gkoverlap
+aL = aL * (1 - ksp * 0.6) + arL * ksp * 1.4
+aR = aR * (1 - ksp * 0.6) + arR * ksp * 1.4
+ktrim = 1.4 * pow(2, (gkblend_alt - 0.5) * 4)
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708) * ktrim
+outs tanh(ain * kdry + aL * kwet), tanh(ainr * kdry + aR * kwet)
+endin

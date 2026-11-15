@@ -1,0 +1,216 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.5
+size,0.6
+density,0
+window,0.4
+overlap,0
+blend,1
+start_alt,0.5
+size_alt,0.3
+density_alt,0
+window_alt,0.5
+overlap_alt,0
+blend_alt,0.5
+pitch_alt,0
+nebconfigend
+
+; register.instr - noise from a shift register clocked by Pitch, through a resonant low-pass: from pitched hiss
+; down to stepped, locked patterns (in the spirit of a shift-register noise synth). NebulaePD. Designed with the
+; owner 2026-11-15 (Freeze locks the pattern, Source lets the register drive the filter, Pitch = the clock with
+; Reset as an external clock); the rest is in docs/REGISTER.md. MIT.
+;
+; Pitch    the clock, 1V/oct. The range is on File: noise (click = 4186 Hz) -> tone (/16, click = 262 Hz) ->
+;          pattern (/256, click = 16 Hz); at most 24 kHz
+; Start    the register's length: 2 .. 24 bits. Short = a short repeating cycle (a pitched buzz at noise/tone
+;          range), long = noise
+; Overlap  chance: how often a fed-back bit is flipped at random (0 = the register's own, repeating sequence)
+; Density  divide: the raw bits -> /2 -> /4 -> /8 (chunkier, lower, more rhythmic)
+; Size     the filter's cutoff (40 Hz .. 16 kHz)
+; Window   resonance, up to whistling self-oscillation
+; Speed    motion: none between the clicks; clockwise the clock and cutoff wander smoothly, anticlockwise they
+;          jump in steps; faster towards the ends (alt Window = depth)
+; Blend    dry input <-> register (it loads fully clockwise)
+; Freeze   lock: no new bits, the register just turns, so its current pattern loops (length = Start)
+;          (latching, LED on)
+; Reset    an external clock: each gate steps the register; Pitch's clock takes over 2 s after the last gate
+; Source   the register drives the filter too: its value steps the cutoff (sequenced sweeps) (latching, LED on)
+;          alt Start = how far
+; Record   stereo: the right channel gets a register of its own (latching, LED on)
+; File     clock range: noise -> tone -> pattern
+; alt (hold Source): Start = filter steps depth, Size = drive into the filter, Window = motion depth,
+;   Blend = output level (+-12 dB), Speed = input gain (Nebulae's own)
+;
+; Instruments: 10 control (range, motion, external clock), 20 the registers and filters, 30 out.
+
+; feedback taps per length (2 .. 32: a maximal-length set for each, 0 = unused)
+giTap ftgen 0, 0, 256, -2, 0,0,0,0, 0,0,0,0, 2,1,0,0, 3,2,0,0, 4,3,0,0, 5,3,0,0, 6,5,0,0, 7,6,0,0, 8,6,5,4,\
+ 9,5,0,0, 10,7,0,0, 11,9,0,0, 12,6,4,1, 13,4,3,1, 14,5,3,1, 15,14,0,0, 16,15,13,4, 17,14,0,0, 18,11,0,0,\
+ 19,6,2,1, 20,17,0,0, 21,19,0,0, 22,21,0,0, 23,18,0,0, 24,23,22,17, 25,22,0,0, 26,6,2,1, 27,5,2,1, 28,25,0,0,\
+ 29,27,0,0, 30,6,4,1, 31,28,0,0, 32,22,2,1
+gkClk init 4186
+gkExt init 0
+gkUseExt init 0
+gkCut init 2000
+
+; one register, stepped sample by sample. In: the clock, the external step, its switch, the length, the chance,
+; the lock, the three extra taps (looked up outside, once per block), the four divider weights. Out: the bits
+; (raw, /2, /4, /8 crossfaded) as +-1, and the register's low 8 bits as a 0..1 value (the "DAC")
+opcode Reg, aa, kkkkkkkkkkkkki
+kfreq, kext, kuse, klen, kchance, klock, kt2, kt3, kt4, kw0, kw1, kw2, kw3, iseed xin
+setksmps 1
+kreg init iseed
+kph init 0
+kout init 0
+kd1 init 0
+kd2 init 0
+kd3 init 0
+kpe init 0
+kval init 0
+kdac init 0
+kstep = 0
+if kuse == 0 then
+    kph = kph + kfreq / sr
+    if kph >= 1 then
+        kph = kph - int(kph)
+        kstep = 1
+    endif
+elseif kext == 1 && kpe == 0 then
+    kstep = 1                                   ; (one step per gate: its block's flag, on the first sample)
+endif
+kpe = kext
+if kstep == 1 then
+    kold = kout
+    kout = (kreg >> (klen - 1)) & 1
+    if klock == 1 then
+        knew = kout                             ; locked: the register just turns
+    else
+        knew = kout
+        knew = (kt2 > 0 ? knew # ((kreg >> (kt2 - 1)) & 1) : knew)
+        knew = (kt3 > 0 ? knew # ((kreg >> (kt3 - 1)) & 1) : knew)
+        knew = (kt4 > 0 ? knew # ((kreg >> (kt4 - 1)) & 1) : knew)
+        if kchance > 0 then
+            krn random 0, 1
+            knew = (krn < kchance ? 1 - knew : knew)
+        endif
+    endif
+    kreg = ((kreg << 1) | knew) & ((1 << klen) - 1)
+    kreg = (kreg == 0 ? 1 : kreg)
+    if kout == 1 && kold == 0 then
+        kd1 = 1 - kd1
+        if kd1 == 1 then
+            kd2 = 1 - kd2
+            if kd2 == 1 then
+                kd3 = 1 - kd3
+            endif
+        endif
+    endif
+    kval = (kout * kw0 + kd1 * kw1 + kd2 * kw2 + kd3 * kw3) * 2 - (kw0 + kw1 + kw2 + kw3)
+    kdac = (kreg & 255) / 255
+endif
+xout a(kval), a(kdac)                           ; (worked out only on a step: the rest of the time it holds)
+endop
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20, 0, -1
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- the clock: Pitch x the range (File), the motion (Speed), the external clock (Reset)
+krng init 0
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    krng = (krng + 1) % 3
+endif
+kdiv = (krng == 0 ? 1 : (krng == 1 ? 1 / 16 : 1 / 256))
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+kdep = kx * (0.3 + 1.4 * gkwindow_alt)
+krt = 0.1 + 6 * kx
+ks1 rspline -1, 1, krt * 0.5, krt
+ks2 rspline -1, 1, krt * 0.5, krt
+kh1 randh 1, krt
+kh2 randh 1, krt
+km1 = (kd > 0 ? ks1 : kh1) * kdep
+km2 = (kd > 0 ? ks2 : kh2) * kdep
+kst = (gkpitch - 0.6) * 60 + km1 * 12          ; motion: the clock +-1 octave at full depth
+gkClk = min(4186 * pow(2, kst / 12) * kdiv, sr / 2)   ; (above 24 kHz it would sound the same, at more CPU)
+gkCut = 40 * pow(400, min(max(gkloopsize + km2 * 0.25, 0), 1))   ; 40 Hz .. 16 kHz
+; the external clock: Reset gates step the register; Pitch takes over 2 s after the last
+kt timeinsts
+kclk trigger gkreset, 0.5, 0
+klast init -10
+if kclk == 1 then
+    klast = kt
+endif
+gkExt = kclk
+gkUseExt = (kt - klast < 2 ? 1 : 0)
+endin
+
+instr 20
+; ---- the registers (left, and right when Record is on), divided, filtered
+; (24 bits at most: Csound's bit operations are 32-bit, and 1 << 32 wrapped round to a mask of 0)
+klen = int(2 + 22 * pow(min(max(gkloopstart, 0), 1), 1.5) + 0.5)
+kch = gkoverlap * 0.5
+klk = (gkfreeze > 0.5 ? 1 : 0)
+kt2 table klen * 4 + 1, giTap
+kt3 table klen * 4 + 2, giTap
+kt4 table klen * 4 + 3, giTap
+; divide: raw -> /2 -> /4 -> /8, crossfaded by Density
+kx3 = min(max(gkdensity, 0), 1) * 3
+kw0 = max(0, 1 - kx3)
+kw1 = (kx3 < 1 ? kx3 : max(0, 2 - kx3))
+kw2 = (kx3 < 1 ? 0 : (kx3 < 2 ? kx3 - 1 : 3 - kx3))
+kw3 = max(0, kx3 - 2)
+aL, adL Reg gkClk, gkExt, gkUseExt, klen, kch, klk, kt2, kt3, kt4, kw0, kw1, kw2, kw3, 1
+kst portk (gkrecord > 0.5 ? 1 : 0), 0.02
+if kst > 0.0001 then                            ; (the second register only runs in stereo)
+    aR, adR Reg gkClk, gkExt, gkUseExt, klen, kch, klk, kt2, kt3, kt4, kw0, kw1, kw2, kw3, 2731
+else
+    aR = aL
+    adR = adL
+endif
+aR = aL * (1 - kst) + aR * kst
+adR = adL * (1 - kst) + adR * kst
+; the filter: an MS-20-style (Korg 35) low-pass, nonlinear; Source = the register's value steps the cutoff
+ksrc portk (gksource > 0.5 ? 1 : 0), 0.02
+kmd = gkloopstart_alt * 4 * ksrc                ; octaves
+acL = gkCut * exp((adL - 0.5) * kmd * 0.6931472)
+acR = gkCut * exp((adR - 0.5) * kmd * 0.6931472)
+acL limit acL, 20, 18000
+acR limit acR, 20, 18000
+; (resonance: Q up to just short of self-oscillation; the drive backs off as it rises, or the hot +-1 bits
+; push the nonlinear filter into squashing its own peak)
+kq = 1 + 8.9 * pow(gkwindow, 0.8)
+kdrv = (0.4 + 2 * gkloopsize_alt) * (1 - 0.7 * gkwindow)
+afL K35_lpf aL * kdrv * 0.5, acL, kq, 1, 1.5
+afR K35_lpf aR * kdrv * 0.5, acR, kq, 1, 1.5
+gaL = afL
+gaR = afR
+endin
+
+gaL init 0
+gaR init 0
+
+instr 30
+ain, ainr inch 1, 2
+aL dcblock gaL, 0.9995                          ; (the default 0.99 is a 76 Hz high-pass)
+aR dcblock gaR, 0.9995
+ktrim = 0.9 * pow(2, (gkblend_alt - 0.5) * 4)
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708) * ktrim
+outs tanh(ain * kdry + aL * kwet), tanh(ainr * kdry + aR * kwet)
+endin

@@ -4,7 +4,7 @@ A Csound drone of up to eight singing voices. Each voice has its own slight detu
 sing through one set of vowel formants, so the whole choir moves from "ah" through "eh", "ee", "oh" to "oo" as
 you turn Start. Press Source and the choir splits onto a chord; Reset steps through the chords.
 
-It's in the **Csound user bank** as `011_chorale` (yellow page, Record button).
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

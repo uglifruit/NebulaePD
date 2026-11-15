@@ -4,7 +4,7 @@ A SuperCollider instrument that writes and plays its own music: four voices (a p
 a noise hat), each with its own rhythm, the pitched ones walking a scale. Clock it from Reset and it plays in time;
 leave it alone and it runs at its own tempo. Patterns slowly mutate, can be locked, and come back home.
 
-It's in the **SuperCollider bank** as `05_sc_pattern` (white page, Freeze button). Expect 5–10 s of silence while
+**Bank:** SuperCollider (the page and button are in `nebulae_banks.txt` on the stick). Expect 5–10 s of silence while
 SuperCollider starts.
 
 ## Panel map

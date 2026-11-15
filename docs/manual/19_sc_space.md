@@ -5,7 +5,7 @@ wash), then into a long, lush reverb, from a small room to a minute of tail. Fre
 as you like, Duck makes it dip while you play and swell in the gaps, Shimmer adds an octave above, and Reset
 clears the tails in a moment.
 
-It's in the **SuperCollider bank** as `08_sc_space` (orange page, Source button).
+**Bank:** SuperCollider (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

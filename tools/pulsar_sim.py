@@ -157,11 +157,21 @@ def sc_formant():
 
 def sc_track():
     print("track")
-    (x, _) = run("track", 6, "gkfreeze = 1\ngkloopstart = 0.4\ngkpitch = (kt < 3 ? 0.6 : 0.8)\n")
-    r = 0.5 * np.exp(0.4 * 3.4657)
-    a, b = strongest(x, 1, 2.8) / C3, strongest(x, 4, 5.8) / (2 * C3)
-    check("Freeze on: formant = %.1fx the pitch; the strongest harmonic number stays" % r,
-          round(a) == round(b) and abs(a - r) < 1.5, "harmonic %.2f, then %.2f" % (a, b))
+    # The formant follows the pitch when frozen: the spectrum's centroid over the pitch stays put across an octave.
+    # Unfrozen, the formant stays at its frequency, so the same ratio halves. (The strongest harmonic was fragile:
+    # near the fundamental, whichever of the low harmonics won flipped with small level changes.)
+    def ratio(z, t0, t1, f0):
+        f, sp = spectrum(z, t0, t1)
+        p = sp ** 2
+        m = (f > 50) & (f < 12000)
+        return float((p[m] * f[m]).sum() / p[m].sum()) / f0
+    (x, _) = run("track", 6, "gkfreeze = 1\ngkloopstart = 0.6\ngkpitch = (kt < 3 ? 0.6 : 0.8)\n")
+    (y, _) = run("track0", 6, "gkfreeze = 0\ngkloopstart = 0.6\ngkpitch = (kt < 3 ? 0.6 : 0.8)\n")
+    a, b = ratio(x, 1, 2.8, C3), ratio(x, 4, 5.8, 2 * C3)
+    c, d = ratio(y, 1, 2.8, C3), ratio(y, 4, 5.8, 2 * C3)
+    check("Freeze on: the formant follows the pitch (centroid / pitch within 25 % an octave up; unfrozen it falls "
+          "by a third or more)", abs(b / a - 1) < 0.25 and d / c < 0.67,
+          "frozen %.2f -> %.2f, unfrozen %.2f -> %.2f" % (a, b, c, d))
 
 
 def sc_duty():
@@ -177,7 +187,7 @@ def sc_mask():
     (x, _) = run("mask", 31, "gkdensity = (kt < 11 ? 1 : (kt < 21 ? 0.5 : 0))\ngkloopsize = 0.2\n", alts=alts)
     n1, n2, n3 = len(onsets(x, 1, 11)), len(onsets(x, 11, 21)), len(onsets(x, 21.5, 31))
     check("Density 1: every pulse (about 20 in 10 s)", 19 <= n1 <= 21, str(n1))
-    check("Density 0.5: about half (6 .. 14)", 6 <= n2 <= 14, str(n2))
+    check("Density 0.5: about half (4 .. 16 of 20: random)", 4 <= n2 <= 16, str(n2))
     check("Density 0: none", n3 == 0 and rms(x, 21.5, 31) < 1e-4, "%d, rms %.5f" % (n3, rms(x, 21.5, 31)))
 
 

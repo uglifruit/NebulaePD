@@ -35,18 +35,37 @@ file brings the status up to date and gives you the build queue.
 - **radiate** (Csound, `instr/radiate.instr`, 2026-11-15): the owner asked "how plausible would be a version of
   QPAS?", then "Lets do it"; 7 design questions (all recommended). A stereo four-peak filter: tested 30/30 + 6.09,
   awaiting hardware; decisions in docs/RADIATE.md. On the stick as `012_radiate` (Csound user, yellow, Record).
+- **Round 4 (2026-11-15, the owner: a hurdy-gurdy, "something that feels like the Lyra 8", "something that sounds
+  like the droning Vhikk X" with "knobs to turn that change formants, overtones ... some degree of motion", and
+  "something noise based, like the Hikari Monos"):** 15 design questions (all recommended), then built: **gurdy**
+  (013), **plates** (014), **veil** (015), **register** (016), all Csound, all tested offline + 6.09, awaiting
+  hardware; decisions in docs/GURDY.md, PLATES.md, VEIL.md, REGISTER.md.
+  - Found on the way: `streson` goes NaN on some frequencies in 6.09 (delay-line resonators instead); `squinewave`
+    isn't in 6.09; an i-rate `if` around audio code left it silent (use per-instance multipliers); a `turnoff` in a
+    user opcode crashed 6.18; a-rate conditions can't go in `?:`; Csound's bit operations are 32-bit (`1 << 32`
+    wraps); the module's opcode names carry type suffixes (`oscili.a`), so scan with them; `wgbow` runs ~0.84
+    samples sharp.
+- **2026-11-15, after round 4:** `dcblock`'s default gain (0.99) is a 76 Hz high-pass, which thinned every drone's
+  fundamental. Every instrument now uses 0.9995 (4 Hz): gurdy, plates, veil, register, radiate, tanpura, pulsar.
+  All suites rerun and pass (7 x 6.18 + 6.09). **Recopy `009_pulsar`, `010_tanpura` and `012_radiate` to the stick**
+  with the four new ones (`firmware/dist/stage_*`), then regenerate the manifest from D:.
+- **The manual, 2026-11-15 (owner: no positions in it, same info for every instrument, printing it):** the stick
+  map lost its position table (positions live only in `nebulae_banks.txt`); every guide says only its bank. New
+  guides in the same shape for the factory five (`00_t*`, from their code), the community instruments (Durm, Plasma
+  Membrane, ReconetC!, Rhythmic Chords, AVALON, Bowed Drone, Mars Affects, Realms: from their authors' manuals) and
+  sc_drift/strike/cloud. Printed builds drop the owner ODT's old SC README tail (`tools/manual_odt.py`). 93 pages.
 - **The stick, sorted 2026-11-15 (owner's picks):** every instrument built so far is on it, checked byte for byte
   against the repo. Positions: `manifest.txt` (= `D:
 ebulae_banks.txt`) and `docs/manual/00_stick.md`. Taken off
   (copies in `firmware/dist/stick_removed_2026-11-15/`, sources in the repo): `001_a_granular_looper_Factory_Default`
-  (Qu-Bit's older release, md5 c20d4f85…; see `docs/manual/05_granular_looper.md`), `bt_test`, `01_sctest`,
+  (Qu-Bit's older release, md5 c20d4f85…; see `docs/manual/00_t1_granularlooper.md`), `bt_test`, `01_sctest`,
   `ZZ_pitchlog`, `31-simple`, and the leftovers `neb_candidate.tgz` + manifest, `list.txt`, a Windows shortcut.
   Kept: `999_fw_backup`, `bt_storyteller` + `bt_keyboard/`, `sc_runtime.tgz`, `csound_plugins/`, `neb_fwbackup/`
   (the revert package). The newest manual PDF is on the stick. New builds from here: copy straight to D: when it
   is plugged in, regenerate the manifest from D:, and update the stick map.
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
   `docs/MORPH.md`, `docs/SCAN.md`, `docs/SC_FOLLOW.md`, `docs/SC_MOSAIC.md`, `docs/SHIFT.md`, `docs/PULSAR.md`,
-  `docs/SC_SPACE.md`, `docs/SC_SWARM.md`, `docs/PARTIALS.md`, `docs/TANPURA.md`, `docs/CHORALE.md`, `docs/RADIATE.md` (each lists the
+  `docs/SC_SPACE.md`, `docs/SC_SWARM.md`, `docs/PARTIALS.md`, `docs/TANPURA.md`, `docs/CHORALE.md`, `docs/RADIATE.md`, `docs/GURDY.md`, `docs/PLATES.md`, `docs/VEIL.md`, `docs/REGISTER.md` (each lists the
   alternatives). Their Python builders/instruments make changes
   cheap.
 - **sc_pattern** (SC, `sc/05_sc_pattern.scd`) built 2026-11-14 after a 4-question walk-through, details auto

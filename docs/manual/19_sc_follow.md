@@ -4,7 +4,7 @@ A SuperCollider instrument that listens to what you play into it, a voice, a bas
 It tracks the pitch, works out the key, and adds a harmony in that key: a third above, a sixth below, whatever
 you set. Held under your notes, or arpeggiated in time with the beat it hears (or with your clock).
 
-It's in the **SuperCollider bank** as `06_sc_follow` (orange page, Record button). Expect 5–10 s of silence while
+**Bank:** SuperCollider (the page and button are in `nebulae_banks.txt` on the stick). Expect 5–10 s of silence while
 SuperCollider starts.
 
 ## Panel map

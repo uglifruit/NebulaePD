@@ -4,7 +4,7 @@ A SuperCollider drone. 32 oscillators sit around one note, each wandering on its
 they beat and shimmer; spread out they become a cluster; press Source and they gather onto a chord. Nothing
 repeats, so it can run for hours.
 
-It's in the **SuperCollider bank** as `09_sc_swarm` (orange page, Reset button).
+**Bank:** SuperCollider (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

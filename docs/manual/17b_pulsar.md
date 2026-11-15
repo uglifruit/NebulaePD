@@ -6,7 +6,7 @@ play notes, the way a vowel does, so the voice sounds like a resonant buzz or a 
 oscillator. Shorten the grains for a thin, bright buzz; drop pulses at random for a broken, crackling tone; take
 the pitch far down and the pulses become a rhythm.
 
-It's in the **Csound user bank** as `009_pulsar` (orange page, Reset button).
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

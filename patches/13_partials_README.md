@@ -4,7 +4,7 @@ A Pure Data drone made of 16 sine waves, the partials of one note. You sculpt wh
 they are, stretch them from an organ into bells and metal, and let each one's level drift on its own, so the tone
 keeps slowly changing colour. Reset deals a new random mix of partial levels and glides to it.
 
-It's in the **Pd bank** as `O_partials` (yellow page, Freeze button), file `13_partials.pd` in the repo.
+**Bank:** Pd (the page and button are in `nebulae_banks.txt` on the stick). Repo file: `13_partials.pd`.
 
 ## Panel map
 ```

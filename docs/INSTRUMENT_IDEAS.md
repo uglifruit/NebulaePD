@@ -55,6 +55,10 @@ with incoming audio". They picked the first four.
 | ★ | **chorale**: **built 2026-11-15** (`instr/chorale.instr`, docs/CHORALE.md) | A choir drone singing vowels; chords on Source | Csound / M |
 | ★ | **swarm**: **built 2026-11-14** (`sc/09_sc_swarm.scd`, docs/SC_SWARM.md) | 32 drifting detuned oscillators; gathers onto chords | SC / S |
 | ★ | **radiate**: **built 2026-11-15** (`instr/radiate.instr`, docs/RADIATE.md; the owner's own idea, after QPAS) | A stereo filter of four resonant peaks: Radiate, shapes, smile, self-oscillation, pings, FM from the right input | Csound / M |
+| ★ | **gurdy**: **built 2026-11-15** (`instr/gurdy.instr`, docs/GURDY.md; the owner's idea) | A hurdy-gurdy: bowed drones, crank on Speed, melody on Start, the buzzing dog | Csound / M |
+| ★ | **plates**: **built 2026-11-15** (`instr/plates.instr`, docs/PLATES.md; after the Lyra-8) | Eight voices in pairs, touched in on buttons/gates, neighbour FM, hyper LFO, delay, distortion | Csound / M |
+| ★ | **veil**: **built 2026-11-15** (`instr/veil.instr`, docs/VEIL.md; after the Vhikk X) | Six drone algorithms on the same overtone/formant/spread/cross-mod knobs, drift, randomise, space, shimmer | Csound / M-L |
+| ★ | **register**: **built 2026-11-15** (`instr/register.instr`, docs/REGISTER.md; after the Hikari Monos) | Shift-register noise clocked by Pitch, locked loops, dividers, a Korg 35 filter the register can step | Csound / M |
 | | **spiral** | An endless rising/falling Shepard–Risset drone | Pd / S |
 | | **accrete** | Each note you play is caught as a frozen spectrum and layered in: a drone that builds from your playing (recommended next) | SC or Pd / M |
 | | **memory** | Tracks the pitches you play; the most-played become a slowly gathering drone chord | SC / M |

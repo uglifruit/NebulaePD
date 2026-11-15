@@ -198,13 +198,43 @@ def strip_generated(content):
     return content
 
 
-def build(src, out, sections):
+# The owner's document ends with an older copy of sc/README.md (SC tables only, listing patches since taken off the
+# stick). Printed builds stop the owner's part just before it: the SC instruments have full guides in our sections
+# (18a-19). The owner's own file is never cut (--into-owner keeps it).
+OWNER_TAIL_FROM = "SuperCollider instruments for the Nebulae (uf2)"
+
+
+def drop_owner_tail(content):
+    """Cut from the top-level element (a child of office:text) that holds the heading to the end of the text.
+    (The heading sits inside a list header, so cutting at the heading itself left the list unclosed.)"""
+    i = content.find(OWNER_TAIL_FROM)
+    if i < 0:
+        return content
+    body = re.search(r"<office:text[^>]*>", content).end()
+    stack = []
+    for m in re.finditer(r"<(/?)([\w:.-]+)[^>]*?(/?)>", content[body:i]):
+        if m.group(3):                                  # <x/>: empty, no depth
+            continue
+        if m.group(1):
+            stack.pop()
+        else:
+            stack.append(body + m.start())
+    if not stack:
+        sys.exit("drop_owner_tail: the SC section's enclosing element wasn't found")
+    start = stack[0]
+    end = content.rindex("</office:text>")
+    return content[:start] + content[end:]
+
+
+def build(src, out, sections, keep_owner_tail=False):
     files = sorted(f for f in os.listdir(sections) if f.endswith(".md"))
     front = [f for f in files if f.startswith("00_")]
     back = [f for f in files if not f.startswith("00_")]
     zin = zipfile.ZipFile(src)
     content = zin.read("content.xml").decode("utf8")
     content = strip_generated(content)
+    if not keep_owner_tail:
+        content = drop_owner_tail(content)
     for old, new in FIXES:
         if content.count(old) == 0 and content.count(new) >= 1:
             continue                                     # already fixed (the owner's document, rebuilt)
@@ -247,7 +277,7 @@ def main():
         bak = os.path.join(SECTIONS, "Nebulae PD instruments (backup %s).odt" % time.strftime("%Y-%m-%d %H%M"))
         shutil.copy2(SRC, bak)
         tmp = SRC + ".new"
-        front, back = build(SRC, tmp, SECTIONS)
+        front, back = build(SRC, tmp, SECTIONS, keep_owner_tail=True)
         try:
             os.replace(tmp, SRC)
         except PermissionError:

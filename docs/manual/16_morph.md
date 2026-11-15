@@ -5,7 +5,7 @@ from the stick (or the right input, or a few seconds of A you just grabbed). Ble
 not a crossfade, but the partials of one sliding into the partials of the other. Overlap turns it into
 cross-synthesis: the notes of A sung with the colour of B. Freeze holds a moment of A while B moves on.
 
-It's in the **Csound user bank** as `007_morph` (orange page, File button).
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

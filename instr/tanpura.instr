@@ -178,8 +178,8 @@ endin
 
 instr 30
 ain, ainr inch 1, 2
-aL dcblock gaL * 2.8
-aR dcblock gaR * 2.8
+aL dcblock gaL * 2.8, 0.9995                    ; (the default 0.99 is a 76 Hz high-pass)
+aR dcblock gaR * 2.8, 0.9995
 gaL = 0
 gaR = 0
 ; reverb (alt Window = size, alt Blend = amount)

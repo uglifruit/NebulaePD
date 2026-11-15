@@ -5,7 +5,7 @@ freeze a moment and hold it, play backwards, or scrub through a sound by hand. T
 the stick, or what you just played into the inputs: Record grabs the last few seconds, so you never miss the
 moment. Layers, smear, blur and a reverb turn a few seconds of anything into a slowly breathing landscape.
 
-It's in the **Csound user bank** as `006_stretch`. Under the hood is a phase vocoder (`mincer`) with a time
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick). Under the hood is a phase vocoder (`mincer`) with a time
 pointer that the panel moves. The pointer can stand still, crawl, run backwards or jump, and the pitch stays
 independent of it.
 

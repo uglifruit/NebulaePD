@@ -6,7 +6,7 @@ either an internal synth chord (a supersaw on V/oct) or whatever you patch into 
 Freeze holds a vowel so you can play it as a chord, Speed shifts the formants up or down, and Track makes the
 internal chord follow the pitch of the voice.
 
-It's in the **Pd bank** as `L_vocoder` (yellow page, File button), file `10_vocoder.pd` in the repo.
+**Bank:** Pd (the page and button are in `nebulae_banks.txt` on the stick). Repo file: `10_vocoder.pd`.
 
 ## Panel map
 ```

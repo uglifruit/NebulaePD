@@ -6,7 +6,7 @@ morphs the output from low-pass through band-pass and high-pass to "smile". Turn
 then sing on their own: a stereo chord you can play from a sequencer. A gate into **Reset** pings them like a
 struck bell or drum.
 
-It's in the **Csound user bank** as `012_radiate` (yellow page, Record button).
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

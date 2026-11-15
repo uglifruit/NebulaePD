@@ -76,7 +76,7 @@ A 4-second buffer records the input all the time, and grains read it back pitche
 Try: patch a melody in, Blend fully wet, Density at noon, Size small, then Freeze and play with Start and Pitch.
 
 ## 05_sc_pattern: generative sequencer
-The full guide is in the manual (`docs/manual/18_sc_pattern.md`); the design and the clock in `docs/SC_PATTERN.md`.
+The full guide is in the manual (`docs/manual/18d_sc_pattern.md`); the design and the clock in `docs/SC_PATTERN.md`.
 Pitch = root, Start = scale, Size = length, Density = hits, Overlap = mutation, Window = tone, Blend = space,
 Speed = tempo (free) / swing (clocked); Reset = 16th clock (scheduled ahead: on time despite the 32 ms latency),
 Freeze = lock, Record = mutate, File = home (held: store), Source = voice set B. Tests:

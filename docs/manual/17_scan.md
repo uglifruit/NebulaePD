@@ -5,7 +5,7 @@ springs. An oscillator reads the string's shape as its waveform. Strike the stri
 ring and dies away: the **timbre** moves, not just the level, like a struck object whose tone keeps changing.
 Bow it to keep it moving, or feed it audio from the inputs.
 
-It's in the **Csound user bank** as `008_scan` (orange page, Source button).
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```

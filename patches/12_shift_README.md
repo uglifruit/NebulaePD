@@ -6,7 +6,7 @@ tape-style feedback delay, so **each echo is shifted again**. The echoes climb, 
 barber-pole echoes. Ring mode turns it into a ring modulator, and Barber mode fades the echoes out at the top
 of a band, so the climb seems endless.
 
-It's in the **Pd bank** as `N_shift` (yellow page, Reset button), file `12_shift.pd` in the repo.
+**Bank:** Pd (the page and button are in `nebulae_banks.txt` on the stick). Repo file: `12_shift.pd`.
 
 ## Panel map
 ```

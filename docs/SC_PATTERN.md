@@ -3,7 +3,7 @@
 Designed with the owner on 2026-11-14 (four questions: voices, patterns, clock, panel; all recommended options,
 the panel as sketched in `docs/SC_IDEAS.md`). The owner was then away again ("make auto decisions"), so the details
 below the line were mine. Patch `sc/05_sc_pattern.scd`, tests `tools/sc_pattern_tests.py`, guide
-`docs/manual/18_sc_pattern.md`.
+`docs/manual/18d_sc_pattern.md`.
 
 ## Agreed
 - Four voices: pluck lead, FM bell, bass, noise hat.

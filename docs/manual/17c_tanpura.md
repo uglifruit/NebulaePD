@@ -4,7 +4,7 @@ A Csound drone after the Indian tanpura. Four strings are plucked in turn, over 
 two strings an octave up on the home note (Sa), then the low Sa. Each string buzzes against a curved bridge (the
 jawari), the bright, shimmering buzz that makes a tanpura sound alive. It plays by itself, or follows a clock.
 
-It's in the **Csound user bank** as `010_tanpura` (orange page, Freeze button).
+**Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
 ```
