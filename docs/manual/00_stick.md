@@ -67,6 +67,10 @@ function. On our instruments, a knob's alt value only changes once you move it p
 | **cauldron** | Csound | Your sound poured into a time/filter experiment (after the Make Noise Bruxa) |
 | **quartet** | Csound | Four wavetable voices, eleven programs, a runaway delay (after the Neutral Labs Elmyra 2) |
 | **somnus** | Csound | Oscillators and a looper through filter, resonator, echo, ambience (after the Befaco Oneiroi) |
+| **avalanche** | Csound | Four oscillators that charge, fire and kick each other into rhythms (after the Jolin Lab Tabor) |
+| **lattice** | Csound | A network of delays, from reverb to multi-tap echo (after the Make Noise Soundhack Plexiphon) |
+| **horizon** | Csound | A feedback loop you play into: drive, boost, scream (after the Bastl Dark Matter) |
+| **prism** | Csound | Six resonant filters on a scale, rotating (after the 4ms Spectral Multiband Resonator) |
 | **Pearls** | Csound | Mutable Instruments Beads, ported |
 | **bt_storyteller** | Csound | The granular looper, narrating to your PC over Bluetooth |
 | **AVALON** | Csound | Ian Hoogeboom's wavetable morph oscillator (after the Synthesis Technology E350 / E352) |
@@ -81,7 +85,7 @@ function. On our instruments, a knob's alt value only changes once you move it p
 | **sc_mosaic** | SuperCollider | Rebuilds the input from pieces of a stick file |
 | **sc_space** | SuperCollider | Diffuse delays into a long reverb |
 | **sc_swarm** | SuperCollider | A drone of drifting oscillators |
-| **999_fw_backup** | Csound | Utility: firmware backup and inventory (see Utilities) |
+| **999_fw_backup** | Csound | Utility: firmware backup and inventory (parked in `parked/`, see Utilities) |
 
 ## Also on the stick
 These are files the firmware or the instruments need:

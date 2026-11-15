@@ -63,6 +63,10 @@ with incoming audio". They picked the first four.
 | ★ | **cauldron**: **built 2026-11-15** (`instr/cauldron.instr`; after the Make Noise Bruxa) | The same experiment as an input effect, Time on 1V/oct, self-patches | Csound / M |
 | ★ | **quartet**: **built 2026-11-15** (`instr/quartet.instr`; after the Neutral Labs Elmyra 2) | Four touch wavetable voices, 11 programs, ladder, runaway delay, bite | Csound / M |
 | ★ | **somnus**: **built 2026-11-15** (`instr/somnus.instr`; after the Befaco Oneiroi) | Stereo oscillators + 5 s looper through filter, resonator, echo, ambience; randomise/undo | Csound / M-L |
+| ★ | **avalanche**: **built 2026-11-15** (`instr/avalanche.instr`; after the Jolin Lab Tabor) | Four relaxation oscillators kicking each other into rhythms or tones, a shutter, starve, fuzz | Csound / M |
+| ★ | **lattice**: **built 2026-11-15** (`instr/lattice.instr`; after the Make Noise Soundhack Plexiphon) | A stereo delay network, modeless from reverb to multi-tap echo, super-infinite | Csound / M |
+| ★ | **horizon**: **built 2026-11-15** (`instr/horizon.instr`; after the Bastl Dark Matter) | A feedback loop you play into: drive, boosts, overdrive, dynamics open or duck it | Csound / S-M |
+| ★ | **prism**: **built 2026-11-15** (`instr/prism.instr`; after the 4ms SMR) | Six resonant filters on 11 scales, rotating and morphing, odds left / evens right | Csound / M |
 | | **spiral** | An endless rising/falling Shepard–Risset drone | Pd / S |
 | | **accrete** | Each note you play is caught as a frozen spectrum and layered in: a drone that builds from your playing (recommended next) | SC or Pd / M |
 | | **memory** | Tracks the pitches you play; the most-played become a slowly gathering drone chord | SC / M |

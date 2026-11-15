@@ -8,6 +8,10 @@ These aren't instruments. Each does one job, then lets audio pass (or plays a te
 
 Safe to keep on the stick. It only runs when you load it.
 
+**Parked (since 2026-11-15):** the Csound user bank holds 25, and it was full, so `999_fw_backup.instr` now waits
+in the stick's `parked/` folder, where the selector doesn't see it. Before a firmware update, move it to the stick
+root (the last instrument in the bank drops out of reach meanwhile), then move it back.
+
 ## Off the stick (since 2026-11-15)
 These did their job and were taken off. To use one again, copy it back to the stick root: `instr/bt_test.instr` as `bt_test.instr`, `patches/99_pitchlog.pd` as `ZZ_pitchlog.pd`, `sc/01_sctest.scd` as is.
 

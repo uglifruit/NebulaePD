@@ -53,6 +53,16 @@ file brings the status up to date and gives you the build queue.
   - Found on the way: a feedback computed a block late adds ksmps to a delay loop; filter phase in a loop shifts its
     pitch (compensate the tap); `poscil` can't switch tables while playing (`tablekt`); an exponential glide never
     arrives (snap it) - it mattered where a tiny offset reads a different part of a noise buffer.
+- **Round 6 (2026-11-15, the owner: "Jolin Tabor / Plexiphon / Dark Matter / 4MS SMR, can you have a go at these?",
+  then "make decisions while I'm away"):** 7 questions (all recommended); built **avalanche** (021, Tabor), **lattice**
+  (022, Plexiphon), **horizon** (023, Dark Matter), **prism** (024, SMR), all Csound, all tested + 6.09, reverbs on
+  the two mono ones. Decisions: docs/AVALANCHE_LATTICE.md, docs/HORIZON_PRISM.md.
+  - **The Csound user bank is full (25 of 25).** `999_fw_backup` was parked in the stick's `parked/` folder, which
+    the selector doesn't scan, so Pearls stayed in reach. The next Csound build needs a decision: take something
+    off, or give the firmware a sixth page.
+  - Found on the way: a tap past the delay buffer segfaults 6.18 mid-render, yet leaves a valid, shorter WAV, so
+    every sweep now checks its length. `alpass` takes a ring time, not a coefficient. `follow2`'s release is a
+    60 dB time.
 - **2026-11-15, after round 4:** `dcblock`'s default gain (0.99) is a 76 Hz high-pass, which thinned every drone's
   fundamental. Every instrument now uses 0.9995 (4 Hz): gurdy, plates, veil, register, radiate, tanpura, pulsar.
   All suites rerun and pass (7 x 6.18 + 6.09). **Recopy `009_pulsar`, `010_tanpura` and `012_radiate` to the stick**
