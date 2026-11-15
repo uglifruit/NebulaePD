@@ -32,6 +32,9 @@ file brings the status up to date and gives you the build queue.
   missing from the module's Csound 6.11 (checked in the SD image), so the string is written out. Tests: WSL
   `tools/scan_sim.py` 11/11 + `python tools/scan_sim.py m609`. Stick file:
   `firmware/dist/stage_scan/008_scan.instr` (Csound user orange page, Source).
+- **radiate** (Csound, `instr/radiate.instr`, 2026-11-15): the owner asked "how plausible would be a version of
+  QPAS?", then "Lets do it"; 7 design questions (all recommended). A stereo four-peak filter: tested 30/30 + 6.09,
+  awaiting hardware; decisions in docs/RADIATE.md. On the stick as `012_radiate` (Csound user, yellow, Record).
 - **The stick, sorted 2026-11-15 (owner's picks):** every instrument built so far is on it, checked byte for byte
   against the repo. Positions: `manifest.txt` (= `D:
 ebulae_banks.txt`) and `docs/manual/00_stick.md`. Taken off
@@ -43,7 +46,7 @@ ebulae_banks.txt`) and `docs/manual/00_stick.md`. Taken off
   is plugged in, regenerate the manifest from D:, and update the stick map.
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
   `docs/MORPH.md`, `docs/SCAN.md`, `docs/SC_FOLLOW.md`, `docs/SC_MOSAIC.md`, `docs/SHIFT.md`, `docs/PULSAR.md`,
-  `docs/SC_SPACE.md`, `docs/SC_SWARM.md`, `docs/PARTIALS.md`, `docs/TANPURA.md`, `docs/CHORALE.md` (each lists the
+  `docs/SC_SPACE.md`, `docs/SC_SWARM.md`, `docs/PARTIALS.md`, `docs/TANPURA.md`, `docs/CHORALE.md`, `docs/RADIATE.md` (each lists the
   alternatives). Their Python builders/instruments make changes
   cheap.
 - **sc_pattern** (SC, `sc/05_sc_pattern.scd`) built 2026-11-14 after a 4-question walk-through, details auto

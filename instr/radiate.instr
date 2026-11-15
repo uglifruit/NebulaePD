@@ -1,0 +1,263 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.5
+size,0.5
+density,1
+window,0
+overlap,0.3
+blend,1
+start_alt,0.3
+size_alt,0.5
+density_alt,0.4
+window_alt,0.5
+overlap_alt,0.6
+blend_alt,0.5
+pitch_alt,0
+nebconfigend
+
+; radiate.instr - a stereo filter of four resonant peaks that radiate apart (in the spirit of a quad-peak filter).
+; NebulaePD. Designed with the owner 2026-11-15; the decisions are in docs/RADIATE.md. MIT.
+;
+; Pitch    cutoff (the lowest peak), 1V/oct: the click = C6 (1046.5 Hz); about 46 Hz .. 11.7 kHz
+; Size     resonance: Q 0.5 .. 40; the last part of the turn self-oscillates (the peaks sing)
+; Start    Radiate: spreads the other peaks above the lowest; noon = exactly the File shape, anticlockwise
+;          squeezes them together (all on one peak fully anticlockwise), clockwise stretches to twice the shape
+; Density  peaks: 1 .. 4
+; Overlap  drive into the filter (unity at 0.3)
+; Window   output: low-pass -> band-pass -> high-pass -> smile (a low-pass at the lowest peak plus a high-pass at
+;          the highest: a dip between two resonant edges), morphing smoothly
+; Speed    animation: none between the clicks; clockwise = a smooth circle (Radiate and cutoff), anticlockwise =
+;          a random wander, faster towards the ends (0.03 .. 8 Hz)
+; Blend    dry input <-> filter (equal power)
+; Reset    ping: every peak rings (a gate or the button); alt Density = ring time
+; Freeze   hold the animation where it is (latching, LED on)
+; Source   the right input stops being audio and modulates every cutoff at audio rate (FM); the left input feeds
+;          both channels (latching, LED on). alt Start = depth
+; Record   dirty: saturation before and after the peaks, and the signal pulls the cutoff (latching, LED on)
+; File     peak shape: even (0, 8, 16, 24 semitones) -> harmonic (1:2:3:4) -> octaves -> chord (root, 5th,
+;          octave, 10th)
+; alt (hold Source): Start = FM depth, Size = animation depth, Window = animation target (Radiate <-> cutoff),
+;   Density = ping ring time (20 ms .. 3 s), Overlap = stereo width, Blend = output level (+-12 dB),
+;   Speed = input gain (Nebulae's own)
+; With nothing in the right input (silent), it copies the left: a mono source comes out in stereo.
+;
+; Instruments, run in this order every block: 10 control, 15 input, 20.1 .. 20.4 the peaks (each filters both
+; channels), 30 output.
+
+gkF[] init 4                                    ; peak frequencies, Hz
+gkG[] init 4                                    ; peak levels (Density)
+gkT[] init 4                                    ; "the highest peak" weights (smile)
+gkBL[] init 4                                   ; per-peak balance, left / right (stereo width)
+gkBR[] init 4
+gkW[] init 4                                    ; output weights: low, band, high, smile
+gkQ init 1
+gkCl init 1                                     ; level compensation, low/high-pass and band-pass
+gkCb init 1
+gkNL init 1                                     ; 1 / the sum of the peaks' levels, per channel
+gkNR init 1
+gkVN init 1                                     ; the singing voices' normalisation
+gkSelf init 0
+gkPing init 0
+gkTau init 0.15
+gkDirty init 0
+gaInL init 0
+gaInR init 0
+gaMod init 1
+gaWL init 0
+gaWR init 0
+; peak shapes in semitones above the lowest peak (File): even, harmonic, octaves, chord
+giShape ftgen 0, 0, 16, -2, 0, 8, 16, 24, 0, 12, 19.0196, 24, 0, 12, 24, 36, 0, 7, 12, 16
+; each peak's place in the stereo field at full width: low peaks near the middle, high peaks wide
+giPan ftgen 0, 0, 4, -2, -0.3, 0.3, -0.8, 0.8
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 15, 0, -1
+event_i "i", 20.1, 0, -1, 0
+event_i "i", 20.2, 0, -1, 1
+event_i "i", 20.3, 0, -1, 2
+event_i "i", 20.4, 0, -1, 3
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- File = shape, Reset = ping; the animation; every peak's frequency, level and balance
+kshape init 0
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    kshape = (kshape + 1) % 4
+endif
+krs trigger gkreset, 0.5, 0                    ; (not "kr": a reserved word)
+gkPing = krs
+gkTau = 0.02 * pow(150, gkdensity_alt)
+gkDirty portk (gkrecord > 0.5 ? 1 : 0), 0.03
+; animation: a phase that stops while frozen; clockwise a sine / cosine pair, anticlockwise a smooth random pair
+kd = (gkspeed - 0.5) / 0.375                    ; the clicks at +-0.333
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)     ; 0 between the clicks .. 1 at the ends
+krate = 0.03 * pow(2, 8 * kx)
+kph init 0
+ka1 init 0
+kb1 init 0
+ka2 init 0
+kb2 init 0
+kl1 init 0
+kl2 init 0
+kdep init 0
+kfz = (gkfreeze > 0.5 ? 1 : 0)
+kc50 = 1 - exp(-ksmps / (sr * 0.05))
+kc300 = 1 - exp(-ksmps / (sr * 0.3))
+if kfz == 0 then
+    kph = kph + krate * ksmps / sr
+    if kph >= 1 then
+        kph = kph - int(kph)
+        ka1 = kb1
+        ka2 = kb2
+        kb1 random -1, 1
+        kb2 random -1, 1
+    endif
+    if kd > 0 then
+        kt1 = sin(6.2831853 * kph)
+        kt2 = cos(6.2831853 * kph)
+    else
+        ksm = 0.5 - 0.5 * cos(3.14159265 * kph)
+        kt1 = ka1 + (kb1 - ka1) * ksm
+        kt2 = ka2 + (kb2 - ka2) * ksm
+    endif
+    kl1 = kl1 + (kt1 - kl1) * kc50               ; (smoothed: no jump when Speed crosses from one side to the other)
+    kl2 = kl2 + (kt2 - kl2) * kc50
+    kon = (kx > 0 ? 1 : 0)
+    kdep = kdep + (kon * gkloopsize_alt - kdep) * kc300   ; fades out between the clicks
+endif
+kwt = gkwindow_alt                              ; animation target: 0 Radiate only .. 1 cutoff only
+krad = gkloopstart + kdep * kl1 * 0.5 * min(1, 2 * (1 - kwt))
+krad = min(max(krad, 0), 1)
+kk = (krad < 0.4 ? krad / 0.4 : (krad < 0.6 ? 1 : 1 + (krad - 0.6) / 0.4))     ; Radiate: noon = the shape exactly
+koct = kdep * kl2 * 2 * min(1, 2 * kwt)
+kst = (gkpitch - 0.6) * 60 + koct * 12
+kfc = 1046.5 * pow(2, kst / 12)
+; resonance
+ks portk gkloopsize, 0.02, i(gkloopsize)
+if ks < 0.85 then
+    kq = 0.5 * pow(80, ks / 0.85)
+    kself = 0
+else
+    kq = 40 * pow(3, (ks - 0.85) / 0.15)
+    kself = (ks - 0.85) / 0.15
+endif
+gkQ = kq
+gkCl = min(1, pow(kq, -0.3))
+gkCb = 2 * pow(kq, -0.5)                        ; (band-pass passes least: +6 dB)
+gkSelf = kself
+; output morph
+kx3 = min(max(gkwindow, 0), 1) * 3
+gkW[0] = max(0, 1 - kx3)
+gkW[1] = (kx3 < 1 ? kx3 : max(0, 2 - kx3))
+gkW[2] = (kx3 < 1 ? 0 : (kx3 < 2 ? kx3 - 1 : 3 - kx3))
+gkW[3] = max(0, kx3 - 2)
+; the peaks (written out: no loop, so nothing shares an opcode's state)
+kc30 = 1 - exp(-ksmps / (sr * 0.03))
+kn = 1 + 3 * gkdensity
+kw = gkoverlap_alt
+kOff[] init 4
+#define PEAK(I) #
+kv$I. table kshape * 4 + $I., giShape
+kOff[$I.] = kOff[$I.] + (kv$I. * kk - kOff[$I.]) * kc30
+gkF[$I.] = min(max(kfc * pow(2, kOff[$I.] / 12), 20), 18000)
+gkG[$I.] = min(max(kn - $I., 0), 1)
+kp$I. table $I., giPan
+gkBL[$I.] = min(1, 1 - kp$I. * kw)
+gkBR[$I.] = min(1, 1 + kp$I. * kw)
+#
+$PEAK(0)
+$PEAK(1)
+$PEAK(2)
+$PEAK(3)
+gkT[0] = gkG[0] - gkG[1]
+gkT[1] = gkG[1] - gkG[2]
+gkT[2] = gkG[2] - gkG[3]
+gkT[3] = gkG[3]
+gkNL = 1 / (gkG[0] * gkBL[0] + gkG[1] * gkBL[1] + gkG[2] * gkBL[2] + gkG[3] * gkBL[3])
+gkNR = 1 / (gkG[0] * gkBR[0] + gkG[1] * gkBR[1] + gkG[2] * gkBR[2] + gkG[3] * gkBR[3])
+gkVN = 1 / sqrt(gkG[0] * gkG[0] + gkG[1] * gkG[1] + gkG[2] * gkG[2] + gkG[3] * gkG[3])
+endin
+
+instr 15
+; ---- the inputs: drive, the right input's two jobs (audio or modulator), dirty saturation
+ainL, ainR inch 1, 2
+kgin = pow(2, (gkoverlap - 0.3) * 5)            ; drive: x0.35 .. x11, unity at 0.3
+; with nothing in the right input it copies the left (a mono source in stereo)
+krm rms ainR, 5
+kmn portk (krm < 0.0005 ? 1 : 0), 0.05
+ksrc portk (gksource > 0.5 ? 1 : 0), 0.01
+aR2 = ainR * (1 - kmn) + ainL * kmn
+aR2 = aR2 * (1 - ksrc) + ainL * ksrc            ; Source: both channels take the left input
+; the cutoff multiplier, at audio rate: Source = the right input modulates (alt Start = depth, up to +-4 octaves
+; for a full-scale input); dirty = the signal pulls the cutoff a little (a growl)
+kfm = gkloopstart_alt * 4 * 0.6931472 * ksrc
+kdt = gkDirty
+amono = (ainL + aR2) * 0.5 * kgin
+gaMod = exp(ainR * kfm + 0.15 * kdt * tanh(3 * amono))
+aL = ainL * kgin
+aR = aR2 * kgin
+; dirty: an asymmetric saturation before the peaks (even and odd harmonics)
+adL = (tanh(aL * 1.5 + 0.2) - 0.1973753) * 0.8
+adR = (tanh(aR * 1.5 + 0.2) - 0.1973753) * 0.8
+gaInL = aL * (1 - kdt) + adL * kdt
+gaInR = aR * (1 - kdt) + adR * kdt
+endin
+
+instr 20
+; ---- one peak: a zero-delay-feedback 2-pole filter per channel (low, band and high outputs, all with a gain of Q
+; at the cutoff), mixed by Window; and its singing voice (self-oscillation and pings), exactly on its frequency
+ip = p4
+kf = gkF[ip]
+af interp kf
+af = af * gaMod
+af limit af, 20, 18000
+kq = gkQ
+alpL, abpL, ahpL zdf_2pole_mode gaInL, af, kq
+alpR, abpR, ahpR zdf_2pole_mode gaInR, af, kq
+kg = gkG[ip]
+kml = gkW[0] * gkCl * kg
+kmb = gkW[1] * gkCb * kg
+kmh = gkW[2] * gkCl * kg
+ksl = (ip == 0 ? gkW[3] * gkCl : 0)             ; smile: the lowest peak's low-pass ...
+ksh = gkW[3] * gkCl * gkT[ip]                   ; ... plus the highest peak's high-pass
+aL = ((alpL * kml + abpL * kmb + ahpL * kmh) * gkNL + alpL * ksl + ahpL * ksh) * gkBL[ip]
+aR = ((alpR * kml + abpR * kmb + ahpR * kmh) * gkNR + alpR * ksl + ahpR * ksh) * gkBR[ip]
+; the voice: self-oscillation (the top of Size) or a ping's decaying ring
+kpe init 0
+kpe = (gkPing == 1 ? 1 : kpe * exp(-ksmps / (sr * gkTau)))
+kva = max(gkSelf, kpe) * kg * gkVN * 0.3
+ava interp kva
+aosc poscil ava, af
+gaWL = gaWL + aL + aosc * gkBL[ip]
+gaWR = gaWR + aR + aosc * gkBR[ip]
+endin
+
+instr 30
+; ---- out: dirty saturation after the peaks, level, dry/wet
+ainL, ainR inch 1, 2
+kdt = gkDirty
+aL dcblock gaWL
+aR dcblock gaWR
+gaWL = 0
+gaWR = 0
+aL = aL * (1 - kdt) + tanh(aL * 2) * 0.6 * kdt
+aR = aR * (1 - kdt) + tanh(aR * 2) * 0.6 * kdt
+ktrim = 1.6 * pow(2, (gkblend_alt - 0.5) * 4)   ; alt Blend: +-12 dB (and +4 dB: level with the dry input)
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708) * ktrim
+outs tanh(ainL * kdry + aL * kwet), tanh(ainR * kdry + aR * kwet)
+endin

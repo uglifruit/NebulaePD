@@ -54,6 +54,7 @@ with incoming audio". They picked the first four.
 | ★ | **partials**: **built 2026-11-14** (`patches/13_partials.pd`, docs/PARTIALS.md) | 16 sine partials: masks, stretch, tilt, drift, random deals | Pd / S-M |
 | ★ | **chorale**: **built 2026-11-15** (`instr/chorale.instr`, docs/CHORALE.md) | A choir drone singing vowels; chords on Source | Csound / M |
 | ★ | **swarm**: **built 2026-11-14** (`sc/09_sc_swarm.scd`, docs/SC_SWARM.md) | 32 drifting detuned oscillators; gathers onto chords | SC / S |
+| ★ | **radiate**: **built 2026-11-15** (`instr/radiate.instr`, docs/RADIATE.md; the owner's own idea, after QPAS) | A stereo filter of four resonant peaks: Radiate, shapes, smile, self-oscillation, pings, FM from the right input | Csound / M |
 | | **spiral** | An endless rising/falling Shepard–Risset drone | Pd / S |
 | | **accrete** | Each note you play is caught as a frozen spectrum and layered in: a drone that builds from your playing (recommended next) | SC or Pd / M |
 | | **memory** | Tracks the pitches you play; the most-played become a slowly gathering drone chord | SC / M |

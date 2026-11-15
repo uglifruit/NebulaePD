@@ -1,5 +1,5 @@
 ==============================================================================
-Csound, user bank  -  Speed anticlockwise (left light)  -  13 files
+Csound, user bank  -  Speed anticlockwise (left light)  -  14 files
   [1-5] Pitch light white
       Record   1  002_avalon
       File     2  003_bowed_drone
@@ -13,9 +13,10 @@ Csound, user bank  -  Speed anticlockwise (left light)  -  13 files
       Reset    9  010_tanpura
       Freeze  10  011_chorale
   [11-15] Pitch light yellow
-      Record  11  999_fw_backup
-      File    12  bt_storyteller
-      Source  13  pearls
+      Record  11  012_radiate
+      File    12  999_fw_backup
+      Source  13  bt_storyteller
+      Reset   14  pearls
 ==============================================================================
 Factory (built in)  -  Speed in the middle (both lights)  -  5 files
   [1-5] Pitch light white

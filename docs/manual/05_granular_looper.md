@@ -31,7 +31,7 @@ the loop to a WAV.
 Use the **Factory** one. It is the newer code and has every feature, which is why the user-bank copy came off
 the stick.
 
-`bt_storyteller` (Csound user, yellow page, File) is the newer Factory code, so it can save loops with File + Freeze. Like
+`bt_storyteller` (Csound user, yellow page, Source) is the newer Factory code, so it can save loops with File + Freeze. Like
 the `001` copy, it is in the user bank under a different name, so it lacks the other five extras in the table.
 
 ## Why

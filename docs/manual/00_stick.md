@@ -1,7 +1,7 @@
 # Nebulae instruments: what is on the stick, and how to choose
 
 The guides in this manual cover the instruments we made: Pure Data (gloop, glitch, spectral, topo, shimmer,
-resonator, chop, vocoder, topo kits, shift, partials), SuperCollider (drift, strike, cloud, pattern, follow, mosaic, space, swarm), Csound (Pearls, stretch, morph, scan, pulsar, tanpura, chorale) and the Bluetooth storyteller. The other
+resonator, chop, vocoder, topo kits, shift, partials), SuperCollider (drift, strike, cloud, pattern, follow, mosaic, space, swarm), Csound (Pearls, stretch, morph, scan, pulsar, tanpura, chorale, radiate) and the Bluetooth storyteller. The other
 instruments on the stick have their own manuals (listed below).
 
 ## Choosing an instrument (custom firmware uf2)
@@ -32,9 +32,10 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 |  | Source | 009_pulsar | pulsar: a granular oscillator, pulsar synthesis (its guide is in this manual) |
 |  | Reset | 010_tanpura | tanpura: a self-playing drone of four plucked, buzzing strings (its guide is in this manual) |
 |  | Freeze | 011_chorale | chorale: a choir drone that sings vowels (its guide is in this manual) |
-| **Csound user**, yellow | Record | 999_fw_backup | Utility: backs up the firmware and writes an inventory to the stick (see Utilities) |
-|  | File | bt_storyteller | The granular looper, telling your PC what happens to it over Bluetooth (its guide is in this manual) |
-|  | Source | pearls | Pearls: Mutable Instruments Beads (its guide is in this manual) |
+| **Csound user**, yellow | Record | 012_radiate | radiate: a stereo filter of four resonant peaks that radiate apart, self-oscillate and ping (its guide is in this manual) |
+|  | File | 999_fw_backup | Utility: backs up the firmware and writes an inventory to the stick (see Utilities) |
+|  | Source | bt_storyteller | The granular looper, telling your PC what happens to it over Bluetooth (its guide is in this manual) |
+|  | Reset | pearls | Pearls: Mutable Instruments Beads (its guide is in this manual) |
 | **Factory** (built in) | 1–5 | a_granularlooper, b_oneshot, c_synth, d_effects, e_testio | Qu-Bit's own: see the Nebulae manual. The granular looper's extra features are in "The two granular loopers" |
 | **Pd**, white | Record | A_durm | No notes on the stick. From its patch: a drum processor with side-chain compression, trigger glitches, filter and downsampler; holding Source turns the burst off |
 |  | File | B_Plasma_Membrane | No notes on the stick. Its knobs each control two parameters (split down the middle) |
