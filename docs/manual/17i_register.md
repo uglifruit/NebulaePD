@@ -5,6 +5,8 @@ itself) clocked by **Pitch**, through a resonant low-pass filter. Fast, it's his
 it steps out rhythms and almost-melodies. **Freeze** locks whatever pattern it's playing into a loop. Let the
 register move the filter (**Source**) and the noise turns into sequenced sweeps.
 
+**Inspired by:** Hikari Instruments **Monos**, the shift-register noise synth. Our own design and name, not a copy.
+
 **Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map

@@ -226,6 +226,39 @@ def drop_owner_tail(content):
     return content[:start] + content[end:]
 
 
+# "Inspired by" lines for the owner's guides (asked for 2026-11-15), added in printed builds only, before each guide's
+# first paragraph (found by its opening words), in that paragraph's own style. The owner's file is never changed.
+OWNER_INSPIRED = [
+    ("A Pure Data take on the Cutlasses", "the Cutlasses Gloop looper."),
+    ("A Pure Data port of ", "your Workshop Computer program 57, Glitch."),
+    ("A spectral instrument in th", "Julius Kammerl's Spectral Clouds, through your WorkshopSpectral port."),
+    ("drum machine that writes its own patterns", "Mutable Instruments Grids (the idea; the pattern map is our own)."),
+    ("A Strymon-style ", "Strymon's shimmer reverbs."),
+    ("A four-voice ", "the Morphor ECHON."),
+]
+
+
+def add_owner_inspired(content):
+    for anchor, text in OWNER_INSPIRED:
+        if content.count(anchor) < 1:
+            sys.exit("OWNER_INSPIRED: %r not found" % anchor)
+        i = content.index(anchor)
+        a = content.rfind("<text:p ", 0, i)
+        if "Inspired by:" in content[max(0, a - 400):a]:
+            continue
+        pstyle = re.match(r'<text:p text:style-name="([^"]+)"', content[a:]).group(1)
+        sp = re.search(r'<text:span text:style-name="(T\d+)"', content[a:i + 200])
+        tstyle = sp.group(1) if sp else "T22"
+        # bold as the owner's text does it: Strong_20_Emphasis around an inner span (alone it falls back to a serif)
+        bs = re.search(r'Strong_20_Emphasis"><text:span text:style-name="(T\d+)"', content[a:a + 20000])
+        bold = bs.group(1) if bs else tstyle
+        para = ('<text:p text:style-name="%s"><text:span text:style-name="Strong_20_Emphasis"><text:span '
+                'text:style-name="%s">Inspired by:</text:span></text:span><text:span text:style-name="%s"> %s</text:span>'
+                '</text:p>' % (pstyle, bold, tstyle, escape(text)))
+        content = content[:a] + para + content[a:]
+    return content
+
+
 def build(src, out, sections, keep_owner_tail=False):
     files = sorted(f for f in os.listdir(sections) if f.endswith(".md"))
     front = [f for f in files if f.startswith("00_")]
@@ -241,6 +274,8 @@ def build(src, out, sections, keep_owner_tail=False):
         if content.count(old) != 1:
             sys.exit("FIXES: %r found %d times" % (old, content.count(old)))
         content = content.replace(old, new)
+    if not keep_owner_tail:
+        content = add_owner_inspired(content)
     b = Builder()
     def read(f):
         text = open(os.path.join(sections, f), encoding="utf8").read()

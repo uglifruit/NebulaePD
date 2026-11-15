@@ -7,6 +7,8 @@ they are, Shape their envelope, and Pitch their pitch. Fully clockwise, Size tur
 dry/wet and reverb come after the grains. Freeze stops the recording. With no input, Source turns it into a
 wavetable synth.
 
+**Port of:** Mutable Instruments **Beads** (XponentOneAudio's port, MIT).
+
 **Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick). It needs `pearls.instr` and the `csound_plugins` folder (with
 `libpearls.so`) on the stick. The first load after installing uf2 installs the plugin and takes a few seconds
 longer. Features marked *new* came in Pearls 5–8 and haven't been tested on hardware by their author yet.

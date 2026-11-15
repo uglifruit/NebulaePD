@@ -4,6 +4,8 @@ A Csound hurdy-gurdy. The drone synth's mechanical ancestor: a rosined wheel bow
 continuously while you play a melody on top. **Speed is the crank**: stop it, turn it steadily, or speed it up.
 Bursts on the crank, or gates into **Reset**, make the trompette's buzzing bridge (the "dog") bark in rhythm.
 
+**Inspired by:** the **hurdy-gurdy**, the medieval wheel-bowed string instrument.
+
 **Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map

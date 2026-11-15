@@ -23,6 +23,9 @@ The five buttons, left to right, are **Record, File, Source, Reset, Freeze**: po
 moves the others along. The current map is **`nebulae_banks.txt`** on the stick, regenerated whenever the stick
 changes. This manual doesn't list positions, so it stays right however the stick is arranged.
 
+Instruments made after another instrument say so in the index below and in an **Inspired by** line at the
+top of their guide.
+
 **The alt layer:** on every instrument, hold **Source** and turn a knob (or press a button) to reach its second
 function. On our instruments, a knob's alt value only changes once you move it past where it was.
 
@@ -34,15 +37,15 @@ function. On our instruments, a knob's alt value only changes once you move it p
 | **c_synth** | factory | Qu-Bit's simple synth voice: two oscillators, a sub and a ladder filter |
 | **d_effects** | factory | Qu-Bit's delay into reverb |
 | **e_testio** | factory | Qu-Bit's input-to-output test |
-| **gloop** (on the stick as Echo) | Pd | A 4-head looper |
-| **glitch** | Pd | A clocked beat-repeater and breakbeat slicer |
-| **spectral** | Pd | Spectral Clouds+: a frozen, gathered, playable spectrum |
-| **topo** | Pd | A drum-pattern map and drum synth |
+| **gloop** (on the stick as Echo) | Pd | A 4-head looper (after the Cutlasses Gloop) |
+| **glitch** | Pd | A clocked beat-repeater and breakbeat slicer (after your Workshop Computer Glitch) |
+| **spectral** | Pd | Spectral Clouds+: a frozen, gathered, playable spectrum (after Spectral Clouds / your WorkshopSpectral) |
+| **topo** | Pd | A drum-pattern map and drum synth (after Mutable Instruments Grids) |
 | **shimmer** | Pd | A shimmer reverb |
-| **resonator** | Pd | Exciter → resonator → delay |
+| **resonator** | Pd | Exciter → resonator → delay (after the Morphor ECHON) |
 | **chop** | Pd | A slice sequencer |
 | **vocoder** | Pd | A 20-band vocoder |
-| **topo kits** | Pd | Topo playing your sample kits |
+| **topo kits** | Pd | Topo playing your sample kits (after Grids, through topo) |
 | **shift** | Pd | A frequency shifter in a feedback delay |
 | **partials** | Pd | An additive drone organ |
 | **Durm** | Pd | Eli Pechman's four-voice drum machine |
@@ -53,16 +56,16 @@ function. On our instruments, a knob's alt value only changes once you move it p
 | **morph** | Csound | Spectral morphing / cross-synthesis |
 | **scan** | Csound | Scanned synthesis |
 | **pulsar** | Csound | Pulsar synthesis |
-| **tanpura** | Csound | A self-playing tanpura drone |
+| **tanpura** | Csound | A self-playing tanpura drone (after the Indian tanpura) |
 | **chorale** | Csound | A choir drone |
-| **radiate** | Csound | A stereo filter of four resonant peaks |
-| **gurdy** | Csound | A hurdy-gurdy |
-| **plates** | Csound | An eight-voice drone you touch into life |
-| **veil** | Csound | A drone voice with six algorithms |
-| **register** | Csound | Shift-register noise |
+| **radiate** | Csound | A stereo filter of four resonant peaks (after the Make Noise QPAS) |
+| **gurdy** | Csound | A hurdy-gurdy (after the medieval instrument) |
+| **plates** | Csound | An eight-voice drone you touch into life (after the SOMA Lyra-8) |
+| **veil** | Csound | A drone voice with six algorithms (after the Forge TME Vhikk X) |
+| **register** | Csound | Shift-register noise (after the Hikari Monos) |
 | **Pearls** | Csound | Mutable Instruments Beads, ported |
 | **bt_storyteller** | Csound | The granular looper, narrating to your PC over Bluetooth |
-| **AVALON** | Csound | Ian Hoogeboom's wavetable morph oscillator |
+| **AVALON** | Csound | Ian Hoogeboom's wavetable morph oscillator (after the Synthesis Technology E350 / E352) |
 | **Bowed Drone** | Csound | Collin Russell's bowed-string drone |
 | **Mars Affects** | Csound | Ian Hoogeboom's filter, VCA, delay and shimmer reverb |
 | **Realms** | Csound | Robert Pabst and Ian Hoogeboom's ambient rooms |

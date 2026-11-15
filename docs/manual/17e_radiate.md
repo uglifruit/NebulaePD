@@ -6,6 +6,8 @@ morphs the output from low-pass through band-pass and high-pass to "smile". Turn
 then sing on their own: a stereo chord you can play from a sequencer. A gate into **Reset** pings them like a
 struck bell or drum.
 
+**Inspired by:** Make Noise **QPAS** (Quad Peak Animation System). Our own design and name, not a copy.
+
 **Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map

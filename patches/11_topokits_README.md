@@ -4,6 +4,8 @@ topo's drum patterns playing **your own samples** from the stick. Everything els
 mutation, Freeze, File, clock and knobs (see the topo guide). What's new is that each of the six drum sounds can
 be a sample, chosen kit by kit.
 
+**Inspired by:** Mutable Instruments **Grids** (through our topo, whose pattern map is our own).
+
 **Bank:** Pd (the page and button are in `nebulae_banks.txt` on the stick). Repo file: `11_topokits.pd`. The
 original `H_topo` stays as it is.
 

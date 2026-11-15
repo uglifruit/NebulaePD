@@ -5,6 +5,8 @@ and its pair swells in, let go and it fades. **Density (Hold)** keeps every voic
 pairs modulate each other (FM) on **Window**, a "hyper LFO" of two square waves shakes them on **Speed**, and
 there's a delay that can run away and a distortion on **Blend**.
 
+**Inspired by:** SOMA Laboratory **Lyra-8**, the organismic synthesizer. Our own design and name, not a copy.
+
 **Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map

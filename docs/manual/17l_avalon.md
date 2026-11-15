@@ -7,6 +7,8 @@ wave, and **Blend** mixes them in five modes. An octave up and down, plus detune
 
 It reads WaveEdit banks (`ROM A/B/C.wav`, `avalon.wav` on the stick); more at waveeditonline.com.
 
+**Inspired by:** Synthesis Technology's **E350 Morphing Terrarium** and **E352 Cloud Terrarium** (its author's note).
+
 **Bank:** Csound user. Summarised from its author's manual (`avalon.pdf`, `avalon.txt`).
 
 ## Panel map

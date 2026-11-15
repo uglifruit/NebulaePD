@@ -10,6 +10,8 @@ A Csound drone voice and effect. Six algorithms (on **File**) share the same fou
 holds everything still. **Overlap** blurs it into a diffuse space, **Record** adds shimmer, and **Source** runs
 your input through the same chain instead.
 
+**Inspired by:** Forge TME **Vhikk X**, the drone voice and FX module. Our own design and name, not a copy.
+
 **Bank:** Csound user (the page and button are in `nebulae_banks.txt` on the stick).
 
 ## Panel map
