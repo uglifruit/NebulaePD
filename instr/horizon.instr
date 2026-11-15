@@ -1,0 +1,124 @@
+nebconfigbegin
+ksmps,16
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,latching,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.4
+size,0.2
+density,0.2
+window,0.6
+overlap,0.5
+blend,0.5
+window_alt,0.5
+blend_alt,0.2
+nebconfigend
+
+; horizon.instr - a feedback loop you play into: drive, boost, scream, with the input's dynamics working the loop
+; (in the spirit of a feedback-loop module). NebulaePD. Designed with the owner 2026-11-15 (Pitch = the loop's
+; pitch, the panel's switches on the buttons, a stereo reverb after); the rest (decided while the owner was away)
+; is in docs/HORIZON_PRISM.md. MIT.
+;
+; The loop: your input (driven) + the loop's own output, delayed -> bass and treble boosts -> overdrive -> round
+; again. Past about 2 o'clock on Feedback it rings by itself (a whisper of noise starts it); below, it colours
+; and lengthens what you play.
+;
+; Pitch    the loop's PITCH, 1V/oct (its delay: C4 at the click; C1 .. C6)
+; Start    DRIVE: your input's level into the loop (-6 .. +30 dB), soft-clipped
+; Size     BASS boost in the loop (0 .. +18 dB, below 180 Hz), with overdrive
+; Density  TREBLE boost in the loop (0 .. +18 dB, above 3.5 kHz), with overdrive: it screams higher
+; Window   FEEDBACK: how much goes round again (rings by itself from about 2 o'clock)
+; Overlap  DYNAMICS, bipolar (off at noon): clockwise your playing opens the loop (silence shuts it);
+;          anticlockwise your playing ducks it (it screams in the gaps)
+; Blend    X-FADE: clean <-> the loop
+; Speed    WOBBLE: the loop's pitch moves: none between the clicks; clockwise a smooth wow, anticlockwise random
+; Freeze   HYPER: drive +12 dB and a second, harder clip (latching)
+; Reset    the envelope's decay: slow (off) / fast (on) (latching)
+; Source   POLARITY: the loop's feedback inverted (an octave down, hollow: odd harmonics) (latching)
+; Record   the clean signal: before the drive (off) / after it (on) (latching)
+; File     the VCA: in the loop (Dynamics works the feedback) / out (Dynamics works the output level instead)
+; Pulse out: a gate from your input's envelope (high while you play: above -20 dB, until it decays)
+; alt (hold Source): Window = reverb size, Blend = reverb amount, Speed = input gain (Nebulae's own)
+
+gkVca init 1
+
+instr 1
+event_i "i", 20, 0, -1
+endin
+
+instr 20
+ain, ainr inch 1, 2
+ainm = (ain + ainr) * 0.5
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkVca = 1 - gkVca
+endif
+; the envelope follower (Dynamics, the Pulse jack); Reset = fast decay
+krel = (gkreset > 0.5 ? 0.3 : 3)                ; (follow2's release: the time to fall 60 dB)
+aenv follow2 ainm, 0.003, krel
+kenv downsamp aenv
+ken = min(1, kenv * 5)                          ; full at -14 dB
+; Pulse: high while you play (above -20 dB), low once the envelope has fallen past -26 dB
+kpg init 0
+kpg = (kenv > 0.1 ? 1 : (kenv < 0.05 ? 0 : kpg))
+gkeol = kpg
+; drive (Start): -6 .. +30 dB, soft-clipped; Hyper (Freeze) +12 dB and a second, harder clip
+khyp = (gkfreeze > 0.5 ? 1 : 0)
+kdrv = ampdb(-6 + 36 * min(max(gkloopstart, 0), 1) + 12 * khyp)
+kdrv portk kdrv, 0.02
+adrv = tanh(ainm * kdrv)
+if khyp == 1 then
+    adrv = tanh(adrv * 3) * 0.8
+endif
+adrv = adrv * 0.7
+; feedback (Window): the loop's gain, 1 (it sustains) at 0.7
+kfb = min(max(gkwindow, 0), 1) / 0.7
+; Dynamics (Overlap), bipolar: clockwise the envelope opens the VCA, anticlockwise it shuts it
+kdy = (gkoverlap - 0.5) * 2
+kdy = (abs(kdy) < 0.05 ? 0 : kdy)
+kvca = (kdy > 0 ? 1 - kdy + kdy * ken : 1 + kdy * ken)
+kvca portk kvca, 0.005
+kfbl = kfb * (gkVca > 0.5 ? kvca : 1)
+koutv = (gkVca > 0.5 ? 1 : kvca)
+kpol = (gksource > 0.5 ? -1 : 1)
+; the loop's delay (Pitch, 1V/oct): C4 at the click
+kst = (gkpitch - 0.6) * 60
+kdl = 0.0038222 * pow(2, -kst / 12)
+; Wobble (Speed): none between the clicks; clockwise a smooth wow, anticlockwise random
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+kwr = 0.3 + 6 * kx
+kws oscili 1, kwr
+kwf randi 1, kwr * 3
+kwv = (kd > 0 ? kws : kwf) * kx * 0.06
+kdl = kdl * exp(kwv)
+kdl limit kdl, 18 / sr, 0.035                   ; (at least a block: the loop is read before it's written)
+kdl portk kdl, 0.01, i(kdl)
+adl interp kdl
+; the loop: input + delayed output -> bass, treble -> overdrive -> a gentle low-pass, a DC block -> round again
+anz rand 0.0001                                 ; (the whisper that starts it)
+abuf delayr 0.05
+atap deltapi adl
+aloop = adrv + atap * kfbl * kpol + anz
+aloop pareq aloop, 180, ampdb(18 * min(max(gkloopsize, 0), 1)), 0.7, 1
+aloop pareq aloop, 3500, ampdb(18 * min(max(gkdensity, 0), 1)), 0.7, 2
+aloop = tanh(aloop)
+aloop tone aloop, 6000
+aloop dcblock aloop, 0.995
+delayw aloop
+; X-fade (Blend): clean (Record: before / after the drive) <-> the loop; the VCA on it when it's out of the loop
+aclean = (gkrecord > 0.5 ? adrv / 0.7 : ainm)
+kb portk gkblend, 0.02
+amix = (aclean * (1 - kb) + aloop * kb * 0.6) * koutv
+; the stereo reverb after (alt Blend = amount, alt Window = size)
+krv = gkblend_alt * gkblend_alt
+krfb = 0.7 + 0.28 * gkwindow_alt
+arL, arR reverbsc amix, amix, krfb, 9000
+outs tanh(amix + arL * krv), tanh(amix + arR * krv)
+endin

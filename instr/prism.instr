@@ -1,0 +1,190 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,triggered,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.4
+size,0.55
+density,0.4
+window,0.5
+overlap,0.5
+blend,0.85
+nebconfigend
+
+; prism.instr - six resonant filters tuned to a scale, that rotate and morph between notes, odd bands left and
+; even right (in the spirit of a spectral multiband resonator). NebulaePD. Designed with the owner 2026-11-15
+; (its own controls, 11 scales in one bank); the rest (decided while the owner was away) is in
+; docs/HORIZON_PRISM.md. MIT.
+;
+; Your input (left and right together) rings six filters. Each sits on a note of the scale; rotating moves the
+; notes round the filters (they cross from side to side), and each filter morphs to its new note by crossfading
+; to a twin already tuned there.
+;
+; Pitch    TRANSPOSE, 1V/oct: the root (C3 at the click)
+; Start    SPREAD: how many scale steps apart the bands are (1 .. 4)
+; Size     Q: wide and breathy -> ringing, singing
+; Density  MORPH: how long a filter takes to move to its new note (5 ms .. 4 s)
+; Window   FREQ NUDGE: odd bands up, even bands down (to 5 semitones; none at noon)
+; Overlap  TILT: louder lows (anticlockwise) <-> louder highs (clockwise); flat at noon
+; Blend    MIX: dry <-> the filters
+; Speed    AUTO-ROTATE: none between the clicks; clockwise rotates up, anticlockwise down, faster further out
+; Reset    rotate UP one step (a gate or the button)
+; Freeze   rotate DOWN one step (a gate or the button)
+; File     SCALE: chromatic, major, minor, pentatonic, whole tone, harmonic series, raga Bhairav, 17-TET,
+;          slendro, Bohlen-Pierce, membrane (a drum's inharmonic modes), then round again
+; Source   LOCK (latching): the odd bands (left) hold their notes while the even ones rotate on
+; Record   SCALE ROTATION (latching): off = the six notes rotate round the bands (the chord stays, its notes
+;          swap sides); on = every band steps along the scale (the chord climbs, wrapping at the top)
+; Pulse out: a short gate on every rotation step
+; alt (hold Source): Speed = input gain (Nebulae's own)
+
+gkScl init 0
+gkRot init 0
+giNs = 11                                       ; scales
+giNn = 24                                       ; notes in each
+; the scales: 24 ratios from the root each
+giS0 ftgen 0, 0, -24, -2, 1.00000, 1.05946, 1.12246, 1.18921, 1.25992, 1.33484, 1.41421, 1.49831, 1.58740, 1.68179, 1.78180, 1.88775, 2.00000, 2.11893, 2.24492, 2.37841, 2.51984, 2.66968, 2.82843, 2.99661, 3.17480, 3.36359, 3.56359, 3.77550   ; chromatic
+giS1 ftgen 0, 0, -24, -2, 1.00000, 1.12246, 1.25992, 1.33484, 1.49831, 1.68179, 1.88775, 2.00000, 2.24492, 2.51984, 2.66968, 2.99661, 3.36359, 3.77550, 4.00000, 4.48985, 5.03968, 5.33936, 5.99323, 6.72717, 7.55099, 8.00000, 8.97970, 10.07937   ; major
+giS2 ftgen 0, 0, -24, -2, 1.00000, 1.12246, 1.18921, 1.33484, 1.49831, 1.58740, 1.78180, 2.00000, 2.24492, 2.37841, 2.66968, 2.99661, 3.17480, 3.56359, 4.00000, 4.48985, 4.75683, 5.33936, 5.99323, 6.34960, 7.12719, 8.00000, 8.97970, 9.51366   ; minor
+giS3 ftgen 0, 0, -24, -2, 1.00000, 1.12246, 1.25992, 1.49831, 1.68179, 2.00000, 2.24492, 2.51984, 2.99661, 3.36359, 4.00000, 4.48985, 5.03968, 5.99323, 6.72717, 8.00000, 8.97970, 10.07937, 11.98646, 13.45434, 16.00000, 17.95939, 20.15874, 23.97291   ; pentatonic
+giS4 ftgen 0, 0, -24, -2, 1.00000, 1.12246, 1.25992, 1.41421, 1.58740, 1.78180, 2.00000, 2.24492, 2.51984, 2.82843, 3.17480, 3.56359, 4.00000, 4.48985, 5.03968, 5.65685, 6.34960, 7.12719, 8.00000, 8.97970, 10.07937, 11.31371, 12.69921, 14.25438   ; whole tone
+giS5 ftgen 0, 0, -24, -2, 1.00000, 2.00000, 3.00000, 4.00000, 5.00000, 6.00000, 7.00000, 8.00000, 9.00000, 10.00000, 11.00000, 12.00000, 13.00000, 14.00000, 15.00000, 16.00000, 17.00000, 18.00000, 19.00000, 20.00000, 21.00000, 22.00000, 23.00000, 24.00000   ; harmonic series
+giS6 ftgen 0, 0, -24, -2, 1.00000, 1.05946, 1.25992, 1.33484, 1.49831, 1.58740, 1.88775, 2.00000, 2.11893, 2.51984, 2.66968, 2.99661, 3.17480, 3.77550, 4.00000, 4.23785, 5.03968, 5.33936, 5.99323, 6.34960, 7.55099, 8.00000, 8.47570, 10.07937   ; raga Bhairav
+giS7 ftgen 0, 0, -24, -2, 1.00000, 1.04162, 1.08496, 1.13012, 1.17715, 1.22613, 1.27716, 1.33031, 1.38567, 1.44334, 1.50341, 1.56597, 1.63114, 1.69902, 1.76973, 1.84338, 1.92009, 2.00000, 2.08323, 2.16993, 2.26023, 2.35429, 2.45227, 2.55432   ; 17-TET
+giS8 ftgen 0, 0, -24, -2, 1.00000, 1.14274, 1.31494, 1.51309, 1.73608, 2.00000, 2.28548, 2.62989, 3.02618, 3.47216, 4.00000, 4.57097, 5.25977, 6.05237, 6.94432, 8.00000, 9.14194, 10.51954, 12.10474, 13.88864, 16.00000, 18.28388, 21.03908, 24.20948   ; slendro
+giS9 ftgen 0, 0, -24, -2, 1.00000, 1.08818, 1.18414, 1.28856, 1.40219, 1.52584, 1.66039, 1.80681, 1.96613, 2.13951, 2.32818, 2.53348, 2.75689, 3.00000, 3.26455, 3.55242, 3.86568, 4.20657, 4.57751, 4.98117, 5.42042, 5.89840, 6.41854, 6.98454   ; Bohlen-Pierce (13 steps to 3:1)
+giS10 ftgen 0, 0, -24, -2, 1.00000, 1.59335, 2.13556, 2.29545, 2.65311, 2.91733, 3.15548, 3.50017, 3.59851, 3.64750, 4.05897, 4.13178, 4.23050, 4.60109, 4.61011, 4.83192, 4.90332, 5.08362, 5.13082, 5.41218, 5.54046, 5.55319, 5.65091, 5.97659   ; membrane (a drum's modes)
+giT ftgen 0, 0, -11, -2, giS0, giS1, giS2, giS3, giS4, giS5, giS6, giS7, giS8, giS9, giS10   ; (the scales' tables, in File's order)
+
+; one band: two twin filters (two resonz each) that crossfade when its note changes; a change that arrives while
+; it is still morphing waits for the morph to finish (the latest one wins)
+opcode Band, a, akkkk
+ain, krat, kmul, kq, kmt xin
+kfa init 0
+kfb init 0
+kx init 0
+kgo init 0
+ktg init 0
+kpd init 0
+kfst init 1
+if kfst == 1 then
+    kfa = krat
+    kfb = krat
+    ktg = krat
+    kfst = 0
+endif
+if krat != ktg && krat != kpd then
+    kpd = krat                                  ; queue it
+endif
+if kx == kgo && kpd > 0 then
+    ktg = kpd
+    kpd = 0
+    if kgo == 0 then
+        kfb = ktg
+        kgo = 1
+    else
+        kfa = ktg
+        kgo = 0
+    endif
+endif
+kstp = ksmps / (sr * kmt)
+kx = (kgo > kx ? min(kgo, kx + kstp) : max(kgo, kx - kstp))
+kca = min(max(kfa * kmul, 20), sr * 0.45)
+kcb = min(max(kfb * kmul, 20), sr * 0.45)
+aa resonz ain, kca, kca / kq, 1
+aa resonz aa, kca, kca / kq, 1
+ab resonz ain, kcb, kcb / kq, 1
+ab resonz ab, kcb, kcb / kq, 1
+xout aa * cos(kx * 1.5708) + ab * sin(kx * 1.5708)
+endop
+
+instr 1
+event_i "i", 20, 0, -1
+endin
+
+instr 20
+ain, ainr inch 1, 2
+ainm = (ain + ainr) * 0.5
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkScl = (gkScl + 1) % giNs
+endif
+; rotation: Reset up, Freeze down, Speed auto-rotates (none between the clicks)
+kup trigger gkreset, 0.5, 0
+kdn trigger gkfreeze, 0.5, 0
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+kph init 0
+kar = 0
+if kx > 0 then
+    kph = kph + 0.08 * pow(60, min(kx, 1)) * ksmps / sr   ; 0.08 .. 5 steps a second
+    if kph >= 1 then
+        kph = kph - 1
+        kar = (kd > 0 ? 1 : -1)
+    endif
+endif
+kstep = kup - kdn + kar
+gkRot = gkRot + kstep
+; the Pulse jack: 10 ms on each step
+kpt init 0
+kpt = (kstep != 0 ? 0.01 : max(0, kpt - ksmps / sr))
+gkeol = (kpt > 0 ? 1 : 0)
+; lock (Source): the odd bands keep the rotation they had
+krL init 0
+krL = (gksource > 0.5 ? krL : gkRot)
+krE = gkRot
+; spread (Start): 1 .. 4 scale steps between bands
+ksp = 1 + round(min(max(gkloopstart, 0), 1) * 3)
+; each band's note: Record off = the six notes rotate round the bands; on = each band steps along the scale
+ktn table gkScl, giT
+#define NOTE(I'ROT) #
+if gkrecord > 0.5 then
+    ki$I. = wrap($I. * ksp + $ROT., 0, giNn)
+else
+    ki$I. = wrap($I. + $ROT., 0, 6) * ksp
+endif
+kn$I. tablekt ki$I., ktn
+#
+$NOTE(0'krL)
+$NOTE(1'krE)
+$NOTE(2'krL)
+$NOTE(3'krE)
+$NOTE(4'krL)
+$NOTE(5'krE)
+; transpose (Pitch, 1V/oct) and the nudge (Window): odd bands up, even down
+kst = (gkpitch - 0.6) * 60
+kroot = 130.813 * pow(2, kst / 12)
+kroot portk kroot, 0.02, i(kroot)
+knu = (gkwindow - 0.5) * 10
+kmo = kroot * pow(2, knu / 12)
+kme = kroot * pow(2, -knu / 12)
+; Q (Size) and morph time (Density)
+kq = 2 * pow(250, min(max(gkloopsize, 0), 1))
+kq portk kq, 0.02, i(kq)
+kmt = 0.005 * pow(800, min(max(gkdensity, 0), 1))
+; tilt (Overlap): +-15 dB across the bands, flat at noon; a gain that makes up for the narrowing as Q rises
+ktl = (gkoverlap - 0.5) * 2 * 6
+kmk = sqrt(kq) * 4                              ; (sqrt(Q) undoes the narrowing for a broad input; tanh tames a tone on a peak)
+#define BAND(I'MUL) #
+ab$I. Band ainm, kn$I., $MUL., kq, kmt
+ab$I. = ab$I. * ampdb(ktl * ($I. - 2.5)) * kmk
+#
+$BAND(0'kmo)
+$BAND(1'kme)
+$BAND(2'kmo)
+$BAND(3'kme)
+$BAND(4'kmo)
+$BAND(5'kme)
+; odd bands (1, 3, 5) left, even (2, 4, 6) right
+aL = ab0 + ab2 + ab4
+aR = ab1 + ab3 + ab5
+kb portk gkblend, 0.02
+outs tanh(ain * (1 - kb) + aL * kb * 0.7), tanh(ainr * (1 - kb) + aR * kb * 0.7)
+endin
