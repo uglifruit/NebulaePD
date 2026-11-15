@@ -1,0 +1,195 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.1
+size,0.5
+density,0.5
+window,0.5
+overlap,0.3
+blend,1
+start_alt,0.6
+size_alt,0.4
+density_alt,0.5
+window_alt,0.6
+overlap_alt,0.5
+blend_alt,0.3
+pitch_alt,0
+nebconfigend
+
+; tanpura.instr - a self-playing tanpura drone: four plucked strings with a buzzing (jawari) bridge.
+; NebulaePD. Designed with the owner 2026-11-14 (Pitch click = C2, self-playing with a clock on Reset taking over,
+; Start = the first string's tuning in zones, Blend mixes the input); the rest is in docs/TANPURA.md. MIT.
+;
+; Strings, plucked in turn: 1 = Pa / Ma / Ni / Sa (Start), 2 and 3 = Sa, 4 = low Sa (the Pitch note).
+;
+; Pitch    low Sa, 1V/oct (click = C2); the two middle strings are an octave above
+; Start    first string: Pa (a fifth) | Ma (a fourth) | Ni (a major seventh) | Sa (all on Sa), in zones
+; Speed    cycle time: about 4 s between the clicks, to 1 s clockwise, 8 s anticlockwise
+; Window   ring time: 2 .. 30 s
+; Density  jawari: the bridge's buzz, clean -> strong
+; Size     tone: dark -> bright
+; Overlap  life: timing sway and the two Sa strings' detune (the slow beating)
+; Blend    dry input <-> tanpura
+; Reset    each pulse plucks the next string (a clock takes over; 2 s without one and it plays itself again)
+; Record   pause: no new plucks, the strings ring on (latching, LED on)
+; Freeze   sustain: the strings ring for ever (latching, LED on)
+; Source   an octave up (a higher tanpura) (latching, LED on)
+; File     not used
+; alt (hold Source): Start = stereo width, Size = pluck hardness, Window = reverb size, Blend = reverb amount,
+;   Speed = input gain (Nebulae's own)
+;
+; Instruments: 1 starts 10 (the player) and four copies of 20 (the strings, 20.1 .. 20.4), and 30 (the output).
+
+gkTrig[] init 4
+gaL init 0
+gaR init 0
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20.1, 0, -1, 0
+event_i "i", 20.2, 0, -1, 1
+event_i "i", 20.3, 0, -1, 2
+event_i "i", 20.4, 0, -1, 3
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- the player: four plucks per cycle, evenly spaced, swaying with Overlap; Reset pulses take over
+kt timeinsts
+kd = (gkspeed - 0.5) / 0.375                    ; the clicks at +-0.333
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+kcyc = (kd > 0 ? 4 * pow(2, -2 * kx) : 4 * pow(2, kx))      ; 4 s; 1 s CW, 8 s CCW
+kgap = kcyc / 4
+kpause = (gkrecord > 0.5 ? 1 : 0)
+kclk trigger gkreset, 0.5, 0
+kext init 0
+klast init -10
+knext init 0.3
+kstr init 0
+kfire = 0
+gkTrig[0] = 0
+gkTrig[1] = 0
+gkTrig[2] = 0
+gkTrig[3] = 0
+if kclk == 1 then
+    kext = 1
+    klast = kt
+    kfire = 1
+endif
+if kext == 1 && kt - klast > 2 then
+    kext = 0                                    ; the clock stopped: play by itself again
+    knext = kt + kgap
+endif
+if kext == 0 && kt >= knext then
+    kfire = 1
+    ksw random -1, 1
+    knext = kt + kgap * (1 + 0.15 * gkoverlap * ksw)
+endif
+if kpause == 1 then
+    kfire = 0
+    knext = max(knext, kt + 0.05)
+endif
+if kfire == 1 then
+    gkTrig[kstr] = 1
+    kstr = (kstr + 1) % 4
+endif
+endin
+
+instr 20
+; ---- one string: a delay-line string (Karplus-Strong) with a one-sided bridge (jawari) in the loop
+istr = p4
+; tuning: 0 = Pa / Ma / Ni / Sa (Start), 1 and 2 = Sa (an octave up), 3 = low Sa
+kst = (gkpitch - 0.6) * 60
+kf0 = 65.406 * pow(2, kst / 12) * (gksource > 0.5 ? 2 : 1)
+kz = int(min(gkloopstart, 0.999) * 4)
+kr1 = (kz == 0 ? 1.5 : (kz == 1 ? 4 / 3 : (kz == 2 ? 15 / 8 : 2)))
+kdet = gkoverlap * 6                            ; cents between the two Sa strings
+if istr == 0 then
+    kf = kf0 * kr1
+elseif istr == 1 then
+    kf = kf0 * 2 * pow(2, kdet / 2400)
+elseif istr == 2 then
+    kf = kf0 * 2 * pow(2, -kdet / 2400)
+else
+    kf = kf0
+endif
+kf = min(max(kf, 20), 1300)                     ; (the loop is at least one 32-sample block)
+; a 50 ms glide that starts at the target (portk starts at 0 Hz: a pluck at load hit a string with no loop gain)
+kfs init 0
+kfs = (kfs == 0 ? kf : kfs + (kf - kfs) * (1 - exp(-ksmps / (sr * 0.05))))
+kf = kfs
+; tone: the loop's loss filter y = (1 - s) x + s x[-1] (delay s samples), s 0.5 dark .. 0.05 bright
+ks = (gkfreeze > 0.5 ? 0.05 : 0.5 - 0.45 * gkloopsize)   ; (frozen: the least loss, so the buzz doesn't drain it)
+; ring time -> loop gain per period; Freeze = (almost) no loss
+kt60 = 2 * pow(15, gkwindow)
+kg = (gkfreeze > 0.5 ? 0.99999 : pow(10, -3 / (kt60 * kf)))
+kT = 1 / kf - ks / sr
+; the pluck: a short, filtered noise burst (alt Size = hardness)
+kp = gkTrig[istr]
+kplk trigger kp, 0.5, 0
+aburst noise 1, 0
+; (a k-rate decay, not expseg + reinit: the reinit stopped the string instance in Csound 6.18)
+kbt = 0.002 + 0.004 * (1 - gkloopsize_alt)      ; burst decay time constant
+kbe init 0
+kbe = (kplk == 1 ? 1 : kbe * exp(-ksmps / (sr * kbt)))
+aenv interp kbe
+khc = 400 * pow(25, gkloopsize_alt)             ; 400 Hz .. 10 kHz
+aex tone aburst * aenv, khc
+; the loop
+kbh = 0.5                                       ; the bridge: half an rms swing below centre
+adel delayr 0.25
+ay deltapi kT
+ayp delay1 ay
+ay2 = ay * (1 - ks) + ayp * ks
+; jawari: the string grazes a curved bridge on one side and is folded back off it (folding keeps the energy and
+; turns it into high partials; clipping just shortened the note).
+; - The bridge sits below the string's own centre (a slow average): measured from 0, the string drifted up off it
+;   and the buzz stopped after 0.1 s.
+; - Its height follows the string's rms swing round that centre (a plucked string is spiky: a bridge set from the
+;   peak sat below nearly all of it), so the buzz lasts as long as the note.
+; - The fold's own DC is taken out, outside the loop's main path (no detuning).
+amid tone ay2, 20
+ash = ay2 - amid
+krm rms ash, 30
+kb = krm * kbh
+acl limit ash, -kb, 100
+adif = 2 * (acl - ash)                          ; the fold: as far above the bridge as it went below
+adc tone adif, 5
+; frozen, the buzz fades out (it drains the note: a frozen note fell 10 dB in 5 s with it, 2 dB without)
+kfz portk (gkfreeze > 0.5 ? 0 : 1), 0.3, 1          ; (starts at 1: portk starts at 0)
+ay3 = ay2 + gkdensity * kfz * (adif - adc)
+delayw aex * 2.4 + ay3 * kg
+; out, panned (alt Start = width): string 1 left, 4 right, 2 and 3 in between
+kw = gkloopstart_alt
+ipan = (istr == 0 ? -1 : (istr == 1 ? -0.33 : (istr == 2 ? 0.33 : 1)))
+kpn = 0.5 + 0.5 * ipan * kw
+gaL = gaL + ay3 * sqrt(1 - kpn)
+gaR = gaR + ay3 * sqrt(kpn)
+endin
+
+instr 30
+ain, ainr inch 1, 2
+aL dcblock gaL * 2.8
+aR dcblock gaR * 2.8
+gaL = 0
+gaR = 0
+; reverb (alt Window = size, alt Blend = amount)
+krfb = 0.6 + 0.37 * gkwindow_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc aL, aR, krfb, 10000
+aL = aL + arL * krev
+aR = aR + arR * krev
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708)
+outs tanh(ain * kdry + aL * kwet), tanh(ainr * kdry + aR * kwet)
+endin
