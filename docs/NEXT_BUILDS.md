@@ -45,6 +45,14 @@ file brings the status up to date and gives you the build queue.
     user opcode crashed 6.18; a-rate conditions can't go in `?:`; Csound's bit operations are 32-bit (`1 << 32`
     wraps); the module's opcode names carry type suffixes (`oscili.a`), so scan with them; `wgbow` runs ~0.84
     samples sharp.
+- **Round 5 (2026-11-15, the owner: "mimic Strega, Elmyra 2, Befaco Oneiroi, Bruxa", a stereo reverb after the mono
+  ones if CPU allows):** 11 questions (all recommended); built **hex** (017, Strega), **cauldron** (018, Bruxa),
+  **quartet** (019, Elmyra 2), **somnus** (020, Oneiroi), all Csound, all tested + 6.09, reverbs kept (all under
+  0.5x the looper). Decisions: docs/HEX_CAULDRON.md, docs/QUARTET_SOMNUS.md. Manuals were read from the makers'
+  PDFs (saved by WebFetch, text extracted with pymupdf).
+  - Found on the way: a feedback computed a block late adds ksmps to a delay loop; filter phase in a loop shifts its
+    pitch (compensate the tap); `poscil` can't switch tables while playing (`tablekt`); an exponential glide never
+    arrives (snap it) - it mattered where a tiny offset reads a different part of a noise buffer.
 - **2026-11-15, after round 4:** `dcblock`'s default gain (0.99) is a 76 Hz high-pass, which thinned every drone's
   fundamental. Every instrument now uses 0.9995 (4 Hz): gurdy, plates, veil, register, radiate, tanpura, pulsar.
   All suites rerun and pass (7 x 6.18 + 6.09). **Recopy `009_pulsar`, `010_tanpura` and `012_radiate` to the stick**

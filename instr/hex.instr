@@ -1,0 +1,187 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,momentary,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,momentary,rising
+speed,0.5
+pitch,0.6
+start,0.2
+size,0.55
+density,0.5
+window,0.6
+overlap,0.2
+blend,0.6
+start_alt,0.5
+size_alt,0
+density_alt,0
+window_alt,0.6
+overlap_alt,0.4
+blend_alt,0.15
+pitch_alt,0.2
+nebconfigend
+
+; hex.instr - a tonic oscillator spilled into a time/filter experiment, agitated (in the spirit of a drone/delay
+; desktop instrument). NebulaePD. Designed with the owner 2026-11-15 (momentary touches, Speed = agitation, a
+; stereo reverb after); the rest is in docs/HEX_CAULDRON.md. MIT.
+;
+; Pitch    TONIC: the tones' pitch, 1V/oct (click = C3)
+; Start    TONES: triangle -> + a subharmonic (1/2) -> + another (1/3) -> folded -> sharp
+; Size     TIME: the rate the tones drip into the filter. Clockwise = short and clean (comb, pitched), anticlockwise
+;          = long, slow and noisy (an avalanche of noise round 9 o'clock)
+; Density  DECAY: the experiment's iterations, a handful -> infinity
+; Window   FILTER: removes substance in the experiment (a low-pass in the loop)
+; Overlap  ABSORB: absorbs substance into the earth (a high-pass in the loop)
+; Speed    AGITATION: none between the clicks; past them a rise-and-fall wave from a minute to audio rate,
+;          clockwise slow rise / fast fall, anticlockwise the opposite; it moves the Filter (alt Overlap = depth)
+; Blend    the tones <-> the experiment
+; Freeze   ACTIVATE (momentary, button or gate): the tones pour into the experiment while held
+; Record   INTERFERENCE (momentary): the experiment bends the tonic while held
+; Reset    restart the agitation
+; Source   your input into the experiment (latching, LED on)
+; File     hold: the experiment decays to infinity and takes nothing new (press again to release)
+; alt (hold Source): Start = activation constant (how much the tones always pour in), Size = activation interference
+;   (the experiment gates the tones itself), Density = tonic interference (the experiment bends the tonic always),
+;   Pitch = time modulation (the subharmonics wobble Time), Overlap = agitation -> Filter depth, Window = reverb
+;   size, Blend = reverb amount, Speed = input gain (Nebulae's own)
+
+giTri ftgen 0, 0, 8192, 10, 1, 0, -0.1111, 0, 0.04, 0, -0.0204, 0, 0.0123, 0, -0.0083, 0, 0.0059, 0, -0.0044
+giSqrR ftgen 0, 0, 8192, 7, 1, 4096, 1, 0, -1, 4096, -1
+giSqr ftgen 0, 0, 8192, 30, giSqrR, 1, 24
+gkHold init 0
+gkAg init 0
+gaAg init 0
+
+; ---- the time/filter experiment (shared with cauldron.instr): a clocked delay with three taps, the first fed back
+; through a low-pass (Filter) and a high-pass (Absorb), soft-limited, so Decay can go to infinity. The clock is
+; 1024 stages over Time: long times run a slow clock, so the repeats grow grainy and noisy, as a bucket-brigade
+; line does. Out: the audio, its activity (a 0..1 envelope) and its interference (the raw output, sampled per block)
+opcode TimeFilter, akk, aaakkk
+ain, atime, afilt, kabsorb, kdecay, kmax xin
+atime limit atime, 0.0008, kmax
+ktm downsamp atime
+kclk = min(1024 / ktm, sr)
+kinc = max(1, sr / kclk)
+knz = 0.012 * min(1, max(0, (6000 - kclk) / 6000))     ; the slow clock's noise
+; everything poured in, and every pass round, goes through the filter and the absorb, then the clock's grain.
+; (The feedback is read and written within the same block: computed a block late, it added 0.67 ms to the loop
+; and put the ringing pitch out by up to 5 %.)
+; the feedback tap is corrected for the filters' phase at the loop's own frequency (the high-pass leads, the
+; low-pass lags, the clock's hold lags), so Time stays the ringing period
+kf0 = 1 / ktm
+kfl = k(afilt)
+kph_hp = 3.14159265 - taninv2(1.4142136 * kf0 * kabsorb, kabsorb * kabsorb - kf0 * kf0)
+krt = kf0 / kfl
+kph_lp = taninv2(krt / 0.6, 1 - krt * krt)
+; (only where the loop's frequency is in each filter's passband: far below the high-pass there's no ringing pitch
+; to keep, and its near-180 degree lead would have added a whole extra echo's worth)
+kwhp = min(max((kf0 / kabsorb - 0.6) / 0.6, 0), 1)
+kwlp = min(max((kfl / kf0 - 0.6) / 0.6, 0), 1)
+kcomp = (kph_hp * kwhp - kph_lp * kwlp) / (6.2831853 * kf0) - (kinc - 1) * 0.5 / sr
+adl delayr 6
+at1 deltapi atime + kcomp
+at2 deltapi atime * 0.707
+at3 deltapi atime * 0.43
+anz noise knz, 0
+afbk = tanh((at1 + anz) * kdecay * 1.12) / 1.12
+afi = ain + afbk
+afi zdf_2pole afi, afilt, 0.6
+afi buthp afi, kabsorb
+afi fold afi, kinc
+delayw afi
+aout = at1 * 0.62 + at2 * 0.3 + at3 * 0.2
+krm rms aout, 8
+kint downsamp aout
+xout aout, min(krm * 3, 1), kint
+endop
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20, 0, -1
+endin
+
+instr 10
+; ---- the agitation (a-rate, so it can reach audio rate), the hold
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkHold = 1 - gkHold
+endif
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)   ; 0 between the clicks .. 1 at the ends
+kon = (kx > 0 ? 1 : 0)
+kra = (1 / 60) * pow(2, 16 * kx)               ; a minute .. ~1 kHz
+krise = (kd > 0 ? 0.85 : 0.15)                 ; the angle: clockwise slow rise, fast fall
+krs trigger gkreset, 0.5, 0
+aph phasor kra
+if krs == 1 then
+    reinit restart
+endif
+restart:
+aph phasor kra
+rireturn
+aag = min(aph / krise, (1 - aph) / (1 - krise))
+kong portk kon, 0.2
+gaAg = aag * kong
+gkAg downsamp gaAg
+endin
+
+instr 20
+; ---- the tones, activation, the experiment, blend, reverb
+ain, ainr inch 1, 2
+kint init 0
+kact init 0
+aexp init 0
+; the tonic, bent by interference (always: alt Density; while Record is held: hard)
+kst = (gkpitch - 0.6) * 60
+kf = 130.81 * pow(2, kst / 12)
+krec portk (gkrecord > 0.5 ? 1 : 0), 0.01
+kti = gkdensity_alt * gkdensity_alt * 1.5 + krec * 2.5
+af = kf * exp(limit(aexp * kti, -4, 4))
+af limit af, 5, 12000
+; the tones (Start): triangle, subharmonics, folding
+kt = min(max(gkloopstart, 0), 1)
+ks2 = min(max(kt * 4, 0), 1)
+ks3 = min(max(kt * 4 - 1, 0), 1)
+kfd = min(max(kt * 4 - 2, 0), 1)
+kdr = min(max(kt * 4 - 3, 0), 1)
+atri poscil 1, af, giTri
+as2 poscil 1, af / 2, giSqr
+as3 poscil 1, af / 3, giSqr
+afo = sin(atri * (1 + 4 * kfd + 4 * kdr) * 1.5708)
+atn = atri * (1 - kfd) + afo * kfd
+atones = (atn + (0.5 * ks2 * as2 + 0.45 * ks3 * as3) * (1 - 0.6 * kdr)) * 0.5
+; activation: a constant (alt Start) + the touch (Freeze) + the experiment's own influence (alt Size)
+kfr portk (gkfreeze > 0.5 ? 1 : 0), 0.02
+kacti = min(1.5, gkloopstart_alt + kfr + gkloopsize_alt * kact * 2)
+kacs portk kacti, 0.01
+aacs interp kacs
+; your input into the experiment (Source); the hold cuts everything new out
+ksrc portk (gksource > 0.5 ? 1 : 0), 0.02
+khd portk gkHold, 0.05
+ain2 = (atones * aacs + (ain + ainr) * 0.75 * ksrc) * (1 - khd)
+; Time (Size), wobbled by the subharmonics (alt Pitch)
+ktime = 1.5 * pow(0.001, min(max(gkloopsize, 0), 1))   ; 1.5 s (anticlockwise) .. 1.5 ms (clockwise)
+ktmd = gkpitch_alt * gkpitch_alt * 0.6
+atime = ktime * exp((as2 + as3) * ktmd)
+; Filter (Window), agitated (alt Overlap depth: +-3 octaves); Absorb (Overlap)
+kfc = 60 * pow(16000 / 60, min(max(gkwindow, 0), 1))
+afc = kfc * exp(gaAg * gkoverlap_alt * 4.16)
+afc limit afc, 30, 18000
+kab = 20 * pow(200, min(max(gkoverlap, 0), 1))       ; 20 Hz .. 4 kHz
+kdec = pow(min(max(gkdensity, 0), 1), 0.7) * 1.08
+kdec = (gkHold > 0.5 ? 1.02 : kdec)
+aexp, kact, kint TimeFilter ain2, atime, afc, kab, kdec, 3
+; blend: the tones (as they are) <-> the experiment
+kb portk gkblend, 0.02
+amix = atones * cos(kb * 1.5708) * 0.8 + aexp * sin(kb * 1.5708) * 1.4
+amix dcblock amix, 0.9995
+; the stereo reverb after (alt Blend = amount, alt Window = size)
+krv = gkblend_alt * gkblend_alt
+krfb = 0.7 + 0.28 * gkwindow_alt
+arL, arR reverbsc amix, amix, krfb, 9000
+outs tanh(amix + arL * krv), tanh(amix + arR * krv)
+endin

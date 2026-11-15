@@ -1,0 +1,219 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,momentary,rising
+reset,momentary,rising
+source,latching,falling
+file,incremental,falling
+record,momentary,rising
+speed,0.5
+pitch,0.6
+start,0.3
+size,0.3
+density,0.3
+window,0.75
+overlap,0.3
+blend,0.1
+start_alt,0
+size_alt,0.35
+density_alt,0.25
+window_alt,0.6
+overlap_alt,0.4
+blend_alt,0.15
+pitch_alt,0.2
+nebconfigend
+
+; quartet.instr - four wavetable voices touched into life, each reshaped by one of eleven programs, through a
+; saturated ladder filter, a delay that runs away and a destructive distortion (in the spirit of a microtonal
+; four-voice drone synth). NebulaePD. Designed with the owner 2026-11-15 (the buttons are touch pads, File = the
+; programs, a stereo reverb after); the rest is in docs/QUARTET_SOMNUS.md. MIT.
+;
+; Pitch    the lowest voice, 1V/oct (click = C2)
+; Start    TUNING: how far apart the voices sit (unquantised: microtonal); alt Start past noon = chromatic
+; Size     WAVE: the position in the wavetable (sine > triangle > saw > square > pulse > formant > bell > buzz)
+; Density  MOD: the amount of the program (File)
+; Window   CUTOFF: the ladder low-pass (alt Pitch = resonance)
+; Overlap  FEEDBACK: the delay's repeats; 100 % at noon, more beyond (it runs away)
+; Speed    LFO on the cutoff: none between the clicks; clockwise a sine, anticlockwise sample & hold
+; Blend    BITE: distortion, waveshaping and a taming filter (fully anticlockwise = clean)
+; Record   touch voice 1 (momentary: while held, or while a gate is high)
+; Reset    touch voice 2 (momentary)
+; Freeze   touch voice 3 (momentary)
+; Source   voice 4 droning (latching, LED on)
+; File     the program: unison, sub-oscillators, chord, waveshaper, saturation, bitmangler, sample-rate reduction,
+;          noise, DJ filter, dual wave, hard sync (eleven go round)
+; alt (hold Source): Start = chromatic past noon, Size = delay mix, Density = envelope (attack/release), Overlap =
+;   delay time, Pitch = resonance, Window = reverb size, Blend = reverb amount, Speed = input gain (Nebulae's own)
+; Your input joins after the delay, into the distortion.
+
+; the wavetable: eight waves morphed into giMorph (Size)
+giW0 ftgen 0, 0, 4096, 10, 1
+giW1 ftgen 0, 0, 4096, 10, 1, 0, -0.1111, 0, 0.04, 0, -0.0204, 0, 0.0123
+giSawR ftgen 0, 0, 4096, 7, 1, 4096, -1
+giW2 ftgen 0, 0, 4096, 30, giSawR, 1, 40
+giSqrR ftgen 0, 0, 4096, 7, 1, 2048, 1, 0, -1, 2048, -1
+giW3 ftgen 0, 0, 4096, 30, giSqrR, 1, 40
+giPulR ftgen 0, 0, 4096, 7, 1, 1024, 1, 0, -0.333, 3072, -0.333
+giW4 ftgen 0, 0, 4096, 30, giPulR, 1, 40
+giW5 ftgen 0, 0, 4096, 10, 0.3, 0.2, 0.5, 1, 0.7, 0.3, 0.15, 0.4, 0.6, 0.3, 0.1
+giW6 ftgen 0, 0, 4096, 10, 0.5, 0, 0, 1, 0, 0, 0.7, 0, 0.5, 0, 0, 0.35, 0, 0, 0.25
+giW7 ftgen 0, 0, 4096, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+giWaves ftgen 0, 0, 8, -2, giW0, giW1, giW2, giW3, giW4, giW5, giW6, giW7
+giMorph ftgen 0, 0, 4096, 10, 1
+giSin ftgen 0, 0, 4096, 10, 1
+gkProg init 0
+gkWv init 0
+gaMix init 0
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20.1, 0, -1, 0
+event_i "i", 20.2, 0, -1, 1
+event_i "i", 20.3, 0, -1, 2
+event_i "i", 20.4, 0, -1, 3
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- the program (File), the wavetable morph (Size)
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkProg = (gkProg + 1) % 11
+endif
+gkWv = min(max(gkloopsize, 0), 1) * 6.999
+ftmorf gkWv, giWaves, giMorph
+endin
+
+instr 20
+; ---- one voice: touch envelope, tuning, the wavetable oscillator and its program
+iv = p4
+; the touch: Record / Reset / Freeze held (or a gate high), voice 4 latched by Source
+if iv == 0 then
+    kt = gkrecord
+elseif iv == 1 then
+    kt = gkreset
+elseif iv == 2 then
+    kt = gkfreeze
+else
+    kt = gksource
+endif
+ke = gkdensity_alt
+kat = 0.005 + 3 * ke * ke
+krl = 0.05 + 4.5 * ke * ke
+ktg = (kt > 0.5 ? 1 : 0)
+kenv init 0
+ktc = (ktg > kenv ? kat : krl)
+kenv = kenv + (ktg - kenv) * (1 - exp(-ksmps / (sr * ktc)))
+; tuning: voice iv sits iv x Start x 12 semitones above the Pitch note; alt Start past noon rounds to semitones
+kst = (gkpitch - 0.6) * 60
+koff = iv * gkloopstart * 12
+koff = (gkloopstart_alt > 0.5 ? round(koff) : koff)
+kf = min(65.406 * pow(2, (kst + koff) / 12), 6000)
+km = min(max(gkdensity, 0), 1)
+kp = gkProg
+af interp kf
+; the main oscillator (the morphing wavetable); hard sync swaps it for a synced copy
+if kp == 10 then
+    aph, async syncphasor kf / sr, a(0)
+    amast, asy2 syncphasor kf / sr, a(0)
+    aslv, asy3 syncphasor kf * (1 + km * 7) / sr, asy2
+    ao tablei aslv, giMorph, 1, 0, 1
+else
+    ao poscil 1, af, giMorph
+endif
+; the programs
+if kp == 0 then                                 ; unison: two detuned copies
+    au1 poscil 1, af * pow(2, km * 30 / 1200), giMorph
+    au2 poscil 1, af * pow(2, -km * 30 / 1200), giMorph
+    ao = (ao + au1 + au2) * 0.5
+elseif kp == 1 then                             ; sub-oscillators: an octave and two down
+    as1 poscil 1, af * 0.5, giSin
+    as2 poscil 1, af * 0.25, giSin
+    ao = ao + (as1 + as2 * 0.8) * km
+elseif kp == 2 then                             ; chord: two more notes, MOD picks the chord
+    kc = int(km * 6.999)
+    kc1 = (kc == 0 ? 0 : (kc == 1 ? 12 : (kc == 2 ? 7 : (kc == 3 ? 4 : (kc == 4 ? 3 : (kc == 5 ? 5 : 10))))))
+    kc2 = (kc == 0 ? 0 : (kc == 1 ? 24 : (kc == 2 ? 12 : (kc == 3 ? 7 : (kc == 4 ? 7 : (kc == 5 ? 7 : 7))))))
+    ach1 poscil 1, af * pow(2, kc1 / 12), giMorph
+    ach2 poscil 1, af * pow(2, kc2 / 12), giMorph
+    ao = (ao + (ach1 + ach2) * (kc > 0 ? 0.8 : 0)) * 0.6
+elseif kp == 3 then                             ; waveshaper: folding
+    ao = sin(ao * (1 + km * 6) * 1.5708)
+elseif kp == 4 then                             ; saturation
+    kdr = 1 + km * 20
+    ao = tanh(ao * kdr) / tanh(kdr) * 0.9
+elseif kp == 5 then                             ; bitmangler: fewer bits
+    kbits = pow(2, 12 - km * 10.5)
+    ao = round(ao * kbits) / kbits
+elseif kp == 6 then                             ; sample-rate reduction
+    ao fold ao, 1 + km * km * 80
+elseif kp == 7 then                             ; noise, tuned round the voice
+    an noise 1, 0
+    an butbp an, kf * 2, kf
+    ao = ao * (1 - km * 0.5) + an * km * 2.5
+elseif kp == 8 then                             ; DJ filter: low-pass below noon, high-pass above
+    if km < 0.5 then
+        ao butlp ao, 30 * pow(600, km * 2)
+    else
+        ao buthp ao, 20 * pow(400, (km - 0.5) * 2)
+    endif
+elseif kp == 9 then                             ; dual wave: a second wave further along the table
+    kw2 = (gkWv + 1 + km * 5) % 7
+    kw2i = int(kw2)
+    kw2f = kw2 - kw2i
+    kt1 table kw2i, giWaves
+    kt2 table kw2i + 1, giWaves
+    adp phasor af * 1.002                       ; (tablekt: the table changes while it plays; poscil can't)
+    ad1 tablekt adp, kt1, 1, 0, 1
+    ad2 tablekt adp, kt2, 1, 0, 1
+    ao = (ao + ad1 * (1 - kw2f) + ad2 * kw2f) * 0.6
+endif
+aenv interp kenv
+gaMix = gaMix + ao * aenv * 0.22
+endin
+
+instr 30
+; ---- saturated mix -> ladder filter (LFO on Speed) -> delay -> + your input -> bite -> reverb
+ain, ainr inch 1, 2
+amix = tanh(gaMix * 1.6) / 1.2
+gaMix = 0
+; the LFO (Speed): none between the clicks; clockwise a sine, anticlockwise sample & hold; +-2 octaves at the ends
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+klr = 0.1 * pow(80, kx)
+ksn oscili 1, klr
+ksh randh 1, klr
+klfo = (kd > 0 ? ksn : ksh) * kx * 2
+kfc = 40 * pow(450, min(max(gkwindow, 0), 1)) * pow(2, klfo)
+kfc = min(kfc, 18000)
+kres = 0.5 + 15 * gkpitch_alt * gkpitch_alt
+af zdf_ladder amix, kfc, kres
+; the delay: alt Overlap = time (10 ms .. 1.6 s), Overlap = feedback (100 % at noon; beyond it runs away, held by
+; a tanh), alt Size = mix
+kdt = 0.01 + 1.59 * gkoverlap_alt * gkoverlap_alt
+kdt portk kdt, 0.1, i(kdt)
+adt interp kdt
+kfb = gkoverlap * 2.2
+adl delayr 2
+atap deltapi adt
+delayw af + tanh(atap * kfb)
+kmx = gkloopsize_alt
+ad = af * (1 - kmx) + atap * kmx
+; your input joins here, then the bite: drive + fold, tamed by a low-pass that closes as it bites harder
+ad = ad + (ain + ainr) * 0.5
+kbt = gkblend * gkblend
+kdrv = 1 + kbt * 30
+ab = tanh(ad * kdrv)
+ab = ab * (1 - kbt * 0.6) + sin(ab * 3.14159 * (1 + kbt * 2)) * kbt * 0.6
+kchk = 18000 * pow(0.15, kbt)
+ab butlp ab, kchk
+ab = ad * (1 - min(1, kbt * 8)) + ab * min(1, kbt * 8) * 0.8
+ab dcblock ab, 0.9995
+; the stereo reverb after (alt Blend = amount, alt Window = size)
+krv = gkblend_alt * gkblend_alt
+krfb = 0.7 + 0.28 * gkwindow_alt
+arL, arR reverbsc ab, ab, krfb, 9000
+outs tanh(ab + arL * krv), tanh(ab + arR * krv)
+endin

@@ -1,0 +1,142 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,latching,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.5
+size,0.5
+density,0.5
+window,0.7
+overlap,0.15
+blend,0.5
+window_alt,0.6
+blend_alt,0.15
+nebconfigend
+
+; cauldron.instr - your input poured into a time/filter experiment that can play itself (in the spirit of a
+; Eurorack echoverb). NebulaePD. Designed with the owner 2026-11-15 (Pitch = Time 1V/oct, the buttons are its
+; self-patches + hold, a stereo reverb after); the rest is in docs/HEX_CAULDRON.md. MIT.
+;
+; Pitch    TIME, 1V/oct: the rate your sound drips into the filter. 20 ms at the click (with Decay up it rings at
+;          50 Hz there, and you can play it); slow = long, grainy, noisy (File = the long range, x8)
+; Start    INPUT LEVEL into the experiment (x0.25 .. x4, unity at noon; it saturates)
+; Size     the self-patches' depth (Record / Source / Reset)
+; Density  DECAY: a handful of iterations -> infinity
+; Window   FILTER: a low-pass on every pass
+; Overlap  ABSORB: a high-pass on every pass
+; Speed    TIME MODULATION: none between the clicks; clockwise a smooth wow, anticlockwise a random flutter
+; Blend    dry <-> the experiment
+; Record   WOW & FLUTTER (latching): the experiment's activity stretches Time
+; Source   NOISE (latching): its interference shakes Absorb
+; Reset    WIND & WAVE (latching): its interference pours back into the input, its activity opens the Filter
+; Freeze   HOLD (latching): decay to infinity, nothing new comes in
+; File     Time range: short (0.9 ms .. 0.45 s) <-> long (x8, to 3.6 s)
+; alt (hold Source): Window = reverb size, Blend = reverb amount, Speed = input gain (Nebulae's own)
+; ---- the time/filter experiment (shared with cauldron.instr): a clocked delay with three taps, the first fed back
+; through a low-pass (Filter) and a high-pass (Absorb), soft-limited, so Decay can go to infinity. The clock is
+; 1024 stages over Time: long times run a slow clock, so the repeats grow grainy and noisy, as a bucket-brigade
+; line does. Out: the audio, its activity (a 0..1 envelope) and its interference (the raw output, sampled per block)
+opcode TimeFilter, akk, aaakkk
+ain, atime, afilt, kabsorb, kdecay, kmax xin
+atime limit atime, 0.0008, kmax
+ktm downsamp atime
+kclk = min(1024 / ktm, sr)
+kinc = max(1, sr / kclk)
+knz = 0.012 * min(1, max(0, (6000 - kclk) / 6000))     ; the slow clock's noise
+; everything poured in, and every pass round, goes through the filter and the absorb, then the clock's grain.
+; (The feedback is read and written within the same block: computed a block late, it added 0.67 ms to the loop
+; and put the ringing pitch out by up to 5 %.)
+; the feedback tap is corrected for the filters' phase at the loop's own frequency (the high-pass leads, the
+; low-pass lags, the clock's hold lags), so Time stays the ringing period
+kf0 = 1 / ktm
+kfl = k(afilt)
+kph_hp = 3.14159265 - taninv2(1.4142136 * kf0 * kabsorb, kabsorb * kabsorb - kf0 * kf0)
+krt = kf0 / kfl
+kph_lp = taninv2(krt / 0.6, 1 - krt * krt)
+; (only where the loop's frequency is in each filter's passband: far below the high-pass there's no ringing pitch
+; to keep, and its near-180 degree lead would have added a whole extra echo's worth)
+kwhp = min(max((kf0 / kabsorb - 0.6) / 0.6, 0), 1)
+kwlp = min(max((kfl / kf0 - 0.6) / 0.6, 0), 1)
+kcomp = (kph_hp * kwhp - kph_lp * kwlp) / (6.2831853 * kf0) - (kinc - 1) * 0.5 / sr
+adl delayr 6
+at1 deltapi atime + kcomp
+at2 deltapi atime * 0.707
+at3 deltapi atime * 0.43
+anz noise knz, 0
+afbk = tanh((at1 + anz) * kdecay * 1.12) / 1.12
+afi = ain + afbk
+afi zdf_2pole afi, afilt, 0.6
+afi buthp afi, kabsorb
+afi fold afi, kinc
+delayw afi
+aout = at1 * 0.62 + at2 * 0.3 + at3 * 0.2
+krm rms aout, 8
+kint downsamp aout
+xout aout, min(krm * 3, 1), kint
+endop
+
+instr 1
+event_i "i", 20, 0, -1
+endin
+
+instr 20
+; ---- your input poured into the experiment, the self-patches, blend, reverb
+ain, ainr inch 1, 2
+kact init 0
+kint init 0
+aexp init 0
+krng init 0
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    krng = 1 - krng
+endif
+kdep = gkloopsize * gkloopsize                  ; the self-patches' depth (Size)
+kwow portk (gkrecord > 0.5 ? 1 : 0), 0.05
+knoi portk (gksource > 0.5 ? 1 : 0), 0.05
+kwnd portk (gkreset > 0.5 ? 1 : 0), 0.05
+khd portk (gkfreeze > 0.5 ? 1 : 0), 0.05
+; the input (Start = level into the experiment: x0.25 .. x4, unity at noon), Wind & Wave adds its interference
+kin = pow(4, (gkloopstart - 0.5) * 2)
+ainm = (ain + ainr) * 0.5
+aint upsamp kint
+ain2 = (ainm * kin + aint * kwnd * kdep * 0.8) * (1 - khd)
+; Time (Pitch, 1V/oct): 20 ms at the click; File = the long range (x8)
+kst = (gkpitch - 0.6) * 60
+ktime = 0.02 * pow(2, -kst / 12) * (krng > 0.5 ? 8 : 1)
+ktime portk ktime, 0.02, i(ktime)
+; Speed: time modulation (none between the clicks; clockwise a smooth wow, anticlockwise a random flutter)
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)
+kwr = 0.3 + 6 * kx
+kws oscili 1, kwr
+kwf randi 1, kwr * 3
+kwv = (kd > 0 ? kws : kwf) * kx * 0.08
+; Wow & Flutter (Record): the experiment's activity stretches Time
+kwa = kact * kwow * kdep * 0.5
+atime interp ktime * exp(kwv + kwa)
+; Filter (Window), opened by the activity in Wind & Wave; Absorb (Overlap), shaken by interference in Noise
+kfc = 60 * pow(16000 / 60, min(max(gkwindow, 0), 1)) * exp(kact * kwnd * kdep * 2.5)
+afc interp min(kfc, 18000)
+kab = 20 * pow(200, min(max(gkoverlap, 0), 1)) * exp(limit(kint * knoi * kdep * 6, -3, 3))
+kab = min(kab, 12000)
+kdec = pow(min(max(gkdensity, 0), 1), 0.7) * 1.08
+kdec = kdec * (1 - khd) + 1.02 * khd
+kmx = (krng > 0.5 ? 5.4 : 0.7)
+aexp, kact, kint TimeFilter ain2, atime, afc, kab, kdec, kmx
+aexp dcblock aexp, 0.9995
+; blend: dry (stereo) <-> the experiment (mono), then the stereo reverb (alt Blend = amount, alt Window = size)
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708) * 1.4
+krv = gkblend_alt * gkblend_alt
+krfb = 0.7 + 0.28 * gkwindow_alt
+arL, arR reverbsc aexp * kwet, aexp * kwet, krfb, 9000
+outs tanh(ain * kdry + aexp * kwet + arL * krv), tanh(ainr * kdry + aexp * kwet + arR * krv)
+endin

@@ -59,6 +59,10 @@ with incoming audio". They picked the first four.
 | ★ | **plates**: **built 2026-11-15** (`instr/plates.instr`, docs/PLATES.md; after the Lyra-8) | Eight voices in pairs, touched in on buttons/gates, neighbour FM, hyper LFO, delay, distortion | Csound / M |
 | ★ | **veil**: **built 2026-11-15** (`instr/veil.instr`, docs/VEIL.md; after the Vhikk X) | Six drone algorithms on the same overtone/formant/spread/cross-mod knobs, drift, randomise, space, shimmer | Csound / M-L |
 | ★ | **register**: **built 2026-11-15** (`instr/register.instr`, docs/REGISTER.md; after the Hikari Monos) | Shift-register noise clocked by Pitch, locked loops, dividers, a Korg 35 filter the register can step | Csound / M |
+| ★ | **hex**: **built 2026-11-15** (`instr/hex.instr`; after the Make Noise Strega) | Tones poured into a clocked time/filter experiment, agitated | Csound / M |
+| ★ | **cauldron**: **built 2026-11-15** (`instr/cauldron.instr`; after the Make Noise Bruxa) | The same experiment as an input effect, Time on 1V/oct, self-patches | Csound / M |
+| ★ | **quartet**: **built 2026-11-15** (`instr/quartet.instr`; after the Neutral Labs Elmyra 2) | Four touch wavetable voices, 11 programs, ladder, runaway delay, bite | Csound / M |
+| ★ | **somnus**: **built 2026-11-15** (`instr/somnus.instr`; after the Befaco Oneiroi) | Stereo oscillators + 5 s looper through filter, resonator, echo, ambience; randomise/undo | Csound / M-L |
 | | **spiral** | An endless rising/falling Shepard–Risset drone | Pd / S |
 | | **accrete** | Each note you play is caught as a frozen spectrum and layered in: a drone that builds from your playing (recommended next) | SC or Pd / M |
 | | **memory** | Tracks the pitches you play; the most-played become a slowly gathering drone chord | SC / M |

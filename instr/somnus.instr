@@ -1,0 +1,245 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,triggered,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.625
+pitch,0.6
+start,0
+size,1
+blend,0.2
+density,0.8
+window,0.2
+overlap,0.3
+start_alt,0.3
+size_alt,0.6
+density_alt,0.2
+window_alt,0.6
+overlap_alt,0.4
+blend_alt,0.4
+pitch_alt,0.4
+nebconfigend
+
+; somnus.instr - a stereo dream machine: oscillators and a 5-second looper through filter, resonator, echo and
+; ambience, with a randomiser you can undo (in the spirit of an ambient drone/looper module). NebulaePD. Designed
+; with the owner 2026-11-15 (Blend morphs the sources, Record / randomise / undo, File = filter mode); the rest is
+; in docs/QUARTET_SOMNUS.md. MIT.
+;
+; Pitch    the oscillators, 1V/oct (click = C3)
+; Blend    SOURCE: sine -> supersaw -> wavetable read from the loop -> the loop itself
+; Speed    the loop's VARISPEED: stopped at noon, the clicks = 1x backwards / forwards, the ends = 2x
+; Start    the loop's START
+; Size     the loop's LENGTH: 7.6 ms (a tiny loop is an oscillator: C3 at 1x) .. the full 5 s
+; Density  FILTER cutoff (File = mode; alt Density = resonance)
+; Window   RESONATOR: three tuned resonances (root, fifth, octave; alt Pitch = tune), more = wetter and longer
+; Overlap  ECHO: two taps (left, right x 1.5), more = wetter and more repeats (alt Overlap = time)
+; Record   record into the loop (latching, LED on): your input, layered over what's there (alt Size = how much of
+;          the old stays); alt Record = record the output instead
+; Reset    randomise: the source, loop, filter, resonator and echo jump somewhere new (gliding)
+; Freeze   undo the last randomise
+; Source   your input straight into the effects too (latching, LED on)
+; File     filter mode: low-pass -> band-pass -> high-pass -> comb
+; alt (hold Source): Start = supersaw detune / wavetable offset, Size = sound-on-sound (how much of the old loop
+;   stays when recording), Density = resonance, Overlap = echo time, Pitch = resonator tune, Window = ambience
+;   spacetime (small and dark -> vast and bright), Blend = ambience amount, Speed = input gain (Nebulae's own)
+; The loop starts filled with white noise (as the original does), so it sounds before you record.
+
+giLen = 240000                                  ; 5 s at 48 kHz
+giBufL ftgen 0, 0, -giLen, 21, 1, 0.3           ; white noise to begin with
+giBufR ftgen 0, 0, -giLen, 21, 1, 0.3
+giSin ftgen 0, 0, 4096, 10, 1
+gkMode init 0
+gkRS[] init 7                                   ; randomiser offsets (current target)
+gkRU[] init 7                                   ; the previous target (undo)
+gkRC[] init 7                                   ; the glided value
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20, 0, -1
+endin
+
+instr 10
+; ---- File = filter mode; Reset = randomise (new targets), Freeze = undo (back to the previous ones)
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkMode = (gkMode + 1) % 4
+endif
+krs trigger gkreset, 0.5, 0
+kun trigger gkfreeze, 0.5, 0
+if krs == 1 then
+    gkRU[0] = gkRS[0]
+    gkRU[1] = gkRS[1]
+    gkRU[2] = gkRS[2]
+    gkRU[3] = gkRS[3]
+    gkRU[4] = gkRS[4]
+    gkRU[5] = gkRS[5]
+    gkRU[6] = gkRS[6]
+    kr0 random -0.35, 0.35
+    kr1 random -0.35, 0.35
+    kr2 random -0.35, 0.35
+    kr3 random -0.35, 0.35
+    kr4 random -0.35, 0.35
+    kr5 random -0.35, 0.35
+    kr6 random -0.35, 0.35
+    gkRS[0] = kr0
+    gkRS[1] = kr1
+    gkRS[2] = kr2
+    gkRS[3] = kr3
+    gkRS[4] = kr4
+    gkRS[5] = kr5
+    gkRS[6] = kr6
+endif
+if kun == 1 then
+    gkRS[0] = gkRU[0]
+    gkRS[1] = gkRU[1]
+    gkRS[2] = gkRU[2]
+    gkRS[3] = gkRU[3]
+    gkRS[4] = gkRU[4]
+    gkRS[5] = gkRU[5]
+    gkRS[6] = gkRU[6]
+endif
+kc = 1 - exp(-ksmps / (sr * 0.25))
+; (each glide snaps onto its target at the end: the wavetable's offset is so fine that a residue of 0.0001 put
+; the undo a few samples out, which in a noise-filled loop is a different waveform)
+#define GL(N) #
+gkRC[$N.] = (abs(gkRS[$N.] - gkRC[$N.]) < 0.0005 ? gkRS[$N.] : gkRC[$N.] + (gkRS[$N.] - gkRC[$N.]) * kc)
+#
+$GL(0)
+$GL(1)
+$GL(2)
+$GL(3)
+$GL(4)
+$GL(5)
+$GL(6)
+endin
+
+instr 20
+ain, ainr inch 1, 2
+; ---- the knobs, plus the randomiser's offsets (Blend, Start, Size, Density, Window, Overlap, detune)
+kbl = min(max(gkblend + gkRC[0], 0), 1)
+kls = min(max(gkloopstart + gkRC[1], 0), 1)
+kll = min(max(gkloopsize + gkRC[2], 0), 1)
+kfi = min(max(gkdensity + gkRC[3], 0), 1)
+krz = min(max(gkwindow + gkRC[4], 0), 1)
+kec = min(max(gkoverlap + gkRC[5], 0), 1)
+kdt = min(max(gkloopstart_alt + gkRC[6], 0), 1)
+; ---- the loop: varispeed (Speed), start, length; record = layer onto what's there at the play position
+kd = (gkspeed - 0.5) / 0.125                    ; the clicks at -1 / +1
+kad = abs(kd)
+krate = (kd < 0 ? -1 : 1) * (kad <= 1 ? kad : 1 + (kad - 1) / 3)     ; 1x at the clicks, 2x at the ends
+klen = 0.0076445 * pow(654.07, kll)             ; one period of C3 (7.6 ms: a tiny loop plays C3 at 1x) .. 5 s
+klen = min(klen, giLen / sr)
+kst = kls * (giLen / sr - klen)                 ; the start keeps the loop inside the buffer
+alp phasor krate / klen
+apos = (kst + alp * klen) * sr
+aLl tablei apos, giBufL, 0, 0, 1
+aLr tablei apos, giBufR, 0, 0, 1
+; ---- the oscillators (Pitch): a stereo sine, a supersaw (alt Start = detune), a wavetable read from the loop
+kp = (gkpitch - 0.6) * 60
+kf = min(130.81 * pow(2, kp / 12), 8000)
+asL poscil 0.5, kf * 0.999, giSin
+asR poscil 0.5, kf * 1.001, giSin
+kdc = kdt * kdt * 0.06
+#define SAW(N'D) #
+ass$N. vco2 0.12, kf * (1 + $D. * kdc)
+#
+$SAW(1'-1)
+$SAW(2'-0.33)
+$SAW(3'0.33)
+$SAW(4'1)
+$SAW(5'-0.66)
+$SAW(6'0.66)
+aswL = ass1 + ass2 + ass5 + ass3 * 0.5
+aswR = ass4 + ass3 + ass6 + ass2 * 0.5
+awp phasor kf
+kwo = (kst + kdt * 0.5 * (giLen / sr - 0.05)) * sr          ; the window's offset into the loop
+awL tablei awp * 2048 + kwo, giBufL, 0, 0, 1
+awR tablei awp * 2048 + kwo, giBufR, 0, 0, 1
+; the source morph (Blend): sine -> supersaw -> wavetable -> loop
+kx3 = kbl * 3
+kw0 = max(0, 1 - kx3)
+kw1 = (kx3 < 1 ? kx3 : max(0, 2 - kx3))
+kw2 = (kx3 < 1 ? 0 : (kx3 < 2 ? kx3 - 1 : 3 - kx3))
+kw3 = max(0, kx3 - 2)
+aL = asL * kw0 + aswL * kw1 + awL * kw2 * 0.8 + aLl * kw3 * 1.6
+aR = asR * kw0 + aswR * kw1 + awR * kw2 * 0.8 + aLr * kw3 * 1.6
+; your input straight into the effects (Source)
+ksrc portk (gksource > 0.5 ? 1 : 0), 0.02
+aL = aL + ain * ksrc
+aR = aR + ainr * ksrc
+; ---- the filter (Density; File = mode; alt Density = resonance)
+kfc = 30 * pow(600, kfi)
+kq = 0.5 + 12 * gkdensity_alt * gkdensity_alt
+kmd = gkMode
+if kmd < 3 then
+    afl1, afb1, afh1 zdf_2pole_mode aL, kfc, kq
+    afl2, afb2, afh2 zdf_2pole_mode aR, kfc, kq
+    aFL = (kmd == 0 ? afl1 : (kmd == 1 ? afb1 * 1.5 : afh1))
+    aFR = (kmd == 0 ? afl2 : (kmd == 1 ? afb2 * 1.5 : afh2))
+else                                            ; comb: a short delay at the cutoff's period, fed back
+    kcd = 1 / min(max(kfc, 40), 1400)
+    kcf = 0.5 + 0.48 * gkdensity_alt
+    acbl delayr 0.05
+    acl deltapi kcd
+    delayw aL + acl * kcf
+    acbr delayr 0.05
+    acr deltapi kcd
+    delayw aR + acr * kcf
+    aFL = (aL + acl) * 0.5
+    aFR = (aR + acr) * 0.5
+endif
+aL = aFL
+aR = aFR
+; ---- the resonator (Window): root, fifth, octave on alt Pitch's tune; wetter and longer as Window rises
+krt = 40 * pow(17.5, gkpitch_alt)               ; 40 .. 700 Hz (each band at least one 32-sample block long)
+krg = 0.8 + 0.18 * krz
+#define RZ(N'R) #
+arl$N. delayr 0.03
+arlt$N. deltapi 1 / (krt * $R.)
+delayw aL * 0.3 + arlt$N. * krg
+arr$N. delayr 0.03
+arrt$N. deltapi 1 / (krt * $R. * 1.003)
+delayw aR * 0.3 + arrt$N. * krg
+#
+$RZ(1'1)
+$RZ(2'1.4983)
+$RZ(3'2)
+aRzL = arlt1 + arlt2 * 0.8 + arlt3 * 0.7
+aRzR = arrt1 + arrt2 * 0.8 + arrt3 * 0.7
+aL = aL * (1 - krz * 0.8) + aRzL * krz * 0.6
+aR = aR * (1 - krz * 0.8) + aRzR * krz * 0.6
+; ---- the echo (Overlap; alt Overlap = time): two taps, left at T, right at 1.5 T, crossed
+ket = 0.05 + 1.45 * gkoverlap_alt * gkoverlap_alt
+ket portk ket, 0.1, i(ket)
+kefb = 0.85 * kec
+aedl delayr 2.3
+aetl deltapi interp(ket)
+aetr deltapi interp(ket * 1.5)
+delayw (aL + aR) * 0.5 + (aetl + aetr) * 0.5 * kefb
+aL = aL * (1 - kec * 0.5) + aetl * kec
+aR = aR * (1 - kec * 0.5) + aetr * kec
+; ---- record into the loop: the input (or, with alt Record, the output), layered over the old (alt Size)
+krec portk (gkrecord > 0.5 ? 1 : 0), 0.01
+kpost = (gkrecord_alt > 0.5 ? 1 : 0)
+ksos = gkloopsize_alt
+if krec > 0.0001 then
+    awl = (ain * (1 - kpost) + aL * kpost * 0.7)
+    awr = (ainr * (1 - kpost) + aR * kpost * 0.7)
+    tablew aLl * (1 - krec + krec * ksos) + awl * krec, apos, giBufL, 0, 0, 1
+    tablew aLr * (1 - krec + krec * ksos) + awr * krec, apos, giBufR, 0, 0, 1
+endif
+; ---- ambience (alt Blend = amount, alt Window = spacetime: small and dark -> vast and bright)
+kam = gkblend_alt * gkblend_alt
+ksp = gkwindow_alt
+arvL, arvR reverbsc aL, aR, 0.6 + 0.38 * ksp, 2000 * pow(7, ksp)
+aL = aL + arvL * kam
+aR = aR + arvR * kam
+aL dcblock aL, 0.9995
+aR dcblock aR, 0.9995
+outs tanh(aL), tanh(aR)
+endin

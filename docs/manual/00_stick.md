@@ -63,6 +63,10 @@ function. On our instruments, a knob's alt value only changes once you move it p
 | **plates** | Csound | An eight-voice drone you touch into life (after the SOMA Lyra-8) |
 | **veil** | Csound | A drone voice with six algorithms (after the Forge TME Vhikk X) |
 | **register** | Csound | Shift-register noise (after the Hikari Monos) |
+| **hex** | Csound | A tonic spilled into a time/filter experiment (after the Make Noise Strega) |
+| **cauldron** | Csound | Your sound poured into a time/filter experiment (after the Make Noise Bruxa) |
+| **quartet** | Csound | Four wavetable voices, eleven programs, a runaway delay (after the Neutral Labs Elmyra 2) |
+| **somnus** | Csound | Oscillators and a looper through filter, resonator, echo, ambience (after the Befaco Oneiroi) |
 | **Pearls** | Csound | Mutable Instruments Beads, ported |
 | **bt_storyteller** | Csound | The granular looper, narrating to your PC over Bluetooth |
 | **AVALON** | Csound | Ian Hoogeboom's wavetable morph oscillator (after the Synthesis Technology E350 / E352) |
