@@ -1,16 +1,21 @@
 ==============================================================================
-Csound, user bank  -  Speed anticlockwise (left light)  -  9 files
+Csound, user bank  -  Speed anticlockwise (left light)  -  13 files
   [1-5] Pitch light white
-      Record   1  001_a_granular_looper_Factory_Default
-      File     2  002_avalon
-      Source   3  003_bowed_drone
-      Reset    4  004_mars_affects
-      Freeze   5  005_realms_v1.0
+      Record   1  002_avalon
+      File     2  003_bowed_drone
+      Source   3  004_mars_affects
+      Reset    4  005_realms_v1.0
+      Freeze   5  006_stretch
   [6-10] Pitch light orange
-      Record   6  999_fw_backup
-      File     7  bt_storyteller
-      Source   8  bt_test
-      Reset    9  pearls
+      Record   6  007_morph
+      File     7  008_scan
+      Source   8  009_pulsar
+      Reset    9  010_tanpura
+      Freeze  10  011_chorale
+  [11-15] Pitch light yellow
+      Record  11  999_fw_backup
+      File    12  bt_storyteller
+      Source  13  pearls
 ==============================================================================
 Factory (built in)  -  Speed in the middle (both lights)  -  5 files
   [1-5] Pitch light white
@@ -20,7 +25,7 @@ Factory (built in)  -  Speed in the middle (both lights)  -  5 files
       Reset    4  d_effects
       Freeze   5  e_testio
 ==============================================================================
-Pd  -  Speed clockwise (right light green)  -  11 files
+Pd  -  Speed clockwise (right light green)  -  15 files
   [1-5] Pitch light white
       Record   1  A_durm
       File     2  B_Plasma_Membrane
@@ -34,14 +39,22 @@ Pd  -  Speed clockwise (right light green)  -  11 files
       Reset    9  I_shimmer
       Freeze  10  J_resonator
   [11-15] Pitch light yellow
-      Record  11  ZZ_pitchlog
+      Record  11  K_chop
+      File    12  L_vocoder
+      Source  13  M_topokits
+      Reset   14  N_shift
+      Freeze  15  O_partials
 ==============================================================================
-SuperCollider  -  Speed clockwise again (right light BLUE)  -  5 files
+SuperCollider  -  Speed clockwise again (right light BLUE)  -  8 files
   [1-5] Pitch light white
-      Record   1  01_sctest
-      File     2  02_sc_drift
-      Source   3  03_sc_strike
-      Reset    4  04_sc_cloud
-      Freeze   5  31-simple
+      Record   1  02_sc_drift
+      File     2  03_sc_strike
+      Source   3  04_sc_cloud
+      Reset    4  05_sc_pattern
+      Freeze   5  06_sc_follow
+  [6-10] Pitch light orange
+      Record   6  07_sc_mosaic
+      File     7  08_sc_space
+      Source   8  09_sc_swarm
 ==============================================================================
 Hold Speed 1.5 s = selector. Pitch turn = group of five. Lit button = loads at once. Pitch/Speed click = leave.

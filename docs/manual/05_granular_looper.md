@@ -1,8 +1,9 @@
 # The two granular loopers: what's different
 
-The stick has the granular looper twice:
+The stick had the granular looper twice:
 - `a_granularlooper`: the built-in one in the **Factory bank** (Speed in the middle, Record button).
-- `001_a_granular_looper_Factory_Default`: a copy in the **Csound user bank** (white page, Record button).
+- `001_a_granular_looper_Factory_Default`: a copy that was in the **Csound user bank** (taken off the stick on
+  2026-11-15, because the Factory one does everything it does).
 
 They sound the same. The grains, pitch, speed, recording, overdubbing and the alt knobs all come from almost
 identical Csound code, so Qu-Bit's manual covers both. The difference is the firmware around them. It gives
@@ -27,10 +28,10 @@ the loop to a WAV.
 - The 300-second record buffer, and the same buffer, ksmps and sample-rate settings.
 
 ## Which to use
-Use the **Factory** one. It is the newer code and has every feature. The user-bank copy only earns its place if
-you want a second copy on the user bank, for example as a fallback while trying a different firmware.
+Use the **Factory** one. It is the newer code and has every feature, which is why the user-bank copy came off
+the stick.
 
-`bt_storyteller` (yellow page, Source) is the newer Factory code, so it can save loops with File + Freeze. Like
+`bt_storyteller` (Csound user, yellow page, File) is the newer Factory code, so it can save loops with File + Freeze. Like
 the `001` copy, it is in the user bank under a different name, so it lacks the other five extras in the table.
 
 ## Why

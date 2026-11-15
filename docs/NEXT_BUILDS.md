@@ -13,51 +13,34 @@ file brings the status up to date and gives you the build queue.
   is planned for this queue.
 - **stretch** (Csound, `instr/stretch.instr`) was built on 2026-11-13. It passed its offline tests (13/13 on 6.18,
   2/2 on 6.09) and is **waiting for the owner's hardware test**.
-  - It isn't on the stick yet, because the stick (D:) wasn't plugged in. The file to copy is
-    `firmware/dist/stage_stretch/006_stretch.instr`.
-  - When the stick is back, copy that file, regenerate `manifest.txt` and `D:\nebulae_banks.txt` with
-    `tools/stick_manifest.py`, and put `docs/manual/Nebulae instruments.pdf` on the stick.
 - **chop** (Pd, `patches/09_chop.pd`) was built on 2026-11-14 after a full design walk-through. It passed its
   offline tests (`python tools/chop_tests.py`, 13 scenarios) and is **waiting for the owner's hardware test**.
-  Stick file: `firmware/dist/stage_chop/K_chop.pd` (Pd yellow page, Record; `ZZ_pitchlog` moves to File).
+  Stick file: `firmware/dist/stage_chop/K_chop.pd` (Pd yellow page, Record).
 - **2026-11-14, the owner (away from the keyboard): "Make auto decisions and carry on to next instruments for me to
   check."** So the builds after chop were designed without a walk-through: each design doc lists its decisions
   and the alternatives, for the owner to review before (or after) a hardware test.
 - **vocoder** (Pd, `patches/10_vocoder.pd`) built 2026-11-14 that way (`docs/VOCODER.md`: 15 decisions to
   review). Offline tests pass (`python tools/vocoder_tests.py`, 10 scenarios). Stick file:
-  `firmware/dist/stage_vocoder/L_vocoder.pd` (Pd yellow page, File; `ZZ_pitchlog` moves to Source).
+  `firmware/dist/stage_vocoder/L_vocoder.pd` (Pd yellow page, File).
 - **topo kits** (Pd, `patches/11_topokits.pd`, a sibling: `06_topo.pd` unchanged) built 2026-11-14 the same way
   (`docs/TOPOKITS.md`). Tests pass (`python tools/topokits_tests.py`). Stick file:
-  `firmware/dist/stage_topokits/M_topokits.pd` (Pd yellow page, Source; `ZZ_pitchlog` moves to Reset).
+  `firmware/dist/stage_topokits/M_topokits.pd` (Pd yellow page, Source).
 - **morph** (Csound, `instr/morph.instr`) built 2026-11-14 the same way (`docs/MORPH.md`). Tests: WSL
   `tools/morph_sim.py` 13/13 (6.18) + `python tools/morph_sim.py m609` (6.09.1). Stick file:
-  `firmware/dist/stage_morph/007_morph.instr` (Csound user orange page, File; Pearls moves to the yellow page).
+  `firmware/dist/stage_morph/007_morph.instr` (Csound user orange page, File).
 - **scan** (Csound, `instr/scan.instr`) built 2026-11-14 the same way (`docs/SCAN.md`). `scanu`/`scans` are
   missing from the module's Csound 6.11 (checked in the SD image), so the string is written out. Tests: WSL
   `tools/scan_sim.py` 11/11 + `python tools/scan_sim.py m609`. Stick file:
-  `firmware/dist/stage_scan/008_scan.instr` (Csound user orange page, Source; `bt_test` and Pearls move to the
-  yellow page).
-- **To copy to the stick (2026-11-14), all from `firmware/dist/`** (then regenerate `manifest.txt` and
-  `D:\nebulae_banks.txt` with `tools/stick_manifest.py`, and copy `docs/manual/Nebulae instruments.pdf`):
-
-  | File | Bank, page, button |
-  |---|---|
-  | `stage_stretch/006_stretch.instr` | Csound user, orange, Record |
-  | `stage_morph/007_morph.instr` | Csound user, orange, File |
-  | `stage_scan/008_scan.instr` | Csound user, orange, Source (`999_fw_backup`, `bt_storyteller` move along; `bt_test`, `pearls` to yellow) |
-  | `stage_pulsar/009_pulsar.instr` | Csound user, orange, Reset |
-  | `stage_tanpura/010_tanpura.instr` | Csound user, orange, Freeze |
-  | `stage_chorale/011_chorale.instr` | Csound user, yellow, Record (`999_fw_backup`, `bt_storyteller`, `bt_test`, `pearls` follow it) |
-  | `stage_chop/K_chop.pd` | Pd, yellow, Record |
-  | `stage_vocoder/L_vocoder.pd` | Pd, yellow, File |
-  | `stage_topokits/M_topokits.pd` | Pd, yellow, Source |
-  | `stage_shift/N_shift.pd` | Pd, yellow, Reset |
-  | `stage_partials/O_partials.pd` | Pd, yellow, Freeze (`ZZ_pitchlog` moves to the blue page, Record) |
-  | `sc/05_sc_pattern.scd` (from the repo) | SuperCollider, white, Freeze |
-  | `sc/06_sc_follow.scd` | SuperCollider, orange, Record |
-  | `sc/07_sc_mosaic.scd` | SuperCollider, orange, File |
-  | `sc/08_sc_space.scd` | SuperCollider, orange, Source |
-  | `sc/09_sc_swarm.scd` | SuperCollider, orange, Reset (`31-simple` moves to Freeze) |
+  `firmware/dist/stage_scan/008_scan.instr` (Csound user orange page, Source).
+- **The stick, sorted 2026-11-15 (owner's picks):** every instrument built so far is on it, checked byte for byte
+  against the repo. Positions: `manifest.txt` (= `D:
+ebulae_banks.txt`) and `docs/manual/00_stick.md`. Taken off
+  (copies in `firmware/dist/stick_removed_2026-11-15/`, sources in the repo): `001_a_granular_looper_Factory_Default`
+  (Qu-Bit's older release, md5 c20d4f85…; see `docs/manual/05_granular_looper.md`), `bt_test`, `01_sctest`,
+  `ZZ_pitchlog`, `31-simple`, and the leftovers `neb_candidate.tgz` + manifest, `list.txt`, a Windows shortcut.
+  Kept: `999_fw_backup`, `bt_storyteller` + `bt_keyboard/`, `sc_runtime.tgz`, `csound_plugins/`, `neb_fwbackup/`
+  (the revert package). The newest manual PDF is on the stick. New builds from here: copy straight to D: when it
+  is plugged in, regenerate the manifest from D:, and update the stick map.
 - **For the owner to review:** the auto-designed builds' decision tables, `docs/VOCODER.md`, `docs/TOPOKITS.md`,
   `docs/MORPH.md`, `docs/SCAN.md`, `docs/SC_FOLLOW.md`, `docs/SC_MOSAIC.md`, `docs/SHIFT.md`, `docs/PULSAR.md`,
   `docs/SC_SPACE.md`, `docs/SC_SWARM.md`, `docs/PARTIALS.md`, `docs/TANPURA.md`, `docs/CHORALE.md` (each lists the

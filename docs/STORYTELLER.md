@@ -112,5 +112,5 @@ repo, `python bt/tests/test_narrator.py` checks every line, or at least `python 
 - It runs only while `bt_storyteller` is loaded. Loading another instrument disconnects the PC and turns the radio
   off within a few seconds.
 - CPU: the listening adds about 7 % to the looper, so the looper itself is unaffected.
-- `bt_test` (the stage 1–2 check: pairing plus a hello line every 10 s) is still on the stick for diagnosing
-  Bluetooth problems.
+- `bt_test` (the stage 1–2 check: pairing plus a hello line every 10 s) came off the stick on 2026-11-15. For
+  diagnosing Bluetooth problems, copy `instr/bt_test.instr` back to the stick root.
