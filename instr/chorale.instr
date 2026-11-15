@@ -1,0 +1,221 @@
+nebconfigbegin
+ksmps,64
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0
+size,0.5
+density,0.5
+window,0.4
+overlap,0.2
+blend,1
+start_alt,0.7
+size_alt,0.3
+density_alt,0.5
+window_alt,0.6
+overlap_alt,0.5
+blend_alt,0.3
+pitch_alt,0
+nebconfigend
+
+; chorale.instr - a choir drone that sings vowels.
+; NebulaePD. Designed with the owner 2026-11-15 (Pitch click = C2, a unison choir with Source = chords and Reset
+; stepping 8 chord shapes, Blend mixes the input); the rest is in docs/CHORALE.md. MIT.
+;
+; Up to 8 voices (a glottal-like pulse each, with its own vibrato and detune) sing through one set of 5 formant
+; filters, so the vowel can move: ah -> eh -> ee -> oh -> oo.
+;
+; Pitch    the note, 1V/oct (click = C2)
+; Start    vowel: ah -> eh -> ee -> oh -> oo (morphs)
+; Size     formant shift: noon = natural; anticlockwise = bigger, darker voices; clockwise = smaller, brighter
+; Density  voices: 1 .. 8 (some an octave up, one an octave down)
+; Window   ensemble: how far the voices spread in pitch (a tight choir -> a loose crowd)
+; Overlap  breath: air in the voices
+; Speed    vowel drift: none between the clicks; past them the vowel wanders round Start, faster towards the ends
+; Blend    dry input <-> choir
+; Source   chords: the voices split onto a chord (latching, LED on)
+; Reset    next chord shape: fifth, major, minor, sus4, maj7, min7, add9, fourths (button or gate)
+; Freeze   hold the vowel where it is (latching, LED on)
+; Record   breathe: the voices take staggered breaths (latching, LED on)
+; File     voice register: bass -> tenor -> alto -> soprano (formants)
+; alt (hold Source): Start = stereo width, Size = vibrato depth, Window = reverb size, Blend = reverb amount,
+;   Speed = input gain (Nebulae's own)
+;
+; Instruments: 1 starts 10 (control), 20.1 .. 20.8 (voices) and 30 (formants and output).
+
+; formant data (Csound manual, Appendix "Formant values"): register x vowel (a e i o u) x [5 freqs, 5 amps dB,
+; 5 bandwidths]; registers bass, tenor, alto, soprano
+giForm ftgen 0, 0, 512, -2, \
+    600, 1040, 2250, 2450, 2750,   0, -7, -9, -9, -20,     60, 70, 110, 120, 130, \
+    400, 1620, 2400, 2800, 3100,   0, -12, -9, -12, -18,   40, 80, 100, 120, 120, \
+    250, 1750, 2600, 3050, 3340,   0, -30, -16, -22, -28,  60, 90, 100, 120, 120, \
+    400, 750, 2400, 2600, 2900,    0, -11, -21, -20, -40,  40, 80, 100, 120, 120, \
+    350, 600, 2400, 2675, 2950,    0, -20, -32, -28, -36,  40, 80, 100, 120, 120, \
+    650, 1080, 2650, 2900, 3250,   0, -6, -7, -8, -22,     80, 90, 120, 130, 140, \
+    400, 1700, 2600, 3200, 3580,   0, -14, -12, -14, -20,  70, 80, 100, 120, 120, \
+    290, 1870, 2800, 3250, 3540,   0, -15, -18, -20, -30,  40, 90, 100, 120, 120, \
+    400, 800, 2600, 2800, 3000,    0, -10, -12, -12, -26,  40, 80, 100, 120, 120, \
+    350, 600, 2700, 2900, 3300,    0, -20, -17, -14, -26,  40, 60, 100, 120, 120, \
+    800, 1150, 2800, 3500, 4950,   0, -4, -20, -36, -60,   80, 90, 120, 130, 140, \
+    400, 1600, 2700, 3300, 4950,   0, -24, -30, -35, -60,  60, 80, 120, 150, 200, \
+    350, 1700, 2700, 3700, 4950,   0, -20, -30, -36, -60,  50, 100, 120, 150, 200, \
+    450, 800, 2830, 3500, 4950,    0, -9, -16, -28, -55,   70, 80, 100, 130, 135, \
+    325, 700, 2530, 3500, 4950,    0, -12, -30, -40, -64,  50, 60, 170, 180, 200, \
+    800, 1150, 2900, 3900, 4950,   0, -6, -32, -20, -50,   80, 90, 120, 130, 140, \
+    350, 2000, 2800, 3600, 4950,   0, -20, -15, -40, -56,  60, 100, 120, 150, 200, \
+    270, 2140, 2950, 3900, 4950,   0, -12, -26, -26, -44,  60, 90, 100, 120, 120, \
+    450, 800, 2830, 3800, 4950,    0, -11, -22, -22, -50,  70, 80, 100, 130, 135, \
+    325, 700, 2700, 3800, 4950,    0, -16, -35, -40, -60,  50, 60, 170, 180, 200
+; chord shapes (semitones, 4 notes each)
+giShapes ftgen 0, 0, 32, -2, 0, 7, 12, 19,  0, 4, 7, 12,  0, 3, 7, 12,  0, 5, 7, 12,  0, 4, 7, 11,  0, 3, 7, 10, \
+    0, 4, 7, 14,  0, 5, 10, 15
+; per voice: octave (unison mode) and pan position
+giOct ftgen 0, 0, 8, -2, 0, 0, 12, 0, 12, 0, 12, -12
+giPan ftgen 0, 0, 8, -2, 0, -0.6, 0.6, -0.3, 0.3, -0.9, 0.9, 0.1
+
+gaV init 0
+gaVL init 0
+gaVR init 0
+gkChord init 0
+gkReg init 0
+gkVowel init 0
+
+instr 1
+event_i "i", 10, 0, -1
+event_i "i", 20.1, 0, -1, 0
+event_i "i", 20.2, 0, -1, 1
+event_i "i", 20.3, 0, -1, 2
+event_i "i", 20.4, 0, -1, 3
+event_i "i", 20.5, 0, -1, 4
+event_i "i", 20.6, 0, -1, 5
+event_i "i", 20.7, 0, -1, 6
+event_i "i", 20.8, 0, -1, 7
+event_i "i", 30, 0, -1
+endin
+
+instr 10
+; ---- Reset = next chord, File = next register; the vowel (Start, drift, Freeze)
+krs trigger gkreset, 0.5, 0                    ; (not "kr": a reserved word)
+if krs == 1 then
+    gkChord = (gkChord + 1) % 8
+endif
+kf trigger gkfilestate, 0.5, 0
+if kf == 1 then
+    gkReg = (gkReg + 1) % 4
+endif
+kd = (gkspeed - 0.5) / 0.375
+kx = (abs(kd) > 0.333 ? abs(kd) - 0.333 : 0)    ; 0 between the clicks .. 1 at the ends
+kdr rspline -1, 1, 0.05 + 0.6 * kx, 0.1 + 1.2 * kx
+kv = gkloopstart * 4 + kdr * kx * 1.5
+kv = min(max(kv, 0), 4)
+if gkfreeze < 0.5 then
+    gkVowel = kv
+endif
+endin
+
+instr 20
+; ---- one voice: a glottal-like pulse (a saw, softened) with its own vibrato, detune and breaths
+iv = p4
+ioct table iv, giOct
+ipan table iv, giPan
+ird random -1, 1                                 ; this voice's place in the ensemble spread
+irate random 4.5, 6
+kst = (gkpitch - 0.6) * 60
+kch = (gksource > 0.5 ? 1 : 0)
+kci = gkChord * 4 + (iv % 4)
+knote table kci, giShapes
+ksemi = kch * (knote + (iv >= 4 ? 12 : 0)) + (1 - kch) * ioct
+ksemi portk ksemi, 0.15
+kspread = gkwindow * gkwindow * 25 * ird        ; cents
+kjit randi gkwindow * 6, 0.7 + iv * 0.13        ; a slow wander of its own
+kvib poscil gkloopsize_alt * 50, irate * (1 + 0.05 * ird)   ; (k-rate: vco2 takes a k-rate frequency)
+kf = 65.406 * pow(2, (kst + ksemi + (kspread + kjit) / 100) / 12)
+kf = min(max(kf, 20), 3000)
+kfv = kf * pow(2, kvib / 1200)
+asrc vco2 0.5, kfv
+asrc tone asrc, 1500
+; voices in (Density): voice iv sounds when Density x 8 passes it
+kon = min(max(gkdensity * 7 + 1 - iv, 0), 1)
+kon portk kon, 0.1
+; breathe (Record): every few seconds this voice drops out for a breath
+kbt init 0
+kbr init 1
+kgap init 3
+kbt += ksmps / sr
+if gkrecord > 0.5 && kbt > kgap then
+    kbt = 0
+    kgap random 3, 8
+endif
+kin = (gkrecord > 0.5 && kbt < 0.6 ? 0 : 1)
+kbr portk kin, 0.08
+kamp = kon * kbr
+gaV = gaV + asrc * kamp
+kw = gkloopstart_alt
+gaVL = gaVL + asrc * kamp * sqrt(0.5 - 0.5 * ipan * kw)
+gaVR = gaVR + asrc * kamp * sqrt(0.5 + 0.5 * ipan * kw)
+endin
+
+instr 30
+; ---- breath, the 5 formants (vowel morph, register, shift), reverb, output
+ain, ainr inch 1, 2
+knum = 1 + gkdensity * 7
+kn = 1 / sqrt(knum)
+anz noise 0.4, 0
+kbreath = gkoverlap * gkoverlap
+avl = (gaVL + anz * kbreath * 0.5) * kn
+avr = (gaVR + anz * kbreath * 0.5) * kn
+gaV = 0
+gaVL = 0
+gaVR = 0
+kvw = gkVowel
+kv0 = int(min(kvw, 3.999))
+kfr = kvw - kv0
+kreg = gkReg
+ksh = pow(2, (gkloopsize - 0.5) * 0.8)          ; formant shift, +-0.4 octave
+kb0 = kreg * 75 + kv0 * 15
+kb1 = kb0 + 15
+aoL = 0
+aoR = 0
+; (written out per formant: opcodes inside a k-rate loop share one state)
+#define FORMANT(J) #
+kfa table kb0 + $J, giForm
+kfb table kb1 + $J, giForm
+kaa table kb0 + 5 + $J, giForm
+kab table kb1 + 5 + $J, giForm
+kwa table kb0 + 10 + $J, giForm
+kwb table kb1 + 10 + $J, giForm
+kF$J = (kfa + (kfb - kfa) * kfr) * ksh
+kA$J = ampdb(kaa + (kab - kaa) * kfr)
+kW$J = (kwa + (kwb - kwa) * kfr) * ksh
+kF$J portk kF$J, 0.03
+kF$J = min(kF$J, 15000)
+aL$J reson avl, kF$J, kW$J, 1
+aR$J reson avr, kF$J, kW$J, 1
+aoL = aoL + aL$J * kA$J
+aoR = aoR + aR$J * kA$J
+#
+$FORMANT(0)
+$FORMANT(1)
+$FORMANT(2)
+$FORMANT(3)
+$FORMANT(4)
+aoL = aoL * 2.7
+aoR = aoR * 2.7
+; reverb (alt Window = size, alt Blend = amount)
+krfb = 0.6 + 0.37 * gkwindow_alt
+krev = gkblend_alt * gkblend_alt
+arL, arR reverbsc aoL, aoR, krfb, 9000
+aoL = aoL + arL * krev
+aoR = aoR + arR * krev
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708)
+outs tanh(ain * kdry + aoL * kwet), tanh(ainr * kdry + aoR * kwet)
+endin
