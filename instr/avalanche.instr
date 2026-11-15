@@ -1,0 +1,170 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,latching,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.4
+size,0.5
+density,0.45
+window,0.3
+overlap,0.3
+blend,0.2
+start_alt,0.55
+size_alt,0.4
+window_alt,0.5
+blend_alt,0.2
+nebconfigend
+
+; avalanche.instr - four relaxation oscillators that charge, fire and push each other into chaotic rhythms (in
+; the spirit of an avalanche-transistor rhythmic oscillator). NebulaePD. Designed with the owner 2026-11-15 (the
+; oscillators on the knobs, a stereo reverb after); the rest (decided while the owner was away) is in
+; docs/AVALANCHE_LATTICE.md. MIT.
+;
+; Each oscillator charges towards its supply and fires (a sharp discharge, a blink) when it crosses its threshold.
+; A firing kicks the others it's tied to:
+;   OSC1 percussive, the fundamental: it kicks 2 and 3   OSC2 follows 1   OSC3 follows 2 (and some of 1)
+;   OSC4 the shutter: it opens and shuts (or filters) everything
+;
+; Pitch    OSC1's rate, 1V/oct (File: rhythm range, the click = 4 Hz; tone range, the click = C3)
+; Start    OSC1's cross-mod: how hard the others kick it back
+; Size     OSC2's cross-mod: how hard OSC1 kicks it
+; Density  OSC2's rate (x0.25 .. x4 OSC1's)
+; Window   OSC4's rate: the shutter (slow)
+; Overlap  OSC4's depth: how much it interrupts (or, with Record, filters)
+; Speed    STARVE: full power at noon; turning either way starves it into stutters, then silence
+; Blend    NM (the raw oscillators) <-> ZZ (fuzzed and smoothed)
+; Freeze   steady (latching): the components' jitter stops, so the pattern settles into a cycle
+; Reset    kick: every oscillator fires at once (a gate or the button)
+; Record   the shutter filters instead of interrupting (latching)
+; Source   your input starves it: its level takes the power away (latching)
+; File     range: rhythm <-> tone
+; Pulse out: TR, a gate whenever two oscillators fire together (the engine's peaks)
+; alt (hold Source): Start = OSC3's rate, Size = OSC3's cross-mod, Window = reverb size, Blend = reverb amount,
+;   Speed = input gain (Nebulae's own)
+
+gkRng init 0
+
+; the four oscillators, sample by sample. In: rates (Hz at full power), cross-mods, supply, jitter, kick.
+; Out: the audio (the capacitors' ramps plus their discharge spikes), the shutter's state, the coincidence count
+opcode Aval, aak, kkkkkkkkkkk
+kf1, kf2, kf3, kf4, km1, km2, km3, ksup, kjit, kkick, kseed xin
+setksmps 1
+kv1 init 0.1
+kv2 init 0.3
+kv3 init 0.5
+kv4 init 0.2
+kp1 init 0
+kp2 init 0
+kp3 init 0
+kp4 init 0
+kc init 0
+ilo = 0.1
+ith = 0.75
+; charge rates: tau so that a full-power cycle from ilo to ith takes 1/f
+kln = log((1 - ilo) / (1 - ith))
+ka1 = 1 - exp(-kf1 * kln / sr)
+ka2 = 1 - exp(-kf2 * kln / sr)
+ka3 = 1 - exp(-kf3 * kln / sr)
+ka4 = 1 - exp(-kf4 * kln / sr)
+kn1 random -kjit, kjit
+kv1 = kv1 + (ksup - kv1) * ka1 * (1 + kn1)
+kv2 = kv2 + (ksup - kv2) * ka2 * (1 - kn1)
+kv3 = kv3 + (ksup - kv3) * ka3 * (1 + kn1 * 0.5)
+kv4 = kv4 + (ksup - kv4) * ka4
+kp1 = kp1 * 0.9
+kp2 = kp2 * 0.9
+kp3 = kp3 * 0.9
+kp4 = kp4 * 0.9
+kfire = 0
+if kv1 >= ith || kkick == 1 then
+    kv1 = ilo
+    kp1 = 1
+    kfire += 1
+    kv2 = kv2 + km2 * 0.4                       ; OSC1 kicks 2 ...
+    kv3 = kv3 + km3 * 0.15                      ; ... and a little of 3
+endif
+if kv2 >= ith || kkick == 1 then
+    kv2 = ilo
+    kp2 = 1
+    kfire += 1
+    kv3 = kv3 + km3 * 0.4                       ; OSC2 kicks 3
+    kv1 = kv1 + km1 * 0.25                      ; and back to 1
+endif
+if kv3 >= ith || kkick == 1 then
+    kv3 = ilo
+    kp3 = 1
+    kfire += 1
+    kv1 = kv1 + km1 * 0.25                      ; OSC3 kicks 1 too
+endif
+if kv4 >= ith || kkick == 1 then
+    kv4 = ilo
+    kp4 = 1
+endif
+kc = (kfire >= 2 ? 1 : kc * 0.9995)
+; the audio: each ramp (centred) plus its discharge spike
+kout = (kv1 - 0.4) * 0.5 + (kv2 - 0.4) * 0.4 + (kv3 - 0.4) * 0.35 + (kp1 + kp2 * 0.8 + kp3 * 0.7) * 0.6
+kshut = (kv4 - ilo) / (ith - ilo)               ; 0 just after it fires .. 1 as it is about to
+xout a(kout), a(kshut), kc
+endop
+
+instr 1
+event_i "i", 20, 0, -1
+endin
+
+instr 20
+ain, ainr inch 1, 2
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkRng = 1 - gkRng
+endif
+; rates: OSC1 from Pitch (1V/oct), OSC2 a multiple of it, OSC3 from alt Start, OSC4 the slow shutter
+kst = (gkpitch - 0.6) * 60
+kf1 = (gkRng > 0.5 ? 130.81 : 4) * pow(2, kst / 12)
+kf1 = min(kf1, 3000)
+kf2 = kf1 * pow(16, gkdensity - 0.5)
+kf3 = kf1 * pow(16, gkloopstart_alt - 0.5) * 1.13
+kf4 = 0.2 * pow(100, gkwindow)                  ; 0.2 .. 20 Hz
+; starve (Speed): noon = full power; either way the supply drops below the threshold (0.75): stutters, silence.
+; Source: your input's level starves it too
+kd = abs(gkspeed - 0.5) * 2
+krms rms (ain + ainr) * 0.5
+ksrc = (gksource > 0.5 ? 1 : 0)
+ksup = 1 - 0.32 * kd - ksrc * min(0.3, krms * 2)
+ksup portk ksup, 0.01, 1
+; jitter (the components' noise); Freeze stops it
+kjit = (gkfreeze > 0.5 ? 0 : 0.04)
+kkick trigger gkreset, 0.5, 0
+anm, ash, kc Aval kf1, kf2, kf3, kf4, gkloopstart * 1.5, gkloopsize * 1.5, gkloopsize_alt * 1.5, ksup, kjit, kkick, 1
+; TR: a gate on the Pulse jack whenever the engine peaks (two firing together); held 15 ms
+ktr init 0
+ktr = (kc > 0.99 ? 0.015 : max(0, ktr - ksmps / sr))
+gkeol = (ktr > 0 ? 1 : 0)
+; the shutter (OSC4): interrupts (or, with Record, filters) by Overlap's depth
+kdep = gkoverlap
+if gkrecord > 0.5 then
+    afc = 200 + 8000 * ash
+    anm2 butlp anm, afc
+    anm = anm * (1 - kdep) + anm2 * kdep
+else
+    agate = 1 - kdep * limit((0.6 - ash) * 5, 0, 1)   ; shut for the early part of OSC4's cycle, open after
+    anm = anm * agate
+endif
+anm dcblock anm, 0.9995
+; ZZ: a diode-style fuzz, smoothed
+azz = tanh(anm * 6) - 0.3 * tanh(anm * 2)
+azz butlp azz, 2500
+kb = gkblend
+amix = anm * (1 - kb) * 0.8 + azz * kb * 0.5
+; the stereo reverb after (alt Blend = amount, alt Window = size)
+krv = gkblend_alt * gkblend_alt
+krfb = 0.7 + 0.28 * gkwindow_alt
+arL, arR reverbsc amix, amix, krfb, 9000
+outs tanh(amix + arL * krv), tanh(amix + arR * krv)
+endin

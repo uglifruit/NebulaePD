@@ -1,0 +1,177 @@
+nebconfigbegin
+ksmps,32
+-B,2048
+-b,512
+sr,48000
+freeze,momentary,rising
+reset,triggered,rising
+source,latching,falling
+file,incremental,falling
+record,latching,rising
+speed,0.5
+pitch,0.6
+start,0.3
+size,0.5
+density,0.4
+window,0.58
+overlap,0.55
+blend,0.4
+start_alt,0.75
+size_alt,0.3
+nebconfigend
+
+; lattice.instr - a stereo network of delay paths that morphs from reverb to multi-tap echo, with no modes (in the
+; spirit of a modeless spatial texturizer). NebulaePD. Designed with the owner 2026-11-15 (its own controls); the
+; rest (decided while the owner was away) is in docs/AVALANCHE_LATTICE.md. MIT.
+;
+; Pitch    SIZE: the time between paths (5 ms .. 1.4 s; 120 ms at the click): a room's size with Plexus low, an
+;          echo's repeat with Plexus high. Smooth
+; Start    PLEXUS: eight paths, all entangled (reverb) -> two, apart, with taps (multi-tap echo)
+; Overlap  DECAY: feedback, to super-infinite at the top
+; Density  DIFFUSE: softens (blurs the input, early reflections) <-> sharp
+; Window   COLOR: darker below 1 o'clock, brighter above, over time
+; Speed    COUPLE: left and right apart (dual mono) -> fully interlaced
+; Blend    MIX: live <-> network
+; Freeze   SEND (momentary: while held, or a gate high, nothing new goes in; the network rings on)
+; Reset    clear the network
+; Source   hold (latching): Decay to infinity and nothing new goes in
+; File     SKEW: off -> inverse (Plexus, Size and Color pushed apart left and right) -> tandem (pushed the same way)
+; Record   (not used)
+; Pulse out: high while the network is sounding (above -30 dB): the envelope follower as a gate
+; alt (hold Source): Start = input level (unity at 3/4), Size = skew amount, Speed = input gain (Nebulae's own)
+
+gkSk init 0
+giR ftgen 0, 0, 8, -2, 1, 1.127, 1.268, 1.413, 1.583, 1.731, 1.879, 2.039   ; path lengths (left: even, right: odd)
+
+instr 1
+event_i "i", 20, 0, -1
+endin
+
+instr 20
+ain, ainr inch 1, 2
+kfl trigger gkfilestate, 0.5, 0
+if kfl == 1 then
+    gkSk = (gkSk + 1) % 3
+endif
+; skew: inverse pushes the left and right halves apart, tandem the same way (alt Size = how far)
+ksk = gkloopsize_alt * 0.5
+kskL = (gkSk == 0 ? 0 : ksk)
+kskR = (gkSk == 0 ? 0 : (gkSk == 1 ? -ksk : ksk))
+; the knobs, per side
+kp = min(max(gkloopstart, 0), 1)
+kpL = min(max(kp + kskL, 0), 1)
+kpR = min(max(kp + kskR, 0), 1)
+kst = (gkpitch - 0.6) * 60
+ksz = 0.12 * pow(2, kst / 12)
+ksz limit ksz, 0.005, 1.4
+ksz portk ksz, 0.1, i(ksz)
+kszL = min(ksz * pow(2, kskL * 2), 1.4)         ; (Size is skewed up to an octave each way, within its range)
+kszR = min(ksz * pow(2, kskR * 2), 1.4)
+kco = gkwindow
+kcoL = min(max(kco + kskL, 0), 1)
+kcoR = min(max(kco + kskR, 0), 1)
+kcp = min(max(gkspeed, 0), 1)                   ; couple
+khold = (gksource > 0.5 ? 1 : 0)
+kdec = gkoverlap * 1.12
+kdec = kdec * (1 - khold) + 1.0 * khold
+; clear (Reset): the feedback drops out until every path has emptied
+krs trigger gkreset, 0.5, 0
+kclr init 0
+kclr = (krs == 1 ? max(kszL, kszR) * 2.04 * 1.5 * 1.1 + 0.05 : max(0, kclr - ksmps / sr))   ; (until the longest path empties)
+kdec = (kclr > 0 ? 0 : kdec)
+; the input: level (alt Start), send (Freeze held = closed), hold (Source)
+klev = pow(1.6, (gkloopstart_alt - 0.75) * 4)
+ksend portk (gkfreeze > 0.5 || khold == 1 ? 0 : 1), 0.005
+aiL = ain * klev * ksend
+aiR = (ainr * klev) * ksend
+; diffuse: four allpasses per side (early reflections), and a softening low-pass as it rises
+kdf = gkdensity
+; (alpass takes a ring time: 14.45 x its delay is a coefficient of 0.62, which smears without passing the spike)
+adL alpass aiL, 0.0047 * 14.45, 0.0047
+adL alpass adL, 0.0089 * 14.45, 0.0089
+adL alpass adL, 0.0131 * 14.45, 0.0131
+adL alpass adL, 0.0193 * 14.45, 0.0193
+adR alpass aiR, 0.0053 * 14.45, 0.0053
+adR alpass adR, 0.0097 * 14.45, 0.0097
+adR alpass adR, 0.0139 * 14.45, 0.0139
+adR alpass adR, 0.0211 * 14.45, 0.0211
+aiL = aiL * (1 - kdf) + adL * kdf
+aiR = aiR * (1 - kdf) + adR * kdf
+kdfc = 18000 * pow(0.3, kdf)
+aiL tone aiL, kdfc
+aiR tone aiR, kdfc
+; color: a one-pole low-pass that closes below 1 o'clock, a one-pole high-pass that opens above (in every path)
+kdkL = (kcoL < 0.58 ? 800 * pow(22.5, kcoL / 0.58) : 18000)
+kdkR = (kcoR < 0.58 ? 800 * pow(22.5, kcoR / 0.58) : 18000)
+kbrL = (kcoL > 0.58 ? 20 * pow(75, (kcoL - 0.58) / 0.42) : 5)
+kbrR = (kcoR > 0.58 ? 20 * pow(75, (kcoR - 0.58) / 0.42) : 5)
+; the paths' gains: Plexus fades from all eight (low) to the first two (high); entanglement falls with it
+knL = 4 - 3 * kpL                               ; paths per side: 4 .. 1
+knR = 4 - 3 * kpR
+keL = 1 - kpL
+keR = 1 - kpR
+; ---- the network: eight paths (even = left, odd = right). Each reads its input from last block's mix (a one-
+; block lag in the loop, 0.67 ms, folded into the lengths), is delayed, coloured and fed back through the mixing
+aY0 init 0
+aY1 init 0
+aY2 init 0
+aY3 init 0
+aY4 init 0
+aY5 init 0
+aY6 init 0
+aY7 init 0
+#define PATH(N'SIDE'K) #
+kr$N. table $N., giR
+kg$N. = min(max(kn$SIDE. - $K., 0), 1)
+ad$N. delayr 4.4
+at$N. deltapi interp(ksz$SIDE. * kr$N.)
+atq$N. deltapi interp(ksz$SIDE. * kr$N. * 1.5)
+delayw ai$SIDE. + aY$N.
+ax$N. tone at$N., kdk$SIDE.
+ax$N. atone ax$N., kbr$SIDE.
+ax$N. = ax$N. * kg$N.
+#
+$PATH(0'L'0)
+$PATH(2'L'1)
+$PATH(4'L'2)
+$PATH(6'L'3)
+$PATH(1'R'0)
+$PATH(3'R'1)
+$PATH(5'R'2)
+$PATH(7'R'3)
+; mixing (Householder-like): each path gives back itself minus a share of its group's sum. The group is its own
+; side (Couple 0: dual mono) or all eight (Couple 1); how much it mixes at all is the entanglement (Plexus)
+asL = ax0 + ax2 + ax4 + ax6
+asR = ax1 + ax3 + ax5 + ax7
+asA = asL + asR
+amL = (1 - kcp) * asL * 0.5 + kcp * asA * 0.25
+amR = (1 - kcp) * asR * 0.5 + kcp * asA * 0.25
+#define MIX(N'SIDE) #
+aY$N. = tanh((ax$N. - ke$SIDE. * am$SIDE.) * kdec)
+#
+$MIX(0'L)
+$MIX(2'L)
+$MIX(4'L)
+$MIX(6'L)
+$MIX(1'R)
+$MIX(3'R)
+$MIX(5'R)
+$MIX(7'R)
+; out: the paths, plus taps at one and a half times their length as Plexus rises (the multi-tap side)
+aoL = (asL + (atq0 + atq2 * kg2) * kpL * 0.7) * 0.5
+aoR = (asR + (atq1 + atq3 * kg3) * kpR * 0.7) * 0.5
+aoL dcblock aoL, 0.9995
+aoR dcblock aoR, 0.9995
+; the envelope as a gate on the Pulse jack
+krm rms (aoL + aoR) * 0.5, 5
+kpg init 0
+khl init 0
+khl = (krm > 0.03 ? 0.15 : max(0, khl - ksmps / sr))   ; on above -30 dB, held 150 ms after it last was
+kpg = (khl > 0 ? 1 : 0)
+gkeol = kpg
+; mix (Blend): live <-> network, equal power
+kb portk gkblend, 0.02
+kdry = cos(kb * 1.5708)
+kwet = sin(kb * 1.5708) * 1.3
+outs tanh(ain * kdry + aoL * kwet), tanh(ainr * kdry + aoR * kwet)
+endin
