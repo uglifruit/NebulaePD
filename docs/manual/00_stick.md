@@ -22,7 +22,7 @@ starting with `_` are hidden. `nebulae_banks.txt` on the stick is this map, rege
 ## The stick, 2026-11-15
 | Bank / page | Button | Instrument | What it is |
 |---|---|---|---|
-| **Csound user**, white | Record | 001_a_granular_looper_Factory_Default | An older release of Qu-Bit's granular looper (its overdub buffers differ from the built-in one) |
+| **Csound user**, white | Record | 001_a_granular_looper_Factory_Default | An older release of Qu-Bit's granular looper. It sounds the same as the Factory one but lacks six of its extras (see "The two granular loopers") |
 | | File | 002_avalon | AVALON "Morphing Nebulaeum": an 8×8×64 wavetable morph oscillator after the Synthesis Technology Terrariums; reads WaveEdit banks (`ROM A/B/C.wav`, `avalon.wav`). Manual: `avalon.pdf`, `avalon.txt` |
 | | Source | 003_bowed_drone | Bowed Drone (Collin Russell; V1 port by Chris Erin): evolving bowed-string drones. Diagram: `Bowed_Drone_Diagram.pdf` |
 | | Reset | 004_mars_affects | Mars Affects 1.5.1: filter, VCA, delay, effect, reverb and ducking in a chain (after the factory Effects / World of Echo). Manual: `mars_affects.pdf` |
