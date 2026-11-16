@@ -72,6 +72,10 @@ Stick `015_veil.instr`.
   (((1 − fb²) / 0.208)^0.7: 1 at the default size, 0.31 at the longest). The overtone stack, which ran 7 dB hotter
   than the other algorithms, is trimmed by 4.4 dB. Worst case now about 1 %; test `spacelevel` (< 2 % on every
   algorithm at the longest size).
+- **The owner: moving a knob after leaving the alt layer jumps; it should be a soft pickup.** Not Veil: the
+  firmware held a knob's value after a layer change until it moved 0.1, then jumped to the knob, both ways (going
+  in is rarely heard on Veil, whose alt knobs mostly act slowly or only on Reset). Fixed in the firmware for every
+  instrument: uf2_2, docs/FIRMWARE.md. Veil is unchanged.
 
 ## Hardware questions
 - Which algorithms earn their place? Any to swap for something else?

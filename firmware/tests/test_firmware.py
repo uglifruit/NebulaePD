@@ -343,6 +343,117 @@ class TestPitchFilter(unittest.TestCase):
         self.assertEqual(n_uf1, 0)
 
 
+class TestKnobPickup(unittest.TestCase):
+    """uf2_2: after a layer change a knob keeps its value until it is turned to it or through it (no jump).
+
+    Mirrors controlhandler: one pot read by a primary and an alt AdcData. Entering the alt layer freezes the primary
+    (setIgnoreHID) and starts the alt's resist from the primary's pot (resistNormalSettings); leaving it unfreezes the
+    primary and starts its resist (resistSecondarySettings). The alt is read only inside the alt layer, so its
+    smoothing filter is stale when the layer is entered."""
+
+    def build(self, src, pickup=1.0):
+        sys.modules["MCP3208"].MCP3208 = lambda **k: FakeADC()
+        py2shim.stub("digitaldata")
+        real_get = nebopts.get
+        nebopts.get = lambda key, *a: pickup if key == "knob_pickup" else real_get(key, *a)
+        try:
+            ctl = py2shim.load("control", src=src, register=False)
+            self.p = ctl.AdcData(0, -1, 0.0, 1.0, init_val=0.7)
+            self.a = ctl.AdcData(0, -1, 0.0, 1.0, init_val=0.3)     # the stored alt value
+        finally:
+            nebopts.get = real_get
+
+    @staticmethod
+    def knob(v):
+        FakeADC.code = int(round(v * 511)) << 3
+
+    def sweep(self, chans, frm, to, step):
+        """Turn the knob from frm to to; returns [(knob, value of each channel)] per poll."""
+        n = int(round(abs(to - frm) / step))
+        out = []
+        for i in range(n + 1):
+            k = frm + (to - frm) * i / float(n)
+            self.knob(k)
+            out.append((k, [c.getValue() for c in chans]))
+        for _ in range(30):                        # let it settle at the end
+            out.append((to, [c.getValue() for c in chans]))
+        return out
+
+    def run_layers(self, src, pickup=1.0, step=0.005):
+        self.build(src, pickup)
+        p, a = self.p, self.a
+        self.knob(0.7)
+        for _ in range(100):
+            p.getValue()
+        # into the alt layer, then turn the knob from 0.7 down to 0.1 (the alt's held value is 0.3)
+        self.p_before = p.getValue()
+        p.setIgnoreHID(True)
+        a.setResistVal(p.getPotValue())
+        into = self.sweep([p, a], 0.7, 0.1, step)
+        # back out, then turn the knob up to 0.95 (the primary's held value is 0.7)
+        p.setIgnoreHID(False)
+        p.setResistVal(p.getPotValue())
+        out = self.sweep([p], 0.1, 0.95, step)
+        # into the alt layer again from above: the alt now holds 0.1, the knob goes down to 0
+        p.setIgnoreHID(True)
+        a.setResistVal(p.getPotValue())
+        again = self.sweep([p, a], 0.95, 0.0, step)
+        return into, out, again
+
+    @staticmethod
+    def biggest_step(rows, ch):
+        vals = [r[1][ch] for r in rows]
+        return max(abs(b - c) for b, c in zip(vals, vals[1:]))
+
+    @staticmethod
+    def held_until(rows, ch, held):
+        """The knob position where the value first leaves held."""
+        return next((k for k, v in rows if abs(v[ch] - held) > 0.003), None)
+
+    def picks_up_at(self, rows, ch, held, down, lag):
+        """Never before the knob reaches the held value (going down or up), and at most lag past it."""
+        k = self.held_until(rows, ch, held)
+        past = (held - k) if down else (k - held)
+        self.assertGreaterEqual(past, -0.015)
+        self.assertLessEqual(past, lag)
+
+    def check_pickup(self, into, out, again, max_step, lag):
+        self.assertTrue(all(v[0] == self.p_before for _, v in into))           # primary frozen in the alt layer
+        self.assertTrue(all(v[1] == 0.3 for _, v in into[:3]))                 # the alt starts at its stored value
+        self.picks_up_at(into, 1, 0.3, True, lag)                              # alt: at its own value
+        self.assertLess(self.biggest_step(into, 1), max_step)
+        self.assertAlmostEqual(into[-1][1][1], 0.1, delta=0.01)
+        self.picks_up_at(out, 0, 0.7, False, lag)                              # primary: at its own value
+        self.assertLess(self.biggest_step(out, 0), max_step)
+        self.assertAlmostEqual(out[-1][1][0], 0.95, delta=0.01)
+        self.assertTrue(all(abs(v[0] - 0.95) < 0.01 for _, v in again))        # (frozen at 0.95)
+        self.picks_up_at(again, 1, into[-1][1][1], True, lag)
+        self.assertLess(self.biggest_step(again, 1), max_step)
+        self.assertEqual(again[-1][1][1], 0.0)
+
+    def test_stock_jumps(self):
+        for src, pickup in ((py2shim.BASE, 1.0), (py2shim.SRC, 0.0)):        # stock, and uf2_2 with knob_pickup=0
+            into, out, again = self.run_layers(src, pickup)
+            self.assertGreater(self.biggest_step(into, 1), 0.25)               # alt: 0.3 -> the knob at ~0.6
+            self.assertGreater(self.biggest_step(out, 0), 0.35)                # primary: 0.7 -> the knob at ~0.2
+
+    def test_pickup_slow_and_fast(self):
+        into, out, again = self.run_layers(py2shim.SRC)
+        print("\n  pickup: biggest step in / out / in again %.3f / %.3f / %.3f (stock: 0.3 / 0.5 jumps)"
+              % (self.biggest_step(into, 1), self.biggest_step(out, 0), self.biggest_step(again, 1)))
+        self.check_pickup(into, out, again, 0.03, 0.05)
+        into, out, again = self.run_layers(py2shim.SRC, step=0.05)             # a fast turn: passes through
+        # a turn this fast moves the value in steps of up to 0.146 even without a layer change (stock's smoothing
+        # and stability gate), and the value follows the knob by about 20 ms
+        self.check_pickup(into, out, again, 0.15, 0.25)
+
+    def test_no_pickup_without_layer_change(self):
+        self.build(py2shim.SRC)
+        self.knob(0.2)
+        vals = [self.p.getValue() for _ in range(60)]                          # at load: straight to the knob
+        self.assertAlmostEqual(vals[-1], 0.2, delta=0.01)
+
+
 class TestSelector(unittest.TestCase):
     """Real controlhandler.py + ui.py (stubbed hardware): Speed = bank, Pitch = page, a button loads its slot."""
 

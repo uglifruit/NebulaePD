@@ -10,7 +10,19 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## To do
-**Owner (on hardware): the uf2 install session.** Files are staged in `firmware/dist/stage_uf2/`. Use the
+**Owner (on hardware): install uf2_2 (knob pickup, 2026-11-16).** The module is on uf2_1; uf2_2 changes only
+`control.py` and `nebopts.py` (plus the VERSION line).
+1. Copy `firmware/dist/v2_1_2_uf2_2/neb_update.zip` to the stick root.
+2. **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot (it recalibrates the CV).
+3. Test on Veil (or any instrument): set Start, hold Source and turn Start somewhere else, let go. Start should
+   do nothing until you turn it back to where it was, then carry on from there. The same going into the alt layer.
+4. If you'd rather have the stock behaviour back: `knob_pickup=0` in `neb_options.txt` on the stick.
+
+Not compiled with Python 2: none is available on the PC, and the on-module precheck (`000_fw_backup`) is parked
+because the Csound bank is full. The change is plain Python 2 (reviewed line by line, no non-ASCII bytes). If the
+module doesn't start after the update, revert as for any update (the STOCK card, or uf2_1's `neb_update.zip`).
+
+**Earlier: the uf2 install session (done, the module runs uf2_1).** Files are staged in `firmware/dist/stage_uf2/`. Use the
 cloned card; the STOCK card stays in the drawer.
 1. **Precheck (recommended).**
    - Copy `1_precheck/*` to the stick root. There must be no `neb_update.zip` in the root yet.
@@ -546,3 +558,19 @@ How it works:
     ("Non Boolean in test") on every control. The firmware's OSC was fine (proved on the PC with `scsender.py`).
   - Fixed: `~nebSynth`. New `tools/sc_osc_tests.py` runs each patch live and reads every control back from the
     synth: 01-04 all OK. No firmware change: copy the three .scd files to the stick again.
+- 2026-11-16: **uf2_2: knob pickup.** The owner, on Veil: moving a knob after leaving the alt layer jumps; it
+  should be a soft pickup, both ways.
+  - Cause (stock `control.py` `AdcData.getPot`): after a layer change a knob kept its old value until the knob
+    moved 0.1 from where it was at the change, then jumped to the knob. The same in both directions and on every
+    engine. Going in, it was rarely heard because most alt knobs act slowly or only on a button.
+  - Now the value is held until the smoothed knob comes within 0.01 of it or passes through it (a sign change
+    between two polls, so a fast turn can't skip over it). On the first read after the change the knob's filter
+    restarts from the knob: an alt channel isn't read outside the alt layer, so its filter is stale.
+  - Also: `AdcData` started at the minimum, so each knob's first read (each alt knob on the first Source hold
+    after a load) sent 0 for one poll. It starts from the stored value now.
+  - `neb_options.txt` `knob_pickup=0` = stock. A Pd patch load resets the alt layer to the defaults (uf1), so an
+    alt knob there now acts once it passes its default.
+  - Test `TestKnobPickup`: stock and `knob_pickup=0` jump 0.3 (in) and 0.5 (out); uf2_2's biggest step is 0.02 /
+    0.005 / 0.01 on a slow turn and within a normal fast turn's steps on a fast one. 58 logic tests and 15 build
+    tests pass.
+  - `neb_update.zip` sha256 `8a7a34d183f6f53b17a3804a0bb15f8224bb06dd57747c0e8c95a6f6dd79e479`. **Not installed.**

@@ -26,6 +26,11 @@ BUTTON_GPIO_GATE_SR = 3
 BUTTON_GPIO_GATE_NONE = 4
 BUTTON_SR_GATE_NONE = 5
 
+# uf2_2: soft pickup after a layer change (Source held / released). A knob keeps its held value until it is turned
+# to it or through it, then takes over from there: no jump. Stock held the value until the knob moved 0.1, then
+# jumped to wherever the knob was. neb_options.txt knob_pickup=0 brings the stock behaviour back.
+PICKUP_WINDOW = 0.01
+
 def addHysteresis(cur, new, distance):
     output = cur    
     if cur + distance < new:    
@@ -50,7 +55,12 @@ class AdcData(object):
         self.minimum = minimum
         self.maximum = maximum
         self.range = maximum - minimum
-        self.curVal = minimum
+        # uf2_2: start from the stored value (stock started at the minimum, so a knob's first read, e.g. each alt
+        # knob on the first Source hold after a load, sent 0 for one poll before the real value)
+        try:
+            self.curVal = min(max(float(init_val), minimum), maximum)
+        except (TypeError, ValueError):
+            self.curVal = minimum
         self.cv_offset = 0.011
         self.pot_channel = pot_channel
         self.cv_channel = cv_channel
@@ -77,6 +87,8 @@ class AdcData(object):
         self.stablized = True
         self.stable_delta = 0.0
         self.last_in = 0.0
+        self.pickup = nebopts.get("knob_pickup") >= 0.5   # uf2_2 (see PICKUP_WINDOW)
+        self.pickup_prev = None
         if (pot_channel >= 0):
             self.mcp_pot = MCP3208.MCP3208(spi=SPI.SpiDev(SPI_PORT, SPI_DEVICE_POT))
         if (cv_channel >= 0):
@@ -91,6 +103,22 @@ class AdcData(object):
     def setResistVal(self, value):
         self.resisting_change = True
         self.resist_val = value
+        self.pickup_prev = None
+
+    def pickupCheck(self):
+        # uf2_2 soft pickup: hold until the (smoothed) knob reaches the held value or passes through it
+        if self.pickup_prev is None:
+            # the first read since the layer change: an alt channel isn't read outside the alt layer, so its
+            # smoothing filter is stale; restart it from the knob, or it would sweep across the held value
+            self.filtPotVal = self.raw_pot
+        d = self.filtPotVal - self.static_pot
+        crossed = self.pickup_prev is not None and (d > 0) != (self.pickup_prev > 0)
+        if abs(d) <= PICKUP_WINDOW or crossed:
+            self.resisting_change = False
+            self.resist_val = self.raw_pot
+            self.pickup_prev = None
+        else:
+            self.pickup_prev = d
 
     def clearResistVal(self):
         self.resisting_change = False
@@ -161,10 +189,13 @@ class AdcData(object):
             self.raw_pot = temp_pot
             self.filtPotVal += self.smoothCoeff * (temp_pot - self.filtPotVal)
             if self.resisting_change is True:
-                temp_hyst = addHysteresis(self.resist_val, self.raw_pot, 0.1) 
-                if temp_hyst != self.resist_val:
-                    self.resisting_change = False
-                    self.resist_val = self.raw_pot
+                if self.pickup:
+                    self.pickupCheck()
+                else:
+                    temp_hyst = addHysteresis(self.resist_val, self.raw_pot, 0.1)
+                    if temp_hyst != self.resist_val:
+                        self.resisting_change = False
+                        self.resist_val = self.raw_pot
                 pot = self.static_pot
             else:
                 if self.ignoring_pot == False:

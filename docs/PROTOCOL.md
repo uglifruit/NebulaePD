@@ -31,6 +31,7 @@ handled by the Nebulae itself and not meant for your patch. The reference PDF li
 details inconsistently (e.g. `record_alt`); treat button semantics as unverified.
 
 ## Notes
-- Pots use pickup ("resist") behaviour when switching between normal and alt layers, so alt values may not update
-  until the pot passes the stored value.
+- Layer changes (Source held / released): stock firmware holds each pot's value until the pot moves 0.1 from where
+  it was at the change, then jumps to the pot, in both directions. **Custom firmware uf2_2** makes it a true pickup:
+  the value is held until the pot reaches it or passes through it (`neb_options.txt` `knob_pickup=0` = stock).
 - Send rate and smoothing are set in `control.py` (not reviewed) — treat updates as asynchronous, ~control rate.

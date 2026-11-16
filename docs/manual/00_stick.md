@@ -27,7 +27,8 @@ Instruments made after another instrument say so in the index below and in an **
 top of their guide.
 
 **The alt layer:** on every instrument, hold **Source** and turn a knob (or press a button) to reach its second
-function. On our instruments, a knob's alt value only changes once you move it past where it was.
+function. With the custom firmware (uf2_2 or later) every knob picks up: when you hold or let go of Source, a
+knob keeps its value until you turn it to that value or through it, then carries on from there, so nothing jumps.
 
 ## In this manual
 | Instrument | Bank | What it is |

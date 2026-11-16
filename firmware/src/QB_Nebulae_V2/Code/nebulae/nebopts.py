@@ -12,6 +12,9 @@
 #   pd_alts_at_load = 0    1 = send every *_alt value once when a Pd patch connects (stock: only while Source is
 #                          held). Each Pd load resets them to the defaults first (nebulae.py), so this only tells a
 #                          patch the defaults it already starts with: off by default.
+#   knob_pickup = 1        (uf2_2) after a layer change (Source held or released) a knob keeps its value until you
+#                          turn it to that value or through it, then takes over: no jump. 0 = stock: the value is
+#                          held until the knob moves about 10 %, then jumps to the knob.
 import os
 
 OPTIONS_PATH = "/home/alarm/QB_Nebulae_V2/Code/config/neb_options.txt"
@@ -24,6 +27,7 @@ OPTIONS = {
     "sc_period": (256.0, 64.0, 1024.0),
     "sc_nperiods": (2.0, 2.0, 4.0),
     "pd_alts_at_load": (0.0, 0.0, 1.0),
+    "knob_pickup": (1.0, 0.0, 1.0),
 }
 
 
