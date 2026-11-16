@@ -10,7 +10,7 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## To do
-**Owner (on hardware): install uf2_2 (knob pickup, 2026-11-16).** The module is on uf2_1; uf2_2 changes only
+**Done 2026-11-16: uf2_2 (knob pickup) installed and confirmed working on hardware by the owner.** It changes only
 `control.py` and `nebopts.py` (plus the VERSION line).
 1. Copy `firmware/dist/v2_1_2_uf2_2/neb_update.zip` to the stick root.
 2. **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot (it recalibrates the CV).
@@ -573,4 +573,5 @@ How it works:
   - Test `TestKnobPickup`: stock and `knob_pickup=0` jump 0.3 (in) and 0.5 (out); uf2_2's biggest step is 0.02 /
     0.005 / 0.01 on a slow turn and within a normal fast turn's steps on a fast one. 58 logic tests and 15 build
     tests pass.
-  - `neb_update.zip` sha256 `8a7a34d183f6f53b17a3804a0bb15f8224bb06dd57747c0e8c95a6f6dd79e479`. **Not installed.**
+  - `neb_update.zip` sha256 `8a7a34d183f6f53b17a3804a0bb15f8224bb06dd57747c0e8c95a6f6dd79e479`.
+  - **Installed 2026-11-16; the owner: "works".** So it runs under the module's Python 2 as well.

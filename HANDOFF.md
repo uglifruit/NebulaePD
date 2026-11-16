@@ -213,7 +213,7 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
     detent, click = 23 = 0 dB); 06_topo uses it for swing (no audio input there), but the gain carries over.
   - Clicking Pitch while holding Source resets **all** alt values to defaults (`pitch_alt` default is 0).
   - **Knob takeover at a layer change:** stock holds a pot's value until the pot moves 0.1, then jumps to the pot
-    (both ways, every engine). **uf2_2** (2026-11-16) makes it a true pickup: held until the pot reaches or passes
+    (both ways, every engine). **uf2_2** (2026-11-16, confirmed on hardware) makes it a true pickup: held until the pot reaches or passes
     the value (`knob_pickup=0` in `neb_options.txt` = stock). An instrument can't do this itself: it never sees the
     pot while the firmware holds it.
 - **Gate inputs (from `controlhandler.py`/`digitaldata.py`): no gate input stays high while a gate is held.**

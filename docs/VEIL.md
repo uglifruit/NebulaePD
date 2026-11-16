@@ -75,7 +75,7 @@ Stick `015_veil.instr`.
 - **The owner: moving a knob after leaving the alt layer jumps; it should be a soft pickup.** Not Veil: the
   firmware held a knob's value after a layer change until it moved 0.1, then jumped to the knob, both ways (going
   in is rarely heard on Veil, whose alt knobs mostly act slowly or only on Reset). Fixed in the firmware for every
-  instrument: uf2_2, docs/FIRMWARE.md. Veil is unchanged.
+  instrument: uf2_2, docs/FIRMWARE.md (confirmed on hardware 2026-11-16). Veil is unchanged.
 
 ## Hardware questions
 - Which algorithms earn their place? Any to swap for something else?
