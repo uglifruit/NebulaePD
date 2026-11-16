@@ -244,6 +244,15 @@ def sc_shimmer():
     a, b = up(x), up(y)
     check("Record: octave-up energy in the tail (880 + 1760 Hz against 440: > 10 dB more)", b - a > 10,
           "%+.1f -> %+.1f dB" % (a, b))
+    # the owner's report (2026-11-16): shimmer on with the drone playing crackled, then went silent (the loop ran
+    # away to a full-scale DC). Everything at its most: it must stay alive and below the ceiling
+    auto = "gkoverlap = 1\ngkrecord = (kt > 2 ? 1 : 0)\n"
+    (z, _) = run("shim_max", 30, auto, alts=ALTS.replace("window_alt=0.6", "window_alt=1").replace(
+        "overlap_alt=0.4", "overlap_alt=1"))
+    s = seg(z, 20, 30)
+    pk, mv = float(np.max(np.abs(s))), float(np.std(np.diff(s)))
+    check("Record at its most, with the drone, for 30 s: no runaway (peak < 0.98, still moving, no NaN)",
+          pk < 0.98 and mv > 1e-3 and not np.isnan(z).any(), "peak %.3f, movement %.4f" % (pk, mv))
 
 
 def sc_sweep():

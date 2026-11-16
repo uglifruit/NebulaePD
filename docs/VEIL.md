@@ -58,7 +58,14 @@ Stick `015_veil.instr`.
 | source | the input in (+57 dB), the oscillators out (−72 dB) |
 | space | a tail 0.5–1 s after the input stops (−17 dB against none) |
 | shimmer | octave-up energy in the tail +50 dB |
+| shimmer at its most (added 2026-11-16) | with the drone, full Overlap, alt Window and alt Overlap, for 30 s: stays alive, peak 0.78 |
 | sweep | 60 s of extremes through every algorithm: bounded, no NaN; CPU 0.43× the factory looper |
+
+## Fixed after hardware (2026-11-16)
+- **The owner: shimmer on "introduces shimmer, then crackles, and goes silent" until it's switched off.** The
+  shimmer loop (reverb → octave up → back in) had a gain above unity and no limit. It ran away in about 4 s to a
+  full-scale DC, which is silent. Now the feedback is scaled by the reverb's own gain (√(1 − fb²)), high-passed at
+  200 Hz and soft-limited. The new test fails on the old code (pinned at 1.000) and passes now.
 
 ## Hardware questions
 - Which algorithms earn their place? Any to swap for something else?

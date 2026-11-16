@@ -436,7 +436,10 @@ aR dcblock gaVR, 0.9995
 gaVL = 0
 gaVR = 0
 ksh portk (gkrecord > 0.5 ? 1 : 0), 0.1
-kshm = ksh * (0.25 + 0.5 * gkoverlap_alt)
+krfb = 0.75 + 0.23 * gkwindow_alt
+; the shimmer's feedback, scaled by the reverb's own gain (which grows as its decay lengthens) so the loop stays
+; under unity at every size: without it the loop ran away to a full-scale DC (heard as crackle, then silence)
+kshm = ksh * (0.25 + 0.5 * gkoverlap_alt) * sqrt(1 - krfb * krfb) * 1.3
 ash = gaSh
 aiL = aL + ash * kshm
 aiR = aR + ash * kshm
@@ -445,10 +448,12 @@ ad1 alpass aiL, 0.4, 0.0133
 ad1 alpass ad1, 0.4, 0.0237
 ad2 alpass aiR, 0.4, 0.0151
 ad2 alpass ad2, 0.4, 0.0211
-krfb = 0.75 + 0.23 * gkwindow_alt
 arL, arR reverbsc ad1, ad2, krfb, 9000
 aup OctUp (arL + arR) * 0.5
-gaSh tone aup, 6000
+; the feedback path: high-passed (no lows or DC go round again), softened, and soft-limited as a backstop
+aup buthp aup, 200
+aup tone aup, 6000
+gaSh = tanh(aup * 2) * 0.5
 ksp = gkoverlap
 aL = aL * (1 - ksp * 0.6) + arL * ksp * 1.4
 aR = aR * (1 - ksp * 0.6) + arR * ksp * 1.4
