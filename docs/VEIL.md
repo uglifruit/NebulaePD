@@ -66,6 +66,12 @@ Stick `015_veil.instr`.
   shimmer loop (reverb → octave up → back in) had a gain above unity and no limit. It ran away in about 4 s to a
   full-scale DC, which is silent. Now the feedback is scaled by the reverb's own gain (√(1 − fb²)), high-passed at
   200 Hz and soft-limited. The new test fails on the old code (pinned at 1.000) and passes now.
+- **The owner: Space cranked "sounds like it's distorting".** It was overload, not the sound. The reverb came in
+  at 1.4× and grew louder as its decay lengthened, so the louder algorithms drove the output limiter: 18–19 % of
+  samples were squashed by more than 1 dB. Now the reverb comes in at 0.8×, evened out across sizes
+  (((1 − fb²) / 0.208)^0.7: 1 at the default size, 0.31 at the longest). The overtone stack, which ran 7 dB hotter
+  than the other algorithms, is trimmed by 4.4 dB. Worst case now about 1 %; test `spacelevel` (< 2 % on every
+  algorithm at the longest size).
 
 ## Hardware questions
 - Which algorithms earn their place? Any to swap for something else?

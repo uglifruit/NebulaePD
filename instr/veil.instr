@@ -302,8 +302,8 @@ kw = gkloopstart_alt
 aM = (aL + aR) * 0.5
 aL = aM + (aL - aM) * kw
 aR = aM + (aR - aM) * kw
-gaVL = gaVL + aL * kg
-gaVR = gaVR + aR * kg
+gaVL = gaVL + aL * kg * 0.6                     ; (trimmed 2026-11-16: it ran 7 dB hotter than the others)
+gaVR = gaVR + aR * kg * 0.6
 endin
 
 instr 24
@@ -454,9 +454,12 @@ aup OctUp (arL + arR) * 0.5
 aup buthp aup, 200
 aup tone aup, 6000
 gaSh = tanh(aup * 2) * 0.5
+; the space's level: the reverb's own gain grows as its decay lengthens (alt Window), so it is evened out, and it
+; comes in at 0.8 (it was 1.4, which with the louder algorithms drove the output limiter: heard as distortion)
 ksp = gkoverlap
-aL = aL * (1 - ksp * 0.6) + arL * ksp * 1.4
-aR = aR * (1 - ksp * 0.6) + arR * ksp * 1.4
+krc = pow((1 - krfb * krfb) / 0.2079, 0.7)      ; (1 at the default size, 0.31 at the longest: a drone builds up in it)
+aL = aL * (1 - ksp * 0.6) + arL * ksp * 0.8 * krc
+aR = aR * (1 - ksp * 0.6) + arR * ksp * 0.8 * krc
 ktrim = 1.4 * pow(2, (gkblend_alt - 0.5) * 4)
 kb portk gkblend, 0.02
 kdry = cos(kb * 1.5708)

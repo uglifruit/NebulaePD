@@ -29,7 +29,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import stretch_sim as S   # noqa: E402
-from radiate_sim import psd, band, steps, db, seg, rms   # noqa: E402
+from radiate_sim import psd, band, steps, pulses, db, seg, rms   # noqa: E402
 
 OUT = os.path.join(ROOT, "firmware", "dist", "veil_sim")
 S.OUT = OUT
@@ -222,6 +222,21 @@ def sc_source():
           b440 - a440 > 30 and ac2 - bc2 > 30, "440 %+.1f dB, C2 %+.1f dB" % (b440 - a440, bc2 - ac2))
 
 
+def sc_spacelevel():
+    """The owner (2026-11-16): Space cranked sounded distorted. It drove the output limiter (18 % of samples squashed
+    on the louder algorithms). Space full and its longest size, on every algorithm: under 2 % squashed by > 1 dB."""
+    print("spacelevel")
+    alts = ALTS.replace("window_alt=0.6", "window_alt=1")
+    worst = []
+    for alg in range(6):
+        au = "gkoverlap = 1\n" + (pulses(*[1.2 + 0.3 * i for i in range(alg)], name="gkfilestate") if alg else "")
+        (x, _) = run("splev%d" % alg, 9, au, alts=alts)
+        pre = np.arctanh(np.clip(seg(x, 5, 9), -0.999999, 0.999999))    # (the output limiter is tanh: undo it)
+        worst.append(100 * float(np.mean(np.abs(pre) > 0.5)))
+    check("Space full at its longest, every algorithm: the output limiter barely works (< 2 % squashed > 1 dB)",
+          max(worst) < 2, " ".join("%.1f" % w for w in worst) + " %")
+
+
 def sc_space():
     print("space")
     auto = "gksource = 1\ngkwindow = 0\n"
@@ -296,7 +311,7 @@ def sc_m609():
 def main():
     make_inputs()
     want = sys.argv[1:] or ["pitch", "algos", "overtones", "formant", "spread", "crossmod", "vowel", "motion",
-                            "reset", "source", "space", "shimmer", "sweep"]
+                            "reset", "source", "space", "spacelevel", "shimmer", "sweep"]
     for w in want:
         globals()["sc_" + w]()
     print("\n%d/%d passed" % (sum(RESULTS), len(RESULTS)))
