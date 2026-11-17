@@ -1,6 +1,6 @@
 # NebulaePD
 
-Pure Data instruments for the [Qu-Bit Nebulae V2](https://www.qubitelectronix.com/) Eurorack module, plus notes and a
+Instruments for the [Qu-Bit Nebulae V2](https://www.qubitelectronix.com/) Eurorack module, plus notes and a
 desktop test harness.
 
 - `docs/ARCHITECTURE.md` — hardware/software architecture, constraints, open questions
@@ -15,4 +15,6 @@ desktop test harness.
 - `reference/` — official Nebulae development PDF; `upstream/` — files copied from
   [QB_Nebulae_V2](https://github.com/Qu-Bit-Electronix/QB_Nebulae_V2) (MIT, © 2019 Qu-Bit Electronix; see `upstream/UPSTREAM_LICENSE`)
 
-Patches working - except Spectral, which clicks.
+Known patch problems:
+
+Spectral - clicks
