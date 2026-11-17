@@ -36,15 +36,15 @@ nebconfigend
 ;
 ; Pitch    the oscillator, 1V/oct (click = C3)
 ; Start    where a strike hits the string
-; Size     mass: light (fast, bright motion) -> heavy (slow, dark)
-; Density  stiffness: loose -> tight (the wave travels faster)
-; Window   damping: long ring -> short
-; Overlap  centring: how hard the masses are pulled back to rest (adds a springy wobble)
+; Size     mass: light (the tone changes faster) -> heavy (slower)
+; Density  stiffness: loose -> tight (the wave travels faster); with Size: 0.02 .. 2 trips round the ring a second
+; Window   damping: rings 60 s -> 0.4 s
+; Overlap  centring: how hard the masses are pulled back to rest (a springy wobble, 0.05 .. 3 Hz)
 ; Blend    dry input <-> string
 ; Speed    a second reader: none between the clicks; CW = detuned (chorus, stereo), CCW = an octave below
 ; Reset    strike (button or gate)
-; Record   bow: a constant push keeps the string moving (latching, LED on)
-; Source   the audio input drives the string (latching, LED on)
+; Record   bow: a gentle wandering push keeps the string moving (latching, LED on)
+; Source   the audio input's level pushes the string at Start (latching, LED on)
 ; Freeze   hold the waveform as it is (the string carries on underneath)
 ; File     next strike shape: narrow bump, wide bump, square, noise
 ; alt (hold Source): Start = strike strength, Size = stereo width, Density = bow pressure, Window = tone,
@@ -61,7 +61,10 @@ giShp0 ftgen 0, 0, giN, 7, 0, giN, 0
 giShp1 ftgen 0, 0, giN, 7, 0, giN, 0
 giShp2 ftgen 0, 0, giN, 7, 0, giN, 0
 giShp3 ftgen 0, 0, giN, 7, 0, giN, 0
+giPush ftgen 0, 0, giN, 7, 0, giN, 0            ; the bow's and the input's soft spot (a bell curve at the middle)
 gkShape init 0
+#define BOWGAIN #0.05#
+#define INGAIN #0.035#
 
 instr 1
 ; ---- the four strike shapes (File steps through them), the first copied into the hammer's table
@@ -74,6 +77,7 @@ shapes:
     irn random -1, 1
     tableiw (abs(ix) < 10 ? irn : 0), i_, giShp3
     tableiw exp(-(ix / 3) * (ix / 3)), i_, giInit
+    tableiw exp(-(ix / 2.5) * (ix / 2.5)), i_, giPush
     i_ += 1
     if (i_ < giN) igoto shapes
 event_i "i", 20, 0, -1
@@ -97,17 +101,26 @@ endin
 instr 20
 ain, ainr inch 1, 2
 ; ---- the string: 64 masses on a ring, one update per k-cycle (750 a second), semi-implicit Euler:
-;   a = (stiffness (x[i-1] + x[i+1] - 2 x[i]) - centring x[i]) / mass - damping v[i];  v += a;  x += v
-; kept stable: stiffness / mass < 1, damping < 1
-kmass = 0.5 * exp(gkloopsize * 2.9957)          ; 0.5 .. 10
-kinvm = 1 / kmass
-kstif = (0.02 + 0.43 * gkdensity) * min(kmass, 1)
-kdamp = 0.0003 * exp(gkwindow * 4.6052)         ; 0.0003 .. 0.03 of the velocity per update
-kcent = 0.0002 * exp(gkoverlap * 4.6052)        ; 0.0002 .. 0.02
+;   a = stiffness (x[i-1] + x[i+1] - 2 x[i]) - centring x[i] - damping v[i];  v += a;  x += v
+; The motion must stay slow next to the note: a wave going round the ring R times a second moves harmonic n by
+; n x R Hz (a strike sends two waves, one each way, so every harmonic splits by +-n R). It was ~5 Hz at the
+; defaults, which split a C3 strike into two notes 8 % apart (heard as noise). So the physics is set in Hz:
+; Size (mass) and Density (stiffness) set R, 0.02 .. 2 Hz (0.25 at the defaults); Overlap (centring) sets a
+; wobble of 0.05 .. 3 Hz. Window sets the ring time, 60 s .. 0.4 s to -60 dB, on the shape itself as well as the
+; motion (a slow string damped only on its motion just freezes in place). (2026-11-17)
+kR = 0.25 * exp((gkdensity - 0.5) * 2.8) * exp((0.4 - gkloopsize) * 1.8)
+kvw = kR * giN / kr                             ; wave speed, masses per update
+kstif = kvw * kvw
+kw0 = 6.2832 * 0.05 * exp(gkoverlap * 4.1) / kr
+kcent = kw0 * kw0
+kt60 = 60 * exp(-gkwindow * 5)                 ; seconds to -60 dB: 60 .. 0.4 (8 at the default)
+kleak = 6.9078 / (kt60 * kr)                    ; of the shape per update
+kdamp = kleak                                   ; of the velocity per update
 kX[] init giN
 kV[] init giN
-; ---- excitation: a strike (Reset) adds the strike shape at Start to the positions; the bow (Record) pushes one
-; mass that moves slowly round the ring; the audio input (Source) pushes mass 0
+; ---- excitation: a strike (Reset) adds the strike shape at Start to the positions; the bow (Record) and the
+; input (Source) push the string through a soft spot (a bell curve a few masses wide, never one mass: a kicked
+; mass is a spike in the waveform)
 kst trigger gkreset, 0.5, 0
 ; (labels stay outside if-blocks: a loop inside an if/endif ran only once in Csound 6.09)
 if kst == 0 kgoto nostrike
@@ -122,17 +135,34 @@ strike:
     ki += 1
     if (ki < giN) kgoto strike
 nostrike:
-kbp phasor 0.37
-kb = int(kbp * giN) % giN
-kbv = kV[kb]
-kV[kb] = kbv + gkrecord * 0.004 * (0.2 + 1.6 * gkdensity_alt)
+; the bow: a wandering push (random, either way, so it never builds up a lean) at a spot moving slowly round
+; the ring; scaled by the stiffness, so it moves the string about as much at every setting
+kbp phasor 0.13
+kbn randi 1, 2 + 6 * kR, 0.31
+kfb = gkrecord * (0.2 + 1.6 * gkdensity_alt) * kbn * kstif * $BOWGAIN
+; the input: its level pushes the string at Start (onsets push harder), in a random direction
 kin portk gksource, 0.02
-kain downsamp (ain + ainr) * 0.5, ksmps
-kv0 = kV[0]
-kV[0] = kv0 + kain * kin * 0.05
-; ---- update: every velocity from the old positions first, then the positions (no array assignment: in
-; Csound 6.09 "kX = kXn" doesn't copy, and the update ran in place - different, wrong dynamics)
+krm rms (ain + ainr) * 0.5, 20
+krs portk krm, 0.3
+kin2 randi 1, 2 + 6 * kR, 0.77
+kfi = kin * (krm * kin2 + max(krm - krs, 0) * 3) * kstif * $INGAIN
+if (abs(kfb) + abs(kfi)) == 0 kgoto nopush
+kpb = kbp * giN
+kpi = gkloopstart * giN
 ki = 0
+push:
+    kgb tablei ki - kpb + giN / 2 + giN, giPush, 0, 0, 1     ; (kept positive for the wrap)
+    kgi tablei ki - kpi + giN / 2 + giN, giPush, 0, 0, 1
+    kv0 = kV[ki]
+    kV[ki] = kv0 + kfb * kgb + kfi * kgi
+    ki += 1
+    if (ki < giN) kgoto push
+nopush:
+; ---- update: every velocity from the old positions first, then the positions (no array assignment: in
+; Csound 6.09 "kX = kXn" doesn't copy, and the update ran in place - different, wrong dynamics). The ring's mean
+; motion is taken out (it only moves the waveform's DC, but a push could build it up for ever)
+ki = 0
+kvs = 0
 updv:
     kim = (ki + giN - 1) % giN
     kip = (ki + 1) % giN
@@ -140,39 +170,46 @@ updv:
     kx0 = kX[ki]
     kxp = kX[kip]
     kv0 = kV[ki]
-    ka = (kstif * (kxm + kxp - 2 * kx0) - kcent * kx0) * kinvm - kdamp * kv0
-    kV[ki] = kv0 + ka
+    ka = kstif * (kxm + kxp - 2 * kx0) - kcent * kx0 - kdamp * kv0
+    kvn = kv0 + ka
+    kV[ki] = kvn
+    kvs += kvn
     ki += 1
     if (ki < giN) kgoto updv
+kvm = kvs / giN
 ki = 0
 updx:
     kx0 = kX[ki]
-    kv0 = kV[ki]
-    kX[ki] = kx0 + kv0
+    kv0 = kV[ki] - kvm
+    kV[ki] = kv0
+    kX[ki] = kx0 * (1 - kleak) + kv0
     ki += 1
     if (ki < giN) kgoto updx
-; guard: a string pushed hard for a long time (bow + input, light, undamped) is scaled back, so its state stays
-; bounded forever (the output is soft-clipped anyway)
+; guard: a string pushed hard for a long time (bow + input, undamped) is eased back, at most 0.5 % per update
+; (a sudden rescale would be a step in the waveform), so its state stays bounded for ever
 kmx maxarray kX
 kmn minarray kX
 kpk = max(kmx, -kmn)
-if kpk > 1.5 then
-    kX = kX * (1.5 / kpk)
-    kV = kV * (1.5 / kpk)
+if kpk > 0.6 then
+    kgd = max(0.6 / kpk, 0.995)
+    kX = kX * kgd
+    kV = kV * kgd
 endif
 ; ---- into the tables: alternately A and B, crossfaded across the k-cycle (the shape glides between updates)
 kab init 0
 kab = 1 - kab
-; (a written-out copy: copya2ftab gives different results in Csound 6.09; tablewkt with guard-point mode 1 also
-; keeps poscil3's guard point right)
+; (a written-out copy: copya2ftab gives different results in Csound 6.09. tablewkt's last argument must be 2, the
+; guard-point mode, which also copies point 0 into the guard point that poscil3 reads at the wrap. Mode 1 is wrap
+; mode: the guard stayed at 0, so the waveform dropped to 0 once a cycle, a click at the note's pitch. Fixed
+; 2026-11-17; checked in 6.18 and 6.09)
 ktw = (kab == 1 ? giShA : giShB)
 kfz trigger gkfreeze, 0.5, 0
 kq = 0
 wloop:
     kqv = kX[kq]
-    tablewkt kqv, kq, ktw, 0, 0, 1
+    tablewkt kqv, kq, ktw, 0, 0, 2
     if kfz == 0 kgoto nofz
-    tablewkt kqv, kq, giFrozen, 0, 0, 1          ; Freeze: a copy of the shape at the press
+    tablewkt kqv, kq, giFrozen, 0, 0, 2          ; Freeze: a copy of the shape at the press
 nofz:
     kq += 1
     if (kq < giN) kgoto wloop

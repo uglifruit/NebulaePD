@@ -71,8 +71,11 @@ Pulse output: write `gkeol` (cleared by Python each control cycle).
     mass-spring model out in orchestra code. The pvs opcodes (`pvsmorph`, `pvsvoc`, `pvsfreeze`, `pvscale`,
     `pvsmooth`) and `mincer` are there. Check any new opcode with `strings` on that library.
   - **`copya2ftab` gives different results in 6.09** (a k-rate array copied into a table each cycle and read
-    back with `poscil3`: half the level, another pitch). A written-out `tablewkt` loop (guard-point mode 1)
-    matches 6.18 exactly.
+    back with `poscil3`: half the level, another pitch). A written-out `tablewkt` loop matches 6.18 exactly.
+  - **`tablew`/`tablewkt`'s last argument: 0 = limit, 1 = wrap, 2 = guard point.** Only 2 also writes point 0
+    into the guard point, which an interpolating oscillator (`poscil3`, `oscili`) reads at the wrap. A table
+    rewritten in mode 1 keeps a guard of 0: a click once per cycle (scan, fixed 2026-11-17; checked in 6.18 and
+    6.09). `table`/`tablew` in limit mode also clamp index `size` to `size - 1`: read the guard with `tab`.
   - `run_csound609.js`: `CS609_MEM=512` for big tables, `CS609_FILES=a.wav,…` to load audio files; there is no live
     input, and `printks` prints only once in that build.
 
