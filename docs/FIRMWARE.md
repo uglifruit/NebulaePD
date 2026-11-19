@@ -603,4 +603,8 @@ How it works:
   - Tests: `TestPickupGuide` (zones, 15 % edges, blink, flash, hold), `TestPickupState`, `TestPickupLeds` (real
     controlhandler + ui in Pd and alt mode, scripted knob states: Record blinks with the rest dark, the latest
     knob wins, the flash, normal LEDs after; off with the option). 64 logic tests and 15 build tests pass.
-  - `neb_update.zip` sha256 `b9a49b4b37e7c54f4a07cf3ac16ee1cab86141728daeff484f5a0a23d8a3e3fb`. **Not installed.**
+  - A knob left alone in the other layer is still on its value, so it picks up on the first read after the
+    change and shows nothing (the owner asked, 2026-11-19); only a pickup you turned to flashes (stops a
+    spurious flash when such a knob is turned within 0.2 s). Test `test_untouched_knob_shows_nothing`.
+    65 logic tests and 15 build tests pass.
+  - `neb_update.zip` sha256 `9543760a16a37cd3d4555e8f91647e64f6c39adeff89ef9943eb7fee3a2717e4`. **Not installed.**

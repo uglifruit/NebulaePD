@@ -524,6 +524,33 @@ class TestPickupState(unittest.TestCase):
         self.assertIsNone(gap)
         self.assertGreaterEqual(picked, t0)
 
+    def test_untouched_knob_shows_nothing(self):
+        # (the owner, 2026-11-19: a knob not touched in the alt layer still sits on its main value, so leaving the
+        # alt layer must not ask for a pickup)
+        k = TestKnobPickup("test_stock_jumps")
+        k.build(py2shim.SRC)
+        p = k.p
+        k.knob(0.62)
+        for _ in range(100):
+            p.getValue()
+        held = p.getValue()
+        p.setIgnoreHID(True)                                  # Source held; this knob isn't touched
+        for i in range(200):
+            FakeADC.code = (int(round(0.62 * 511)) + (i % 3 - 1)) << 3    # +-1 LSB of noise
+            p.getValue()
+        p.setIgnoreHID(False)                                 # let go of Source
+        p.setResistVal(p.getPotValue())
+        p.getValue()
+        moved, gap, picked = p.pickupState()
+        self.assertIsNone(gap)                                # picked up on the first read: not held
+        self.assertEqual(picked, 0.0)                         # ... and no flash to show
+        rows = k.sweep([p], 0.62, 0.8, 0.005)                 # turned straight away
+        moved, gap, picked = p.pickupState()
+        self.assertGreater(moved, 0)
+        self.assertIsNone(pickupguide.choose([p.pickupState()], time.time()))   # no guide, no flash
+        self.assertEqual(rows[0][1][0], held)                 # no jump at the start ...
+        self.assertAlmostEqual(rows[-1][1][0], 0.8, delta=0.01)   # ... and it follows the knob
+
 
 class TestPickupLeds(unittest.TestCase):
     """uf2_3: real controlhandler + ui (stubbed hardware); the knobs' pickup states are scripted."""

@@ -142,7 +142,10 @@ class AdcData(object):
             self.resisting_change = False
             self.resist_val = self.raw_pot
             self.pickup_prev = None
-            self.picked_at = time.time()
+            # only a pickup you turned to is shown (the flash): a knob left alone in the other layer is still
+            # where its value is, so it picks up on the first read, and turning it then must show nothing
+            if self.moved_at > 0:
+                self.picked_at = time.time()
         else:
             self.pickup_prev = d
 
