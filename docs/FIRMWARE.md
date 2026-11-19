@@ -10,8 +10,10 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## To do
-**Owner (on hardware): install uf2_3 (the pickup guide on the button LEDs, 2026-11-19).** The module runs uf2_2.
-uf2_3 changes `control.py`, `controlhandler.py`, `ui.py`, `nebopts.py` and adds `pickupguide.py`.
+Nothing waiting on the firmware. The module runs uf2_3.
+
+**Done 2026-11-19: uf2_3 (the pickup guide on the button LEDs) installed and confirmed working on hardware by the
+owner** ("That work great"). uf2_3 changes `control.py`, `controlhandler.py`, `ui.py`, `nebopts.py` and adds `pickupguide.py`.
 1. Copy `firmware/dist/v2_1_2_uf2_3/neb_update.zip` to the stick root.
 2. **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot.
 3. Test: set Start, hold Source, turn Start. One LED blinks fast: Record = the held value is much lower, File =
@@ -607,4 +609,5 @@ How it works:
     change and shows nothing (the owner asked, 2026-11-19); only a pickup you turned to flashes (stops a
     spurious flash when such a knob is turned within 0.2 s). Test `test_untouched_knob_shows_nothing`.
     65 logic tests and 15 build tests pass.
-  - `neb_update.zip` sha256 `9543760a16a37cd3d4555e8f91647e64f6c39adeff89ef9943eb7fee3a2717e4`. **Not installed.**
+  - `neb_update.zip` sha256 `9543760a16a37cd3d4555e8f91647e64f6c39adeff89ef9943eb7fee3a2717e4`.
+  - **Installed 2026-11-19; the owner: "That work great".**

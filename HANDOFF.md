@@ -215,7 +215,7 @@ both. `.gitattributes` keeps `.pd/.instr/.csd` LF (the CRLF warnings on .py/.md 
   - **Knob takeover at a layer change:** stock holds a pot's value until the pot moves 0.1, then jumps to the pot
     (both ways, every engine). **uf2_2** (2026-11-16, confirmed on hardware) makes it a true pickup: held until the pot reaches or passes
     the value (`knob_pickup=0` in `neb_options.txt` = stock). An instrument can't do this itself: it never sees the
-    pot while the firmware holds it. **uf2_3** (2026-11-19) guides it on the button LEDs: Record / File / Reset /
+    pot while the firmware holds it. **uf2_3** (2026-11-19, confirmed on hardware) guides it on the button LEDs: Record / File / Reset /
     Freeze blink = held value much lower / lower / higher / much higher (15 %), all four flash at the pickup
     (`pickup_leds=0` = off; `pickupguide.py`).
 - **Gate inputs (from `controlhandler.py`/`digitaldata.py`): no gate input stays high while a gate is held.**
