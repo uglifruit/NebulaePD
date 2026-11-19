@@ -89,6 +89,11 @@ class AdcData(object):
         self.last_in = 0.0
         self.pickup = nebopts.get("knob_pickup") >= 0.5   # uf2_2 (see PICKUP_WINDOW)
         self.pickup_prev = None
+        # uf2_3: for the pickup guide on the button LEDs (pickupguide.py): when the knob last moved, and when it
+        # last picked up its held value
+        self.move_ref = None
+        self.moved_at = 0.0
+        self.picked_at = 0.0
         if (pot_channel >= 0):
             self.mcp_pot = MCP3208.MCP3208(spi=SPI.SpiDev(SPI_PORT, SPI_DEVICE_POT))
         if (cv_channel >= 0):
@@ -104,6 +109,26 @@ class AdcData(object):
         self.resisting_change = True
         self.resist_val = value
         self.pickup_prev = None
+        # a fresh layer change: forget earlier turns (turning an alt knob moves the same pot as its main knob, which
+        # must not show a guide the moment Source is let go)
+        self.move_ref = None
+        self.moved_at = 0.0
+        self.picked_at = 0.0
+
+    def trackMove(self):
+        # uf2_3: note the time whenever the knob moves more than its noise (+-1 LSB of 511 is 0.002)
+        if self.move_ref is None:
+            self.move_ref = self.raw_pot       # first read (an alt channel isn't read outside its layer)
+        elif abs(self.raw_pot - self.move_ref) > 0.006:
+            self.move_ref = self.raw_pot
+            self.moved_at = time.time()
+
+    def pickupState(self):
+        # uf2_3: (when it last moved, held value - knob or None if not held, when it last picked up)
+        gap = None
+        if self.resisting_change and self.pickup:
+            gap = self.static_pot - self.filtPotVal
+        return (self.moved_at, gap, self.picked_at)
 
     def pickupCheck(self):
         # uf2_2 soft pickup: hold until the (smoothed) knob reaches the held value or passes through it
@@ -117,6 +142,7 @@ class AdcData(object):
             self.resisting_change = False
             self.resist_val = self.raw_pot
             self.pickup_prev = None
+            self.picked_at = time.time()
         else:
             self.pickup_prev = d
 
@@ -188,6 +214,7 @@ class AdcData(object):
             temp_pot = (temp_pot_code >> 3) / 511.0
             self.raw_pot = temp_pot
             self.filtPotVal += self.smoothCoeff * (temp_pot - self.filtPotVal)
+            self.trackMove()
             if self.resisting_change is True:
                 if self.pickup:
                     self.pickupCheck()
@@ -531,6 +558,12 @@ class ControlChannel(object):
     def setModeChangeValue(self, value_to_resist):
         if self.source == "analog":
             self.input.setResistVal(value_to_resist)
+
+    def pickupState(self):
+        # uf2_3: see AdcData.pickupState; None for encoders and buttons (never held)
+        if self.source == "analog":
+            return self.input.pickupState()
+        return None
 
     def clearResistVal(self):
         if self.source == "analog":

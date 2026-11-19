@@ -10,6 +10,19 @@ Goal: a custom Nebulae firmware for the owner's **Pi 4** unit (stock v2.1.2) wit
 Pitch, fixes, Pd externals copied from the stick, `_`-prefixed abstractions hidden from the selector) → `uf1b` (back-channel) → `uf2` (SuperCollider).
 
 ## To do
+**Owner (on hardware): install uf2_3 (the pickup guide on the button LEDs, 2026-11-19).** The module runs uf2_2.
+uf2_3 changes `control.py`, `controlhandler.py`, `ui.py`, `nebopts.py` and adds `pickupguide.py`.
+1. Copy `firmware/dist/v2_1_2_uf2_3/neb_update.zip` to the stick root.
+2. **Unplug every CV/gate cable**, power on, and wait for the update LEDs and a reboot.
+3. Test: set Start, hold Source, turn Start. One LED blinks fast: Record = the held value is much lower, File =
+   lower, Reset = higher, Freeze = much higher (15 % of the turn). Near it, Record/Freeze hand over to
+   File/Reset; at the pickup all four flash once and the normal LEDs come back. The same after letting go of
+   Source (the main knob). The guide goes away 1 s after you stop turning.
+4. To turn it off: `pickup_leds=0` in `neb_options.txt`.
+
+Not compiled with Python 2 (none on the PC; the `000_fw_backup` precheck is parked). Plain Python 2, no non-ASCII
+bytes. If the module doesn't start, revert with uf2_2's `neb_update.zip` (`firmware/dist/v2_1_2_uf2_2/`).
+
 **Done 2026-11-16: uf2_2 (knob pickup) installed and confirmed working on hardware by the owner.** It changes only
 `control.py` and `nebopts.py` (plus the VERSION line).
 1. Copy `firmware/dist/v2_1_2_uf2_2/neb_update.zip` to the stick root.
@@ -575,3 +588,19 @@ How it works:
     tests pass.
   - `neb_update.zip` sha256 `8a7a34d183f6f53b17a3804a0bb15f8224bb06dd57747c0e8c95a6f6dd79e479`.
   - **Installed 2026-11-16; the owner: "works".** So it runs under the module's Python 2 as well.
+- 2026-11-19: **uf2_3: the pickup guide on the button LEDs** (the owner's design: "It'd stop me having to guess
+  where the old value was, or having to sweep all the way through").
+  - While a held knob is turned (either layer), one LED blinks at about 8 Hz: Record = held value much lower than
+    the knob, File = lower, Reset = higher, Freeze = much higher; "much" = more than 15 % of the turn (owner's
+    pick). Source is left alone. At the pickup all four flash for 0.2 s (owner's pick), then the normal LEDs.
+    The guide shows for the knob turned last, until 1 s after it stops.
+  - `control.py`: `AdcData` notes when the pot last moved (more than 0.006, above the noise), when it picked up,
+    and `pickupState()`; a layer change forgets earlier turns, so an alt knob's turn doesn't light the guide for
+    its main value when Source is let go. `pickupguide.py` (pure: `choose`, `leds`) decides; `controlhandler`
+    `pickupGuide()` reads the layer's six pots; `ui.py` shows it only in the default LED branches (the restore,
+    edit and buffer animations keep priority), after the Pearls LEDs.
+  - `neb_options.txt` `pickup_leds=0` = off (also off with `knob_pickup=0`).
+  - Tests: `TestPickupGuide` (zones, 15 % edges, blink, flash, hold), `TestPickupState`, `TestPickupLeds` (real
+    controlhandler + ui in Pd and alt mode, scripted knob states: Record blinks with the rest dark, the latest
+    knob wins, the flash, normal LEDs after; off with the option). 64 logic tests and 15 build tests pass.
+  - `neb_update.zip` sha256 `b9a49b4b37e7c54f4a07cf3ac16ee1cab86141728daeff484f5a0a23d8a3e3fb`. **Not installed.**

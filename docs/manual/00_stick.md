@@ -29,6 +29,9 @@ top of their guide.
 **The alt layer:** on every instrument, hold **Source** and turn a knob (or press a button) to reach its second
 function. With the custom firmware (uf2_2 or later) every knob picks up: when you hold or let go of Source, a
 knob keeps its value until you turn it to that value or through it, then carries on from there, so nothing jumps.
+With uf2_3 or later the buttons show the way while you turn a held knob, reading left to right like a meter:
+**Record** blinks = its value is much lower than the knob, **File** = a little lower, **Reset** = a little
+higher, **Freeze** = much higher. All four flash once when it picks up.
 
 ## In this manual
 | Instrument | Bank | What it is |

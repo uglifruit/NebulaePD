@@ -15,6 +15,9 @@
 #   knob_pickup = 1        (uf2_2) after a layer change (Source held or released) a knob keeps its value until you
 #                          turn it to that value or through it, then takes over: no jump. 0 = stock: the value is
 #                          held until the knob moves about 10 %, then jumps to the knob.
+#   pickup_leds = 1        (uf2_3) while a held knob is turned, a button LED blinks to show where its value is:
+#                          Record = much lower, File = lower, Reset = higher, Freeze = much higher (15 % of the
+#                          turn); all four flash when it picks up. 0 = off.
 import os
 
 OPTIONS_PATH = "/home/alarm/QB_Nebulae_V2/Code/config/neb_options.txt"
@@ -28,6 +31,7 @@ OPTIONS = {
     "sc_nperiods": (2.0, 2.0, 4.0),
     "pd_alts_at_load": (0.0, 0.0, 1.0),
     "knob_pickup": (1.0, 0.0, 1.0),
+    "pickup_leds": (1.0, 0.0, 1.0),
 }
 
 

@@ -155,6 +155,7 @@ class FakeControlChannel(object):
     """Stands in for control.ControlChannel. Values come from FakeControlChannel.script[name] (a list consumed one
     per update(), last value held) or stay at the init value."""
     script = {}
+    pickup = {}      # name -> (moved_at, gap, picked_at), as control.AdcData.pickupState (uf2_3)
 
     def __init__(self, csound, name, init=0, source="static", data_channel=-1, **kw):
         self.name, self.source = name, source
@@ -192,6 +193,8 @@ class FakeControlChannel(object):
     def hasChanged(self): return self.curVal != self.prevVal
 
     def getTrigSource(self): return "button"
+
+    def pickupState(self): return FakeControlChannel.pickup.get(self.name)
 
 
 class FakeCommChannel(object):

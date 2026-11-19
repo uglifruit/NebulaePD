@@ -34,4 +34,6 @@ details inconsistently (e.g. `record_alt`); treat button semantics as unverified
 - Layer changes (Source held / released): stock firmware holds each pot's value until the pot moves 0.1 from where
   it was at the change, then jumps to the pot, in both directions. **Custom firmware uf2_2** makes it a true pickup:
   the value is held until the pot reaches it or passes through it (`neb_options.txt` `knob_pickup=0` = stock).
+  **uf2_3** shows where the held value is while a held pot is turned: Record / File / Reset / Freeze blink for much
+  lower / lower / higher / much higher (15 %), all four flash at the pickup (`pickup_leds=0` = off).
 - Send rate and smoothing are set in `control.py` (not reviewed) — treat updates as asynchronous, ~control rate.

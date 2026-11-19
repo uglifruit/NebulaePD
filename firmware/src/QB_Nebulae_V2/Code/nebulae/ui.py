@@ -6,6 +6,7 @@ import switch as libSwitch
 import filehandler
 import instrpager
 import nebopts
+import pickupguide
 import threading
 import time
 import random
@@ -89,6 +90,7 @@ class UserInterface(object):
         if self.mode == "instr selector" and self.prev_mode != "instr selector":
             self.enterInstrSel()
         self.prev_mode = self.mode
+        guide_ok = False   # uf2_3: the pickup guide may take the button LEDs (not during an animation)
 
         if self.mode == "secondary controls":
             if self.restoreDefaultsFlag == True:
@@ -96,6 +98,7 @@ class UserInterface(object):
             elif self.controlhandler.getEditFunctionFlag("reset"):
                 self.animateEditFunction("reset")
             else:
+                guide_ok = True
                 #self.set_button_led("freeze", self.controlhandler.getAltValue("freeze_alt"))
                 #self.set_button_led("source", self.controlhandler.getAltValue("source_alt"))
                 #self.set_button_led("record", self.controlhandler.getAltValue("record_alt"))
@@ -143,6 +146,7 @@ class UserInterface(object):
                 self.animateBufferFailure()
                 #self.animateEditFunction("freeze")
             else:
+                guide_ok = True
                 if self.currentInstr == "a_granularlooper":
                     if self.controlhandler.size_status_comm.getState() == 0:
                         #self.set_button_led("reset", self.controlhandler.getEndOfLoopState())
@@ -163,6 +167,15 @@ class UserInterface(object):
         self.update_pitch(self.mode)
         if self.mode == "normal":
             self.update_pearls_leds()
+        if guide_ok:
+            self.show_pickup_guide()
+
+    def show_pickup_guide(self):
+        # uf2_3: while a held knob is turned, Record/File/Reset/Freeze show where its held value is (pickupguide.py)
+        out = pickupguide.leds(self.controlhandler.pickupGuide(), self.now)
+        if out is not None:
+            for name, bright in out.items():
+                self.set_button_led(name, bright)
     
     def clearAllLEDs(self):
         self.set_rgb("pitch_pos", 4095, 4095, 4095, 0.0)

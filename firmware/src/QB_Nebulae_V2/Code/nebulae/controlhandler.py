@@ -8,6 +8,7 @@ import control
 import pdsender
 import scsender
 import nebopts
+import pickupguide
 import os
 import settings
 import time
@@ -150,6 +151,8 @@ class ControlHandler(object):
         self.instr_sel_slot_press = None # uf1: paged selector, the last button pressed (0-4), consumed by ui.py
         # uf1: optionally send every *_alt value once after each Pd (re)connect (neb_options.txt pd_alts_at_load=1)
         self.pd_alts_at_load = nebopts.get("pd_alts_at_load") >= 0.5
+        # uf2_3: the knob pickup guide on the button LEDs (pickupguide.py), only with the pickup on
+        self.pickup_leds = nebopts.get("knob_pickup") >= 0.5 and nebopts.get("pickup_leds") >= 0.5
         self.pd_send_alts = self.pd_alts_at_load
         self.eol_comm = control.CommChannel(self.csound, "eol")
         self.size_status_comm = control.CommChannel(self.csound, "sizestatus")
@@ -227,6 +230,25 @@ class ControlHandler(object):
 
     def getAltStaticVal(self, name):
         return self.altchanneldict[name].getStaticVal()
+
+    # uf2_3: where the held value of the knob being turned is, for the button LEDs (None = nothing to show)
+    PICKUP_POTS = ("start", "size", "density", "overlap", "window", "blend")
+
+    def pickupGuide(self):
+        if not self.pickup_leds:
+            return None
+        if self.control_mode == "secondary controls":
+            chans = [self.altchanneldict.get(n + "_alt") for n in self.PICKUP_POTS]
+        elif self.control_mode in ("normal", "puredata"):
+            chans = [self.channeldict.get(n) for n in self.PICKUP_POTS]
+        else:
+            return None
+        states = []
+        for chn in chans:
+            fn = getattr(chn, "pickupState", None)
+            if fn is not None:
+                states.append(fn())
+        return pickupguide.choose(states, time.time())
 
     def getInstrValue(self, name):
         return self.instrchanneldict[name].getValue()

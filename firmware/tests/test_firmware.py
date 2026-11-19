@@ -27,10 +27,11 @@ import scsender  # noqa: E402
 import scengine  # noqa: E402
 import bootguard  # noqa: E402
 import csplugins  # noqa: E402
+import pickupguide  # noqa: E402
 
 CHANGED = ["check_calibration", "control", "controlhandler", "filehandler", "fileloader", "nebulae", "pdsender", "ui",
            "instrpager", "nebopts", "ufmigrate", "scsender", "scengine", "bootguard", "csplugins", "csplugins_check",
-           "settings"]
+           "settings", "pickupguide"]
 
 
 class TestSyntax(unittest.TestCase):
@@ -452,6 +453,131 @@ class TestKnobPickup(unittest.TestCase):
         self.knob(0.2)
         vals = [self.p.getValue() for _ in range(60)]                          # at load: straight to the knob
         self.assertAlmostEqual(vals[-1], 0.2, delta=0.01)
+
+
+class TestPickupGuide(unittest.TestCase):
+    """uf2_3 pickupguide.py: where a held knob's value is, on Record / File / Reset / Freeze."""
+
+    def lit(self, gap, now_ms=0):
+        out = pickupguide.leds(("gap", gap), now_ms)
+        return [k for k in pickupguide.BUTTONS if out[k] > 0]
+
+    def test_zones_and_edges(self):
+        self.assertEqual(self.lit(-0.5), ["record"])        # much lower
+        self.assertEqual(self.lit(-0.151), ["record"])
+        self.assertEqual(self.lit(-0.15), ["next"])          # lower (File)
+        self.assertEqual(self.lit(-0.02), ["next"])
+        self.assertEqual(self.lit(0.02), ["reset"])          # higher
+        self.assertEqual(self.lit(0.15), ["reset"])
+        self.assertEqual(self.lit(0.151), ["freeze"])        # much higher
+        self.assertEqual(self.lit(0.9), ["freeze"])
+
+    def test_blink_flash_none(self):
+        self.assertEqual(self.lit(0.5, 0), ["freeze"])
+        self.assertEqual(self.lit(0.5, 60), [])               # off half the time (about 8 Hz)
+        self.assertEqual(self.lit(0.5, 120), ["freeze"])
+        out = pickupguide.leds(("flash",), 60)
+        self.assertEqual(sorted(out), sorted(pickupguide.BUTTONS))
+        self.assertTrue(all(v == 1.0 for v in out.values()))
+        self.assertIsNone(pickupguide.leds(None, 0))
+
+    def test_choose(self):
+        c = pickupguide.choose
+        self.assertIsNone(c([], 10))
+        self.assertIsNone(c([None, (0.0, 0.3, 0.0)], 10))                   # never moved
+        self.assertEqual(c([(9.5, 0.3, 0.0)], 10), ("gap", 0.3))
+        self.assertIsNone(c([(8.5, 0.3, 0.0)], 10))                          # stopped turning > 1 s ago
+        self.assertEqual(c([(9.0, 0.3, 0.0), (9.8, -0.1, 0.0)], 10), ("gap", -0.1))   # the latest turned
+        self.assertEqual(c([(9.9, None, 9.85)], 10), ("flash",))            # just picked up
+        self.assertIsNone(c([(9.9, None, 9.7)], 10))                          # flash over: normal LEDs
+        self.assertIsNone(c([(9.9, None, 0.0)], 10))                          # a free knob: nothing
+
+
+class TestPickupState(unittest.TestCase):
+    """uf2_3 control.AdcData.pickupState: the held gap, when the knob moved, when it picked up."""
+
+    def test_states(self):
+        k = TestKnobPickup("test_stock_jumps")
+        k.build(py2shim.SRC)
+        p = k.p
+        k.knob(0.7)
+        for _ in range(100):
+            p.getValue()
+        self.assertIsNone(p.pickupState()[1])                 # not held
+        p.setIgnoreHID(True)                                  # the alt layer: the knob goes to 0.3
+        k.sweep([p], 0.7, 0.3, 0.01)
+        self.assertGreater(p.pickupState()[0], 0)             # it moved
+        p.setIgnoreHID(False)                                 # let go of Source
+        p.setResistVal(p.getPotValue())
+        p.getValue()
+        moved, gap, picked = p.pickupState()
+        self.assertEqual((moved, picked), (0.0, 0.0))         # earlier turns forgotten: no guide yet
+        self.assertAlmostEqual(gap, 0.4, delta=0.02)          # held 0.7, knob 0.3: higher
+        t0 = time.time()
+        k.sweep([p], 0.3, 0.5, 0.005)
+        moved, gap, picked = p.pickupState()
+        self.assertGreaterEqual(moved, t0)
+        self.assertAlmostEqual(gap, 0.2, delta=0.03)
+        self.assertEqual(picked, 0.0)
+        k.sweep([p], 0.5, 0.8, 0.005)                         # through 0.7: picked up
+        moved, gap, picked = p.pickupState()
+        self.assertIsNone(gap)
+        self.assertGreaterEqual(picked, t0)
+
+
+class TestPickupLeds(unittest.TestCase):
+    """uf2_3: real controlhandler + ui (stubbed hardware); the knobs' pickup states are scripted."""
+
+    def setUp(self):
+        TestSelector.setUp(self)
+        # Pd mode: the same main-knob path as normal mode (whose loop has stock Python 2 code: has_key)
+        self.ch.pdSock = FakePdSock()
+        self.ch.enterPureDataMode()
+        self.ch.getEditFunctionFlag = lambda name: False         # (stock has_key, Python 2 only): no animation
+        py2shim.FakeControlChannel.script = {"freeze": [1]}     # Freeze latched: its LED is on normally
+        py2shim.FakeControlChannel.pickup = {}
+
+    def tearDown(self):
+        py2shim.FakeControlChannel.pickup = {}
+        TestSelector.tearDown(self)
+
+    def tick(self, n=1):
+        TestSelector.tick(self, n)
+
+    def leds(self):
+        return TestSelector.leds(self)                          # record, file, source, reset, freeze
+
+    def at(self, now_ms):
+        self.ui.now = now_ms                                    # the blink phase, made deterministic
+        self.ui.show_pickup_guide()
+        return self.leds()
+
+    def test_main_knobs_after_source(self):
+        self.tick(2)
+        self.assertEqual(self.leds()[4], 1)                     # normal: Freeze's latch
+        t = time.time()
+        py2shim.FakeControlChannel.pickup = {"start": (t, -0.4, 0.0)}
+        self.tick()
+        self.assertEqual(self.at(0), [1.0, 0.0, self.leds()[2], 0.0, 0.0])    # much lower: Record blinks
+        self.assertEqual(self.at(60)[0], 0.0)
+        py2shim.FakeControlChannel.pickup = {"start": (t, 0.05, 0.0), "size": (t - 0.5, -0.4, 0.0)}
+        self.assertEqual(self.at(0), [0.0, 0.0, self.leds()[2], 1.0, 0.0])    # the latest knob: higher, Reset
+        py2shim.FakeControlChannel.pickup = {"start": (t, None, time.time())}
+        self.assertEqual(self.at(60), [1.0, 1.0, self.leds()[2], 1.0, 1.0])   # picked up: all four flash
+        py2shim.FakeControlChannel.pickup = {"start": (t - 2.0, -0.4, 0.0)}
+        self.tick()
+        self.assertEqual(self.leds()[4], 1)                     # stopped turning a while ago: normal LEDs
+
+    def test_alt_knobs_and_option_off(self):
+        self.tick(2)
+        self.ch.enterSecondaryMode()
+        t = time.time()
+        py2shim.FakeControlChannel.pickup = {"density": (t, 0.5, 0.0), "density_alt": (t, -0.05, 0.0)}
+        self.tick()
+        self.assertEqual(self.ch.mode(), "secondary controls")
+        self.assertEqual(self.at(0)[:2] + self.at(0)[3:], [0.0, 1.0, 0.0, 0.0])   # the alt knob's: File
+        self.ch.pickup_leds = False                             # pickup_leds=0
+        self.assertIsNone(self.ch.pickupGuide())
 
 
 class TestSelector(unittest.TestCase):
