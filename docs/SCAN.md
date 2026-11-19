@@ -58,6 +58,9 @@ Knock-on changes, because the motion is now slow:
 - The ring's mean motion is removed each update (a push could build it up for ever), and the guard eases the
   string back at most 0.5 % per update instead of rescaling it in one step.
 
+**Hardware 2026-11-19, the owner: "Scan is much improved."** Nothing more reported yet (see Hardware
+questions).
+
 ## Tests (2026-11-17: 14/14 in 6.18; 6.09.1 compiles, the strike identical)
 `wsl -u andy -- python3 /mnt/c/Users/andyu/Documents/NebulaePD/tools/scan_sim.py`; `python tools/scan_sim.py m609`.
 The new checks fail on the 2026-11-14 build (in brackets).
